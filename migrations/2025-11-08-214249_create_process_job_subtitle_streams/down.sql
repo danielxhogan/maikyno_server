@@ -1,0 +1,1 @@
+DROP TABLE process_job_subtitle_streams;

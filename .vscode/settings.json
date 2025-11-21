@@ -1,0 +1,10 @@
+{
+  "files.associations": {
+    "uuid.h": "c",
+    "dirent.h": "c",
+    "scan_movie_streams.h": "c",
+    "test_difficulty.h": "c",
+    "utils.h": "c",
+    "sqlite3.h": "c"
+  }
+}
