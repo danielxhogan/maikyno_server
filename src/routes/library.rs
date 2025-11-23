@@ -59,10 +59,12 @@ pub async fn new_library(new_library_info: web::Json<NewLibraryInfo>,
   }
 
   let root_library_dir = format!("{}/{}",
-    app_state.root_media_dir.to_str().unwrap(), new_library_info.name);
+    app_state.root_media_dir_string, new_library_info.name);
 
   if PathBuf::from(&root_library_dir).exists() {
-    let err_msg = format!("Library: {:?} already exists.", &new_library_info.name);
+    let err_msg = format!("Library: {:?} already exists.",
+    &new_library_info.name);
+
     eprintln!("{err_msg}");
     return Err(MKError::new(MKErrorType::LibraryAlreadyExists, err_msg).into())
   }
@@ -77,17 +79,19 @@ pub async fn new_library(new_library_info: web::Json<NewLibraryInfo>,
   let mut new_library_parent_dirs: ReadDir;
   let mut dir_entry: DirEntry;
   let mut new_library_dir_name: &OsStr;
-  let mut ino: Option<String>;
+  let mut ino_opt: Option<String>;
+  let mut ino: String;
   let mut device_id_metadata: Metadata;
-  let mut device_id: Option<String>;
+  let mut device_id_opt: Option<String>;
+  let mut device_id: String;
   let mut symlink_path: String;
   let mut static_path: String;
   let mut new_library_dir: NewLibraryDir;
   let mut new_library_dirs: Vec<NewLibraryDir> = vec![];
 
   for new_library_info_path in new_library_info.paths.clone() {
-    ino = None;
-    device_id = None;
+    ino_opt = None;
+    device_id_opt = None;
     new_library_path = PathBuf::from(&new_library_info_path);
 
     if !new_library_path.exists() {
@@ -172,7 +176,7 @@ pub async fn new_library(new_library_info: web::Json<NewLibraryInfo>,
       };
 
       if dir_entry.file_name() == new_library_dir_name.to_os_string() {
-        ino = Some(dir_entry.ino().to_string());
+        ino_opt = Some(dir_entry.ino().to_string());
 
         device_id_metadata = match dir_entry.metadata() {
           Ok(device_id_metadata) => { device_id_metadata },
@@ -194,13 +198,13 @@ pub async fn new_library(new_library_info: web::Json<NewLibraryInfo>,
           }
         };
 
-        device_id = Some(device_id_metadata.dev().to_string());
+        device_id_opt = Some(device_id_metadata.dev().to_string());
         break;
       }
     }
 
-    match ino {
-      Some(_) => {},
+    ino = match ino_opt {
+      Some(ino) => { ino },
       None => {
         err_msg = format!("{:?}: {:?}",
           MKErrorType::LibraryPathNotFoundError.to_string(), &new_library_path);
@@ -216,10 +220,10 @@ pub async fn new_library(new_library_info: web::Json<NewLibraryInfo>,
         return Err(MKError::new(
           MKErrorType::LibraryPathNotFoundError, err_msg).into());
       }
-    }
+    };
 
-    match device_id {
-      Some(_) => {},
+    device_id = match device_id_opt {
+      Some(device_id) => { device_id },
       None => {
         err_msg = format!("{:?}: {:?}",
           MKErrorType::LibraryPathNotFoundError.to_string(), &new_library_path);
@@ -235,22 +239,21 @@ pub async fn new_library(new_library_info: web::Json<NewLibraryInfo>,
         return Err(MKError::new(
           MKErrorType::LibraryPathNotFoundError, err_msg).into());
       }
-    }
+    };
 
     symlink_path = format!("{}/{}",
-      &root_library_dir, &new_library_dir_name.to_string_lossy());
+      root_library_dir, new_library_dir_name.to_string_lossy());
 
     static_path = format!("{}/{}",
       new_library_info.name, &new_library_dir_name.to_string_lossy());
 
     new_library_dir = NewLibraryDir {
-      name: new_library_dir_name.to_str().unwrap().to_string(),
+      name: new_library_dir_name.to_string_lossy().to_string(),
       real_path: new_library_info_path.clone(),
       symlink_path: symlink_path.clone(),
       static_path: static_path.clone(),
-      ino: ino.clone().unwrap(),
-      device_id: device_id.clone().unwrap(),
-      // library_id: None
+      ino: ino,
+      device_id: device_id,
     };
 
     new_library_dirs.push(new_library_dir);

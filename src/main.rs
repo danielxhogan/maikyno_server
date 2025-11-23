@@ -21,7 +21,8 @@ use std::{fs, env, path::PathBuf};
 
 #[derive(Debug, Clone)]
 pub struct AppState {
-  root_media_dir: PathBuf,
+  root_media_dir_pathbuf: PathBuf,
+  root_media_dir_string: String
 }
 
 #[actix_web::main]
@@ -30,13 +31,17 @@ async fn main() -> std::io::Result<()>
   let pool = db_pool_init();
 
   let home_dir = env::home_dir().expect("Failed to find home directory.");
-  let root_media_dir = home_dir.join("mk_media");
+  let root_media_dir_pathbuf = home_dir.join("mk_media");
 
-  fs::create_dir_all(&root_media_dir)
+  let root_media_dir_string = root_media_dir_pathbuf.to_str()
+    .expect("Home directory path must not contain non UTF-8 values").to_string();
+
+  fs::create_dir_all(&root_media_dir_pathbuf)
     .expect("Failed to establish root media directory.");
 
   let app_state = AppState {
-    root_media_dir: root_media_dir.clone(),
+    root_media_dir_pathbuf: root_media_dir_pathbuf.clone(),
+    root_media_dir_string: root_media_dir_string.clone()
   };
 
   return HttpServer::new(move || {
@@ -50,7 +55,7 @@ async fn main() -> std::io::Result<()>
       .service(process_media)
       .service(abort_batch)
       .service(af::Files::new("media",
-        root_media_dir.clone()));
+        root_media_dir_pathbuf.clone()));
     })
     .bind(("0.0.0.0", 8080))?.run().await;
 }

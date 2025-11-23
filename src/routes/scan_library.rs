@@ -232,11 +232,16 @@ async fn get_initial_collections(library: &Library, pool: &web::Data<DBPool>)
 
   let collections_seen: CollectionsSeen =
     library_collection_records.clone().into_iter()
-      .map(|collection|
-      {
+      .filter(|collection| {
+        collection.ino != None
+      })
+      .filter(|collection| {
+        collection.device_id != None
+      })
+      .map(|collection| {
         let direntry_id = DirEntryId {
-          ino: collection.ino.clone().unwrap().clone(),
-          device_id:  collection.device_id.clone().unwrap()
+          ino: collection.ino.clone().unwrap(),
+          device_id: collection.device_id.clone().unwrap()
         };
 
         let collection_seen = CollectionSeen {

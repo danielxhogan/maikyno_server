@@ -150,7 +150,18 @@ async fn scan_media_streams(
 {
   unsafe {
     let media_dir_id_c_str =
-      CString::new(scan_media_dir_streams_info.media_dir_id.clone()).unwrap();
+      match CString::new(scan_media_dir_streams_info.media_dir_id.clone()) {
+        Ok(media_dir_id_c_str) => { media_dir_id_c_str },
+        Err(err) => {
+          let err_msg = format!("{:?}\nError: {:?}",
+            MKErrorType::RustToCTypeConversionError.to_string(), err);
+
+          eprintln!("{err_msg}");
+          return Err(MKError::new(MKErrorType::RustToCTypeConversionError,
+            err_msg).into());
+        }
+      };
+
     let media_dir_id_c_char: *const c_char = media_dir_id_c_str.as_ptr();
     av::scan_media_streams(media_dir_id_c_char);
   }
@@ -220,8 +231,19 @@ pub async fn process_media(process_media_info: web::Json<ProcessMediaInfo>,
   }
 
   tokio::spawn(async move {
-    let batch_id_c_str = CString::new(batch.id.clone()).unwrap();
-    // let process_media_ret: c_int;
+
+    let batch_id_c_str =
+      match CString::new(batch.id.clone()) {
+        Ok(batch_id_c_str) => { batch_id_c_str },
+        Err(err) => {
+          let err_msg = format!("{:?}\nError: {:?}",
+            MKErrorType::RustToCTypeConversionError.to_string(), err);
+
+          eprintln!("{err_msg}");
+          return Err(MKError::new(MKErrorType::RustToCTypeConversionError,
+            err_msg).into());
+        }
+      };
 
     unsafe {
       let block_thread_result = web::block(move || {

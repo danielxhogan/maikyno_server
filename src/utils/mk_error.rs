@@ -14,9 +14,11 @@ pub enum MKErrorType
   #[display("Failed to execute database query")]
   DBError,
 
-
-  // fs
+  // library
   // ********************************************************
+  #[display("Home directory path must not contain non UTF-8 values")]
+  InvalidRootMediaDirStringError,
+
   #[display("Could not find library path")]
   LibraryPathNotFoundError,
 
@@ -26,6 +28,8 @@ pub enum MKErrorType
   #[display("Failed to create symbolic link for library")]
   LibrarySymlinkError,
 
+  // fs
+  // ********************************************************
   #[display("Failed to create directory")]
   CreateDirAllError,
 
@@ -50,6 +54,8 @@ pub enum MKErrorType
 
   // proc
   // ********************************************************
+  #[display("Failed to convert Rust variable to C type variable")]
+  RustToCTypeConversionError,
   // #[display("Failed to make clips for video")]
   // MakeClipsError,
 
@@ -102,13 +108,10 @@ impl error::ResponseError for MKError {
 
       // Library
       // ***********************************************************
+      MKErrorType::InvalidRootMediaDirStringError => StatusCode::BAD_REQUEST,
       MKErrorType::LibraryPathNotFoundError => StatusCode::BAD_REQUEST,
       MKErrorType::LibraryAlreadyExists => StatusCode::BAD_REQUEST,
       MKErrorType::LibrarySymlinkError => StatusCode::BAD_REQUEST,
-
-      // Shows
-      // ***********************************************************
-
 
       MKErrorType::DBError => StatusCode::BAD_REQUEST,
 
@@ -130,6 +133,7 @@ impl error::ResponseError for MKError {
 
       // proc
       // ********************************************************
+      MKErrorType::RustToCTypeConversionError => StatusCode::BAD_REQUEST,
       // MKErrorType::MakeClipsError => StatusCode::BAD_REQUEST,
       // MKErrorType::TestDifficultyError => StatusCode::BAD_REQUEST,
       // MKErrorType::ProcessJobBatchIdNotFound => StatusCode::BAD_REQUEST,

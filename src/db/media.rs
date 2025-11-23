@@ -311,19 +311,19 @@ pub fn update_video(pool: web::Data<DBPool>, update_video: UpdateVideo)
 
   let updated_video_result: Result<Video, MKError>;
 
-  let prev_video_result = videos::table
+  let prev_video = match videos::table
     .filter(videos::id.eq(&update_video.id))
     .get_result::<Video>(&mut db)
-    .map_err(|err| {
+  {
+    Ok(prev_video) => { prev_video },
+    Err(err) => {
       let err_msg = format!("Failed to get video:
         {:?}, {:?}\nError: {:?}", update_video.name, update_video.id, err);
 
       eprintln!("{err_msg:?}");
-      return MKError::new(MKErrorType::DBError, err_msg);
-    });
-
-  let prev_video = prev_video_result.unwrap();
-
+      return Err(MKError::new(MKErrorType::DBError, err_msg));
+    }
+  };
 
   let real_path = match update_video.real_path {
     Some(real_path) => { real_path },

@@ -52,7 +52,6 @@ pub struct NewLibraryDir {
   pub real_path: String,
   pub symlink_path: String,
   pub static_path: String,
-  // pub library_id: Option<String>
 }
 
 #[derive(Debug, Queryable, Insertable, Clone)]
