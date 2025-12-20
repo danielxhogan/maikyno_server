@@ -88,7 +88,8 @@ end:
 
 int calculate_pct_complete(InputContext *in_ctx, char *process_job_id)
 {
-  int duration, pct_complete, ret;
+  int ret;
+  int64_t duration, pct_complete;
 
   duration = av_rescale_q(in_ctx->fmt_ctx->duration, AV_TIME_BASE_Q,
     in_ctx->fmt_ctx->streams[in_ctx->pkt->stream_index]->time_base);
@@ -99,7 +100,10 @@ int calculate_pct_complete(InputContext *in_ctx, char *process_job_id)
     if ((ret = update_pct_complete(pct_complete, process_job_id)) < 0) {
       fprintf(stderr, "Failed to update pct_complete for process_job: %s\n",
         process_job_id);
+      return ret;
     }
+
+    return 0;
 }
 
 int update_pct_complete(int64_t pct, char *process_job_id)
@@ -117,7 +121,6 @@ int update_pct_complete(int64_t pct, char *process_job_id)
   {
     fprintf(stderr, "Failed to open database: %s\nError: %s\n",
       DATABASE_URL, sqlite3_errmsg(db));
-    ret = -ret;
     goto end;
   }
 
@@ -126,7 +129,6 @@ int update_pct_complete(int64_t pct, char *process_job_id)
   {
     fprintf(stderr, "Failed to prepare update pct_complete statement. \
       \nError: %s\n", sqlite3_errmsg(db));
-    if (ret > 0) ret = -ret;
     goto end;
   }
 
@@ -138,12 +140,14 @@ int update_pct_complete(int64_t pct, char *process_job_id)
     fprintf(stderr,
       "Failed to update pct_complete for process_job: %s\nError: %s\n",
       process_job_id, sqlite3_errmsg(db));
-    if (ret > 0) ret = -ret;
     goto end;
   }
 
 end:
   sqlite3_finalize(update_pct_complete_stmt);
   sqlite3_close(db);
-  return ret;
+
+  if (ret != SQLITE_DONE) { return -ret; }
+  return 0;
 }
+
