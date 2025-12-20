@@ -224,15 +224,15 @@ int process_video(char *process_job_id, const char *batch_id)
   if (!(in_ctx = open_input(process_job_id, db))) {
     fprintf(stderr, "Failed to open input for process job: %s.\n",
       process_job_id);
-    ret = AVERROR_UNKNOWN;
-    goto end;
+    ret = -1;
+    goto update_status;
   }
 
   if (!(out_ctx = open_output(in_ctx, process_job_id, db))) {
     fprintf(stderr, "Failed to open output for process job: %s.\n",
       process_job_id);
-    ret = AVERROR_UNKNOWN;
-    goto end;
+    ret = -1;
+    goto update_status;
   }
 
   sqlite3_close(db);
@@ -261,7 +261,7 @@ int process_video(char *process_job_id, const char *batch_id)
         else {
           fprintf(stderr, "Failed to check abort status for batch: %s\n",
             batch_id);
-          goto end;
+          goto flush;
         }
       }
     }
@@ -294,7 +294,7 @@ int process_video(char *process_job_id, const char *batch_id)
         av_interleaved_write_frame(out_ctx->fmt_ctx, in_ctx->pkt)) < 0)
       {
         fprintf(stderr, "Failed to write packet to file.\n");
-        goto end;
+        goto flush;
       }
       continue;
     }
@@ -322,6 +322,7 @@ int process_video(char *process_job_id, const char *batch_id)
           fprintf(stderr,
             "Failed to encode video frame from input stream: %d.\n",
             in_stream_idx);
+          goto flush;
         }
       }
       else if (codec_type == AVMEDIA_TYPE_AUDIO)
@@ -331,6 +332,7 @@ int process_video(char *process_job_id, const char *batch_id)
           fprintf(stderr,
             "Failed to encode audio frame from input stream: %d.\n",
             in_stream_idx);
+          goto flush;
         }
       }
     }
@@ -339,13 +341,13 @@ int process_video(char *process_job_id, const char *batch_id)
       fprintf(stderr,
         "Failed to receive frame from input stream: %d from decoder.\n",
         in_ctx->pkt->stream_index);
-      goto end;
+      goto flush;
     }
   }
 
   if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
     fprintf(stderr, "Failed to read frame.\n");
-    goto end;
+    goto flush;
   }
 
 flush:
@@ -357,41 +359,37 @@ flush:
     out_stream_idx = in_ctx->map[in_stream_idx];
 
     if (in_ctx->dec_ctx[in_stream_idx]) {
-      if ((ret = avcodec_send_packet(in_ctx->dec_ctx[in_stream_idx], NULL)) < 0)
+      if (avcodec_send_packet(in_ctx->dec_ctx[in_stream_idx], NULL) < 0)
       {
         fprintf(stderr, "Failed to send packet to decoder.\n");
-        goto end;
+        continue;
       }
 
-      while ((ret =
-        avcodec_receive_frame(in_ctx->dec_ctx[in_stream_idx],
-          in_ctx->dec_frame)) >= 0)
+      while (avcodec_receive_frame(in_ctx->dec_ctx[in_stream_idx],
+          in_ctx->dec_frame) >= 0)
       {
         codec_type = in_ctx->dec_ctx[in_stream_idx]->codec_type;
 
         if (codec_type == AVMEDIA_TYPE_VIDEO)
         {
-          if ((ret = encode_video_frame(out_ctx, out_stream_idx,
-            in_ctx, in_stream_idx)) < 0)
+          if (encode_video_frame(out_ctx, out_stream_idx,
+            in_ctx, in_stream_idx) < 0)
           {
             fprintf(stderr,
               "Failed to encode video frame from input stream: %d.\n",
               in_stream_idx);
+            break;
           }
         }
         else if (codec_type == AVMEDIA_TYPE_AUDIO)
         {
-          if ((ret = encode_audio_frame(out_ctx, out_stream_idx, in_ctx, 0)) < 0) {
+          if (encode_audio_frame(out_ctx, out_stream_idx, in_ctx, 0) < 0) {
             fprintf(stderr,
               "Failed to encode audio frame from input stream: %d.\n",
               in_stream_idx);
+            break;
           }
         }
-      }
-
-      if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
-        fprintf(stderr, "Failed to receive frame from decoder.\n");
-        goto end;
       }
     }
   }
@@ -403,14 +401,15 @@ flush:
   ) {
     out_stream_idx = in_ctx->map[in_stream_idx];
 
-    if (in_ctx->dec_ctx[in_stream_idx]) {
+    if (in_ctx->dec_ctx[in_stream_idx])
+    {
       codec_type = out_ctx->enc_ctx[out_stream_idx]->codec_type;
       in_ctx->dec_frame = NULL;
 
       if (codec_type == AVMEDIA_TYPE_VIDEO)
       {
-        if ((ret = encode_video_frame(out_ctx, out_stream_idx,
-          in_ctx, in_stream_idx)) < 0)
+        if (encode_video_frame(out_ctx, out_stream_idx,
+          in_ctx, in_stream_idx) < 0)
         {
           fprintf(stderr,
             "Failed to encode video frame from input stream: %d.\n",
@@ -419,7 +418,8 @@ flush:
       }
       else if (codec_type == AVMEDIA_TYPE_AUDIO)
       {
-        if ((ret = encode_audio_frame(out_ctx, out_stream_idx, in_ctx, 1)) < 0) {
+        if (encode_audio_frame(out_ctx, out_stream_idx, in_ctx, 1) < 0)
+        {
           fprintf(stderr,
             "Failed to encode audio frame from input stream: %d.\n",
             in_stream_idx);
@@ -430,34 +430,16 @@ flush:
 
   printf("pct_complete: 100%%\n");
 
-  if ((ret = av_write_trailer(out_ctx->fmt_ctx)) < 0) {
+  if (av_write_trailer(out_ctx->fmt_ctx) < 0) {
     fprintf(stderr, "Failed to write trailer to file.\n");
-    goto end;
   }
 
-  if ((ret = update_pct_complete(100, process_job_id)) < 0) {
+  if (update_pct_complete(100, process_job_id) < 0) {
     fprintf(stderr, "Failed to update pct_complete to 100%% for process_job: %s\n",
       process_job_id);
   }
 
-end:
-  if ((end_ret = sqlite3_open(DATABASE_URL, &db)) != SQLITE_OK)
-  {
-    fprintf(stderr, "Failed to open database: %s\nError: %s\n",
-      DATABASE_URL, sqlite3_errmsg(db));
-    end_ret = -end_ret;
-    return end_ret;
-  }
-
-  if ((end_ret = sqlite3_prepare_v2(db, update_process_job_status_query, -1,
-    &update_process_job_status_stmt, 0)) != SQLITE_OK)
-  {
-    fprintf(stderr, "Failed to prepare update process job status statement. \
-      \nError: %s\n", sqlite3_errmsg(db));
-    end_ret = -end_ret;
-    return end_ret;
-  }
-
+update_status:
   if (aborted) {
     if (update_process_job_status(process_job_id, ABORTED) < 0) {
       fprintf(stderr, "Failed to update process job status \
@@ -477,14 +459,16 @@ end:
     }
   }
 
-  sqlite3_finalize(update_process_job_status_stmt);
+fm:
   sqlite3_close(db);
-
   close_input(in_ctx);
   close_output(out_ctx);
 
   if (aborted) return ABORTED;
-  return ret;
+  if ((ret < 0 && ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
+    return ret;
+  }
+  return 0;
 }
 
 int process_media(const char *batch_id)
