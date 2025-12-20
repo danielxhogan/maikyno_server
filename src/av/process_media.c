@@ -164,8 +164,8 @@ int decode_packet(InputContext *in_ctx, OutputContext *out_ctx)
       if ((ret = encode_video_frame(out_ctx, out_stream_idx,
         in_ctx, in_stream_idx)) < 0)
       {
-        fprintf(stderr, "Failed to encode video frame from input stream: %d.\n\
-          Error: %s.\n", in_stream_idx, av_err2str(ret));
+        fprintf(stderr, "Failed to encode video frame from input stream: %d.\n",
+          in_stream_idx);
         return ret;
       }
     }
@@ -173,16 +173,68 @@ int decode_packet(InputContext *in_ctx, OutputContext *out_ctx)
     {
       if ((ret = encode_audio_frame(out_ctx, out_stream_idx, in_ctx, 0)) < 0)
       {
-        fprintf(stderr, "Failed to encode audio frame from input stream: %d.\n\
-          Error: %s.\n", in_stream_idx, av_err2str(ret));
+        fprintf(stderr, "Failed to encode audio frame from input stream: %d.\n\n",
+          in_stream_idx);
         return ret;
       }
     }
   }
 
   if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
-    fprintf(stderr, "Failed to receive frame from \
-      input stream: %d from decoder.\n", in_ctx->pkt->stream_index);
+    fprintf(stderr, "Failed to receive frame from input stream: %d \
+      from decoder.\nError: %s.\n", in_ctx->pkt->stream_index, av_err2str(ret));
+    return ret;
+  }
+
+  return 0;
+}
+
+int transcode(InputContext *in_ctx, OutputContext *out_ctx,
+  const char *batch_id, char *process_job_id)
+{
+  int frame_count, ret = 0;
+  while ((ret = av_read_frame(in_ctx->fmt_ctx, in_ctx->pkt)) >= 0)
+  {
+    int in_stream_idx = in_ctx->pkt->stream_index;
+    int out_stream_idx = in_ctx->map[in_stream_idx];
+
+    if (out_stream_idx == INACTIVE_STREAM) {
+      av_packet_unref(in_ctx->pkt);
+      continue;
+    }
+
+    frame_count += 1;
+    if (frame_count % 500 == 0) {
+      if (check_abort_status(batch_id) == ABORTED) {
+        return ABORTED;
+      }
+
+      if (calculate_pct_complete(in_ctx, process_job_id) < 0) {
+        fprintf(stderr, "Failed to calculate percent complete.\n");
+      }
+    }
+
+    if (!in_ctx->dec_ctx[in_stream_idx]) {
+      in_ctx->pkt->stream_index = out_stream_idx;
+
+      if ((ret =
+        av_interleaved_write_frame(out_ctx->fmt_ctx, in_ctx->pkt)) < 0)
+      {
+        fprintf(stderr, "Failed to write packet to file.\nError: %s.\n",
+          av_err2str(ret));
+        return ret;
+      }
+      continue;
+    }
+
+    if ((ret = decode_packet(in_ctx, out_ctx)) < 0) {
+      fprintf(stderr, "Failed to decode packet.\n");
+      return ret;
+    }
+  }
+
+  if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
+    fprintf(stderr, "Failed to read frame.\nError: %s.\n", av_err2str(ret));
     return ret;
   }
 
@@ -191,14 +243,9 @@ int decode_packet(InputContext *in_ctx, OutputContext *out_ctx)
 
 int process_video(char *process_job_id, const char *batch_id)
 {
-  int aborted = 0, frame_count = 0, ret;
+  int ret;
 
-  if ((ret = check_abort_status(batch_id)) < 0) {
-    if (ret != ABORTED) {
-      fprintf(stderr, "Failed to check abort status for process_job: %s\n",
-        batch_id);
-    }
-    aborted = 1;
+  if ((ret = check_abort_status(batch_id)) == ABORTED) {
     goto update_status;
   }
 
@@ -238,54 +285,10 @@ int process_video(char *process_job_id, const char *batch_id)
   sqlite3_close(db);
   db = NULL;
 
-  while ((ret = av_read_frame(in_ctx->fmt_ctx, in_ctx->pkt)) >= 0)
-  {
-    in_stream_idx = in_ctx->pkt->stream_index;
-    out_stream_idx = in_ctx->map[in_stream_idx];
-    codec_type =
-      in_ctx->fmt_ctx->streams[in_ctx->pkt->stream_index]->codecpar->codec_type;
-
-    if (out_stream_idx == INACTIVE_STREAM) {
-      av_packet_unref(in_ctx->pkt);
-      continue;
-    }
-
-    frame_count += 1;
-    if (frame_count % 500 == 0) {
-      if (check_abort_status(batch_id) == ABORTED) {
-        aborted = 1;
-        goto flush;
-      }
-
-      if (calculate_pct_complete(in_ctx, process_job_id) < 0) {
-        fprintf(stderr, "Failed to calculate percent complete.\n");
-      }
-    }
-
-    if (!in_ctx->dec_ctx[in_stream_idx]) {
-      in_ctx->pkt->stream_index = out_stream_idx;
-
-      if ((ret =
-        av_interleaved_write_frame(out_ctx->fmt_ctx, in_ctx->pkt)) < 0)
-      {
-        fprintf(stderr, "Failed to write packet to file.\n");
-        goto flush;
-      }
-      continue;
-    }
-
-    if ((ret = decode_packet(in_ctx, out_ctx)) < 0) {
-      fprintf(stderr, "Failed to decode packet.\n");
-      goto flush;
-    }
+  if ((ret = transcode(in_ctx, out_ctx, batch_id, process_job_id)) < 0) {
+    fprintf(stderr, "Failed to transcode process job: %s.\n", process_job_id);
   }
 
-  if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
-    fprintf(stderr, "Failed to read frame.\n");
-    goto flush;
-  }
-
-flush:
   for (
     in_stream_idx = 0;
     in_stream_idx < (int) in_ctx->fmt_ctx->nb_streams;
@@ -367,7 +370,7 @@ flush:
     fprintf(stderr, "Failed to write trailer to file.\n");
   }
 
-  if (!aborted) {
+  if (ret != ABORTED) {
     printf("pct_complete: 100%%\n");
 
     if (update_pct_complete(100, process_job_id) < 0) {
@@ -377,7 +380,7 @@ flush:
   }
 
 update_status:
-  if (aborted)
+  if (ret == ABORTED)
   {
     if (update_process_job_status(process_job_id, ABORTED) < 0) {
       fprintf(stderr, "Failed to update process job status \
@@ -400,7 +403,6 @@ update_status:
   close_input(in_ctx);
   close_output(out_ctx);
 
-  if (aborted) return ABORTED;
   if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
     return ret;
   }
