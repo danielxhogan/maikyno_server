@@ -151,3 +151,50 @@ end:
   return 0;
 }
 
+int update_process_job_status(char *process_job_id, enum ProcessJobStatus status)
+{
+  int ret = 0;
+  sqlite3 *db;
+
+  char *update_process_job_status_query =
+    "UPDATE process_jobs \
+    SET job_status = ? \
+    WHERE id = ?;";
+  sqlite3_stmt *update_process_job_status_stmt = NULL;
+
+  if ((ret = sqlite3_open(DATABASE_URL, &db)) != SQLITE_OK)
+  {
+    fprintf(stderr, "Failed to open database: %s\nError: %s\n",
+      DATABASE_URL, sqlite3_errmsg(db));
+    goto end;
+  }
+
+  if ((ret = sqlite3_prepare_v2(db, update_process_job_status_query, -1,
+    &update_process_job_status_stmt, 0)) != SQLITE_OK)
+  {
+    fprintf(stderr, "Failed to prepare update process job status statement. \
+      \nError: %s\n", sqlite3_errmsg(db));
+    goto end;
+  }
+
+  printf("status string: %s\n", job_status_enum_to_string(status));
+
+  sqlite3_bind_text(update_process_job_status_stmt, 1,
+    job_status_enum_to_string(status), -1, SQLITE_STATIC);
+
+  sqlite3_bind_text(update_process_job_status_stmt, 2, process_job_id,
+    -1, SQLITE_STATIC);
+
+  if ((ret = sqlite3_step(update_process_job_status_stmt)) != SQLITE_DONE) {
+    fprintf(stderr, "Failed to update status for process_job: \
+      %s\nError: %s\n", process_job_id, sqlite3_errmsg(db));
+    goto end;
+  }
+
+end:
+  sqlite3_finalize(update_process_job_status_stmt);
+  sqlite3_close(db);
+
+  if (ret != SQLITE_DONE) { return -ret; }
+  return 0;
+}
