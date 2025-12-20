@@ -387,7 +387,6 @@ update_status:
     }
   }
 
-fm:
   sqlite3_close(db);
   close_input(in_ctx);
   close_output(out_ctx);
