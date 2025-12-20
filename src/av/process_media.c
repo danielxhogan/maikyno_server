@@ -242,8 +242,8 @@ int process_video(char *process_job_id, const char *batch_id)
   {
     in_stream_idx = in_ctx->pkt->stream_index;
     out_stream_idx = in_ctx->map[in_stream_idx];
-    codec_type = in_ctx->fmt_ctx->streams[in_ctx->pkt->stream_index]
-      ->codecpar->codec_type;
+    codec_type =
+      in_ctx->fmt_ctx->streams[in_ctx->pkt->stream_index]->codecpar->codec_type;
 
     if (out_stream_idx == INACTIVE_STREAM) {
       av_packet_unref(in_ctx->pkt);
