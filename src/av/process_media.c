@@ -140,7 +140,7 @@ static int encode_audio_frame(OutputContext *out_ctx, int out_stream_idx,
 
 int process_video(char *process_job_id, const char *batch_id)
 {
-  int aborted = 0, ret;
+  int aborted = 0, frame_count = 0, ret;
 
   if ((ret = check_abort_status(batch_id)) < 0) {
     if (ret != ABORTED) {
@@ -151,10 +151,7 @@ int process_video(char *process_job_id, const char *batch_id)
     goto update_status;
   }
 
-  int in_stream_idx, out_stream_idx, frame_count = 0,
-    status_checks_ldr = 0, status_check_flr = 0;
-
-  int64_t duration = -1, pct_complete;
+  int in_stream_idx, out_stream_idx;
 
   InputContext *in_ctx = NULL;
   OutputContext *out_ctx = NULL;
@@ -204,7 +201,6 @@ int process_video(char *process_job_id, const char *batch_id)
     }
 
     frame_count += 1;
-
     if (frame_count % 500 == 0) {
       if (check_abort_status(batch_id) == ABORTED) {
         aborted = 1;
