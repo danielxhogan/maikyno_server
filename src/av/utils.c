@@ -177,8 +177,6 @@ int update_process_job_status(char *process_job_id, enum ProcessJobStatus status
     goto end;
   }
 
-  printf("status string: %s\n", job_status_enum_to_string(status));
-
   sqlite3_bind_text(update_process_job_status_stmt, 1,
     job_status_enum_to_string(status), -1, SQLITE_STATIC);
 
