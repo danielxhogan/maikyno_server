@@ -354,15 +354,17 @@ flush:
     }
   }
 
-  printf("pct_complete: 100%%\n");
-
   if (av_write_trailer(out_ctx->fmt_ctx) < 0) {
     fprintf(stderr, "Failed to write trailer to file.\n");
   }
 
-  if (update_pct_complete(100, process_job_id) < 0) {
-    fprintf(stderr, "Failed to update pct_complete to 100%% for process_job: %s\n",
-      process_job_id);
+  if (!aborted) {
+    printf("pct_complete: 100%%\n");
+
+    if (update_pct_complete(100, process_job_id) < 0) {
+      fprintf(stderr, "Failed to update pct_complete to 100%% for process_job: %s\n",
+        process_job_id);
+    }
   }
 
 update_status:
