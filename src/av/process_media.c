@@ -138,28 +138,9 @@ static int encode_audio_frame(OutputContext *out_ctx, int out_stream_idx,
   return 0;
 }
 
-int process_video(char *process_job_id, const char *batch_id)
+int update_process_job_status(char *process_job_id, enum ProcessJobStatus status)
 {
-  int aborted = 0, ret;
-
-  if ((ret = check_abort_status(batch_id)) < 0) {
-    if (ret != ABORTED) {
-      fprintf(stderr, "Failed to check abort status for process_job: %s\n",
-        batch_id);
-    }
-    aborted = 1;
-    goto end;
-  }
-
-  int in_stream_idx, out_stream_idx, frame_count = 0,
-    status_checks_ldr = 0, status_check_flr = 0, end_ret;
-
-  int64_t duration = -1, pct_complete;
-
-  InputContext *in_ctx = NULL;
-  OutputContext *out_ctx = NULL;
-  enum AVMediaType codec_type;
-
+  int ret = 0;
   sqlite3 *db;
 
   char *update_process_job_status_query =
@@ -186,7 +167,7 @@ int process_video(char *process_job_id, const char *batch_id)
   }
 
   sqlite3_bind_text(update_process_job_status_stmt, 1,
-    job_status_enum_to_string(PROCESSING), -1, SQLITE_STATIC);
+    job_status_enum_to_string(status), -1, SQLITE_STATIC);
 
   sqlite3_bind_text(update_process_job_status_stmt, 2, process_job_id,
     -1, SQLITE_STATIC);
@@ -198,8 +179,47 @@ int process_video(char *process_job_id, const char *batch_id)
     goto end;
   }
 
+end:
   sqlite3_finalize(update_process_job_status_stmt);
-  update_process_job_status_stmt = NULL;
+  sqlite3_close(db);
+  return ret;
+}
+
+int process_video(char *process_job_id, const char *batch_id)
+{
+  int aborted = 0, ret;
+
+  if ((ret = check_abort_status(batch_id)) < 0) {
+    if (ret != ABORTED) {
+      fprintf(stderr, "Failed to check abort status for process_job: %s\n",
+        batch_id);
+    }
+    aborted = 1;
+    goto update_status;
+  }
+
+  int in_stream_idx, out_stream_idx, frame_count = 0,
+    status_checks_ldr = 0, status_check_flr = 0;
+
+  int64_t duration = -1, pct_complete;
+
+  InputContext *in_ctx = NULL;
+  OutputContext *out_ctx = NULL;
+  enum AVMediaType codec_type;
+  sqlite3 *db;
+
+  if (update_process_job_status(process_job_id, PROCESSING) < 0) {
+    fprintf(stderr, "Failed to update process job status \
+      for process job: %s\n", process_job_id);
+  }
+
+  if ((ret = sqlite3_open(DATABASE_URL, &db)) != SQLITE_OK)
+  {
+    fprintf(stderr, "Failed to open database: %s\nError: %s\n",
+      DATABASE_URL, sqlite3_errmsg(db));
+    ret = -ret;
+    goto update_status;
+  }
 
   if (!(in_ctx = open_input(process_job_id, db))) {
     fprintf(stderr, "Failed to open input for process job: %s.\n",
@@ -439,45 +459,21 @@ end:
   }
 
   if (aborted) {
-    sqlite3_bind_text(update_process_job_status_stmt, 1,
-      job_status_enum_to_string(ABORTED), -1, SQLITE_STATIC);
-
-  sqlite3_bind_text(update_process_job_status_stmt, 2, process_job_id,
-    -1, SQLITE_STATIC);
-
-    if ((end_ret = sqlite3_step(update_process_job_status_stmt)) != SQLITE_DONE) {
-      fprintf(stderr, "Failed to update status for process_job: \
-        %s\nError: %s\n", process_job_id, sqlite3_errmsg(db));
-      end_ret = -end_ret;
-      return end_ret;
+    if (update_process_job_status(process_job_id, ABORTED) < 0) {
+      fprintf(stderr, "Failed to update process job status \
+        for process job: %s\n", process_job_id);
     }
   }
   else if (ret < 0) {
-    sqlite3_bind_text(update_process_job_status_stmt, 1,
-      job_status_enum_to_string(FAILED), -1, SQLITE_STATIC);
-
-  sqlite3_bind_text(update_process_job_status_stmt, 2, process_job_id,
-    -1, SQLITE_STATIC);
-
-    if ((end_ret = sqlite3_step(update_process_job_status_stmt)) != SQLITE_DONE) {
-      fprintf(stderr, "Failed to update status for process_job: \
-        %s\nError: %s\n", process_job_id, sqlite3_errmsg(db));
-      end_ret = -end_ret;
-      return end_ret;
+    if (update_process_job_status(process_job_id, FAILED) < 0) {
+      fprintf(stderr, "Failed to update process job status \
+        for process job: %s\n", process_job_id);
     }
   }
   else {
-    sqlite3_bind_text(update_process_job_status_stmt, 1,
-      job_status_enum_to_string(COMPLETE), -1, SQLITE_STATIC);
-
-  sqlite3_bind_text(update_process_job_status_stmt, 2, process_job_id,
-    -1, SQLITE_STATIC);
-
-    if ((end_ret = sqlite3_step(update_process_job_status_stmt)) != SQLITE_DONE) {
-      fprintf(stderr, "Failed to update status for process_job: \
-        %s\nError: %s\n", process_job_id, sqlite3_errmsg(db));
-      end_ret = -end_ret;
-      return end_ret;
+    if (update_process_job_status(process_job_id, COMPLETE) < 0) {
+      fprintf(stderr, "Failed to update process job status \
+        for process job: %s\n", process_job_id);
     }
   }
 
