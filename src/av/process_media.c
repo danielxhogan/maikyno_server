@@ -306,13 +306,14 @@ int process_video(char *process_job_id, const char *batch_id)
       fprintf(stderr,
         "Failed to send packet from input stream: %d to decoder.\n",
         in_stream_idx);
-      goto end;
+      goto flush;
     }
 
     while ((ret =
       avcodec_receive_frame(in_ctx->dec_ctx[in_stream_idx],
         in_ctx->dec_frame)) >= 0)
     {
+      in_ctx->dec_frame->pict_type = AV_PICTURE_TYPE_NONE;
 
       if (codec_type == AVMEDIA_TYPE_VIDEO)
       {
