@@ -253,37 +253,13 @@ int process_video(char *process_job_id, const char *batch_id)
     frame_count += 1;
 
     if (frame_count % 500 == 0) {
-      if ((ret = check_abort_status(batch_id)) < 0) {
-        if (ret == ABORTED) {
-          aborted = 1;
-          goto flush;
-        }
-        else {
-          fprintf(stderr, "Failed to check abort status for batch: %s\n",
-            batch_id);
-          goto flush;
-        }
+      if (check_abort_status(batch_id) == ABORTED) {
+        aborted = 1;
+        goto flush;
       }
-    }
 
-    if (frame_count % 500 == 0 || status_checks_ldr > status_check_flr) {
-      if (frame_count % 500 == 0) { status_checks_ldr += 1; }
-
-      if (codec_type == AVMEDIA_TYPE_VIDEO) {
-        status_check_flr += 1;
-
-        if (duration == -1) {
-          duration = av_rescale_q(in_ctx->fmt_ctx->duration, AV_TIME_BASE_Q,
-            in_ctx->fmt_ctx->streams[in_ctx->pkt->stream_index]->time_base);
-        }
-
-        pct_complete = in_ctx->pkt->pts * 100 / duration;
-        printf("pct_complete: %ld%%\n", pct_complete);
-
-        if ((ret = update_pct_complete(pct_complete, process_job_id)) < 0) {
-          fprintf(stderr, "Failed to update pct_complete for process_job: %s\n",
-            process_job_id);
-        }
+      if (calculate_pct_complete(in_ctx, process_job_id) < 0) {
+        fprintf(stderr, "Failed to calculate percent complete.\n");
       }
     }
 

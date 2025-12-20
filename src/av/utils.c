@@ -86,6 +86,22 @@ end:
   return ret;
 }
 
+int calculate_pct_complete(InputContext *in_ctx, char *process_job_id)
+{
+  int duration, pct_complete, ret;
+
+  duration = av_rescale_q(in_ctx->fmt_ctx->duration, AV_TIME_BASE_Q,
+    in_ctx->fmt_ctx->streams[in_ctx->pkt->stream_index]->time_base);
+
+    pct_complete = in_ctx->pkt->pts * 100 / duration;
+    printf("pct_complete: %ld%%\n", pct_complete);
+
+    if ((ret = update_pct_complete(pct_complete, process_job_id)) < 0) {
+      fprintf(stderr, "Failed to update pct_complete for process_job: %s\n",
+        process_job_id);
+    }
+}
+
 int update_pct_complete(int64_t pct, char *process_job_id)
 {
   int ret;
