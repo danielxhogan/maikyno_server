@@ -368,19 +368,19 @@ flush:
   }
 
 update_status:
-  if (aborted) {
+  if (aborted)
+  {
     if (update_process_job_status(process_job_id, ABORTED) < 0) {
       fprintf(stderr, "Failed to update process job status \
         for process job: %s\n", process_job_id);
     }
-  }
-  else if (ret < 0) {
+  } else if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF)
+  {
     if (update_process_job_status(process_job_id, FAILED) < 0) {
       fprintf(stderr, "Failed to update process job status \
         for process job: %s\n", process_job_id);
     }
-  }
-  else {
+  } else {
     if (update_process_job_status(process_job_id, COMPLETE) < 0) {
       fprintf(stderr, "Failed to update process job status \
         for process job: %s\n", process_job_id);
@@ -393,7 +393,7 @@ fm:
   close_output(out_ctx);
 
   if (aborted) return ABORTED;
-  if ((ret < 0 && ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
+  if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
     return ret;
   }
   return 0;
