@@ -1,7 +1,7 @@
 #include "process_media.h"
 
-static int encode_video_frame(OutputContext *out_ctx, int out_stream_idx,
-  InputContext *in_ctx, int in_stream_idx)
+static int encode_video_frame(InputContext *in_ctx, OutputContext *out_ctx,
+  int in_stream_idx, int out_stream_idx)
 {
   int ret;
 
@@ -35,9 +35,17 @@ static int encode_video_frame(OutputContext *out_ctx, int out_stream_idx,
   return 0;
 }
 
-int write_audio_frame(OutputContext *out_ctx, int out_stream_idx)
+int encode_audio_frame(OutputContext *out_ctx,
+  int out_stream_idx, AVFrame *frame)
 {
-  int ret;
+  int ret = 0;
+
+  if ((ret = avcodec_send_frame(out_ctx->enc_ctx[out_stream_idx], frame)) < 0)
+  {
+    fprintf(stderr, "Failed to send frame to encoder.\nError: %s.\n",
+      av_err2str(ret));
+    return ret;
+  }
 
   while ((ret = avcodec_receive_packet(
     out_ctx->enc_ctx[out_stream_idx], out_ctx->enc_pkt)) >= 0)
@@ -51,45 +59,31 @@ int write_audio_frame(OutputContext *out_ctx, int out_stream_idx)
     if ((ret =
       av_interleaved_write_frame(out_ctx->fmt_ctx, out_ctx->enc_pkt)) < 0)
     {
-      fprintf(stderr, "Failed to write packet to file.\n");
+      fprintf(stderr, "Failed to write packet to file.\nError: %s.\n",
+        av_err2str(ret));
       return ret;
     }
   }
 
   if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
-    fprintf(stderr, "Failed to receive packet from encoder.\n");
+    fprintf(stderr, "Failed to receive packet from encoder.\nError: %s.\n",
+      av_err2str(ret));
     return ret;
   }
 
   return 0;
 }
 
-static int encode_audio_frame(OutputContext *out_ctx, int out_stream_idx,
-  InputContext *in_ctx, int flush_enc)
+static int resample_audio_frame(InputContext *in_ctx, OutputContext *out_ctx,
+  int out_stream_idx)
 {
   int ret, nb_converted_samples;
-
-  if (flush_enc) {
-    if ((ret =
-      avcodec_send_frame(out_ctx->enc_ctx[out_stream_idx], in_ctx->dec_frame)) < 0)
-    {
-      fprintf(stderr, "Failed to send frame to encoder.\n");
-      return ret;
-    }
-
-    if ((ret = write_audio_frame(out_ctx, out_stream_idx)) < 0) {
-      fprintf(stderr, "Failed to write audio frame while flushing encoder.\n");
-      return ret;
-    }
-
-    return 0;
-  }
 
   AVFrame *swr_frame = out_ctx->swr_frame[out_stream_idx];
   FrameSizeConversionContext *fsc_ctx = out_ctx->fsc_ctx[out_stream_idx];
 
   if ((ret = av_frame_make_writable(swr_frame)) < 0) {
-    fprintf(stderr, "Failed to make frame writable.\n");
+    fprintf(stderr, "Failed to make frame writable.\nError: %s.\n", av_err2str(ret));
     return ret;
   }
 
@@ -98,7 +92,7 @@ static int encode_audio_frame(OutputContext *out_ctx, int out_stream_idx,
       swr_frame->nb_samples, (const uint8_t **) in_ctx->dec_frame->data,
       in_ctx->dec_frame->nb_samples)) < 0)
   {
-    fprintf(stderr, "Failed to convert audio frame.\n");
+    fprintf(stderr, "Failed to convert audio frame.\nError: %s.\n", av_err2str(ret));
     return ret;
   }
 
@@ -122,14 +116,9 @@ static int encode_audio_frame(OutputContext *out_ctx, int out_stream_idx,
     out_ctx->nb_samples_encoded[out_stream_idx] +=
       out_ctx->enc_ctx[out_stream_idx]->frame_size;
 
-    if ((ret =
-      avcodec_send_frame(out_ctx->enc_ctx[out_stream_idx], fsc_ctx->frame)) < 0)
+    if ((ret = encode_audio_frame(out_ctx,
+      out_stream_idx, fsc_ctx->frame)) < 0)
     {
-      fprintf(stderr, "Failed to send frame to encoder.\n");
-      return ret;
-    }
-
-    if ((ret = write_audio_frame(out_ctx, out_stream_idx)) < 0) {
       fprintf(stderr, "Failed to write audio frame.\n");
       return ret;
     }
@@ -138,11 +127,10 @@ static int encode_audio_frame(OutputContext *out_ctx, int out_stream_idx,
   return 0;
 }
 
-int decode_packet(InputContext *in_ctx, OutputContext *out_ctx)
+int decode_packet(InputContext *in_ctx, OutputContext *out_ctx,
+  int in_stream_idx, int out_stream_idx)
 {
   int ret = 0;
-  int in_stream_idx = in_ctx->pkt->stream_index;
-  int out_stream_idx = in_ctx->map[in_stream_idx];
   enum AVMediaType codec_type =
       in_ctx->fmt_ctx->streams[in_ctx->pkt->stream_index]->codecpar->codec_type;
 
@@ -161,8 +149,8 @@ int decode_packet(InputContext *in_ctx, OutputContext *out_ctx)
 
     if (codec_type == AVMEDIA_TYPE_VIDEO)
     {
-      if ((ret = encode_video_frame(out_ctx, out_stream_idx,
-        in_ctx, in_stream_idx)) < 0)
+      if ((ret = encode_video_frame(in_ctx, out_ctx,
+        in_stream_idx, out_stream_idx)) < 0)
       {
         fprintf(stderr, "Failed to encode video frame from input stream: %d.\n",
           in_stream_idx);
@@ -171,7 +159,7 @@ int decode_packet(InputContext *in_ctx, OutputContext *out_ctx)
     }
     else if (codec_type == AVMEDIA_TYPE_AUDIO)
     {
-      if ((ret = encode_audio_frame(out_ctx, out_stream_idx, in_ctx, 0)) < 0)
+      if ((ret = resample_audio_frame(in_ctx, out_ctx, out_stream_idx)) < 0)
       {
         fprintf(stderr, "Failed to encode audio frame from input stream: %d.\n\n",
           in_stream_idx);
@@ -227,7 +215,7 @@ int transcode(InputContext *in_ctx, OutputContext *out_ctx,
       continue;
     }
 
-    if ((ret = decode_packet(in_ctx, out_ctx)) < 0) {
+    if ((ret = decode_packet(in_ctx, out_ctx, in_stream_idx, out_stream_idx)) < 0) {
       fprintf(stderr, "Failed to decode packet.\n");
       return ret;
     }
@@ -310,8 +298,8 @@ int process_video(char *process_job_id, const char *batch_id)
 
         if (codec_type == AVMEDIA_TYPE_VIDEO)
         {
-          if (encode_video_frame(out_ctx, out_stream_idx,
-            in_ctx, in_stream_idx) < 0)
+          if (encode_video_frame(in_ctx, out_ctx,
+            in_stream_idx, out_stream_idx) < 0)
           {
             fprintf(stderr,
               "Failed to encode video frame from input stream: %d.\n",
@@ -321,7 +309,7 @@ int process_video(char *process_job_id, const char *batch_id)
         }
         else if (codec_type == AVMEDIA_TYPE_AUDIO)
         {
-          if (encode_audio_frame(out_ctx, out_stream_idx, in_ctx, 0) < 0) {
+          if (encode_audio_frame(out_ctx, out_stream_idx, NULL) < 0) {
             fprintf(stderr,
               "Failed to encode audio frame from input stream: %d.\n",
               in_stream_idx);
@@ -346,8 +334,8 @@ int process_video(char *process_job_id, const char *batch_id)
 
       if (codec_type == AVMEDIA_TYPE_VIDEO)
       {
-        if (encode_video_frame(out_ctx, out_stream_idx,
-          in_ctx, in_stream_idx) < 0)
+        if (encode_video_frame(in_ctx, out_ctx,
+          in_stream_idx, out_stream_idx) < 0)
         {
           fprintf(stderr,
             "Failed to encode video frame from input stream: %d.\n",
@@ -356,7 +344,7 @@ int process_video(char *process_job_id, const char *batch_id)
       }
       else if (codec_type == AVMEDIA_TYPE_AUDIO)
       {
-        if (encode_audio_frame(out_ctx, out_stream_idx, in_ctx, 1) < 0)
+        if (encode_audio_frame(out_ctx, out_stream_idx, NULL) < 0)
         {
           fprintf(stderr,
             "Failed to encode audio frame from input stream: %d.\n",
