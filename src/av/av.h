@@ -2,6 +2,7 @@
 
 #include "scan_media_streams.h"
 #include "process_media.h"
+#include "proc.h"
 #include "input.h"
 #include "output.h"
 #include "hdr.h"

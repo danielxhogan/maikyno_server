@@ -16,6 +16,8 @@ fn main()
   println!("cargo::rerun-if-changed=src/av/scan_media_streams.h");
   println!("cargo::rerun-if-changed=src/av/process_media.c");
   println!("cargo::rerun-if-changed=src/av/process_media.h");
+  println!("cargo::rerun-if-changed=src/av/proc.c");
+  println!("cargo::rerun-if-changed=src/av/proc.h");
   println!("cargo::rerun-if-changed=src/av/input.c");
   println!("cargo::rerun-if-changed=src/av/input.h");
   println!("cargo::rerun-if-changed=src/av/output.c");
@@ -57,6 +59,7 @@ fn main()
 
   cc_builder.file("src/av/scan_media_streams.c");
   cc_builder.file("src/av/process_media.c");
+  cc_builder.file("src/av/proc.c");
   cc_builder.file("src/av/input.c");
   cc_builder.file("src/av/output.c");
   cc_builder.file("src/av/hdr.c");
