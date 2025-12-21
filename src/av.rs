@@ -1716,6 +1716,7 @@ pub const M_CHECK_ACTION: i32 = -5;
 pub const M_PERTURB: i32 = -6;
 pub const M_ARENA_TEST: i32 = -7;
 pub const M_ARENA_MAX: i32 = -8;
+pub const SAMPLE_BUFFER_LENGTH: u32 = 8;
 pub const INACTIVE_STREAM: i32 = -1;
 pub const AV_OPT_FLAG_ENCODING_PARAM: u32 = 1;
 pub const AV_OPT_FLAG_DECODING_PARAM: u32 = 2;
@@ -1739,7 +1740,6 @@ pub const AV_OPT_SERIALIZE_OPT_FLAGS_EXACT: u32 = 2;
 pub const AV_OPT_SERIALIZE_SEARCH_CHILDREN: u32 = 4;
 pub const AV_DOVI_MAX_PIECES: u32 = 8;
 pub const AV_DOVI_MAX_EXT_BLOCKS: u32 = 32;
-pub const SAMPLE_BUFFER_LENGTH: u32 = 8;
 pub const LIBSWRESAMPLE_VERSION_MAJOR: u32 = 6;
 pub const LIBSWRESAMPLE_VERSION_MINOR: u32 = 2;
 pub const LIBSWRESAMPLE_VERSION_MICRO: u32 = 100;
@@ -16309,10 +16309,143 @@ unsafe extern "C" {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
+pub struct SwrOutputContext {
+    pub swr_ctx: *mut SwrContext,
+    pub swr_frame: *mut AVFrame,
+    pub nb_converted_samples: ::std::os::raw::c_int,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of SwrOutputContext"][::std::mem::size_of::<SwrOutputContext>() - 24usize];
+    ["Alignment of SwrOutputContext"][::std::mem::align_of::<SwrOutputContext>() - 8usize];
+    ["Offset of field: SwrOutputContext::swr_ctx"]
+        [::std::mem::offset_of!(SwrOutputContext, swr_ctx) - 0usize];
+    ["Offset of field: SwrOutputContext::swr_frame"]
+        [::std::mem::offset_of!(SwrOutputContext, swr_frame) - 8usize];
+    ["Offset of field: SwrOutputContext::nb_converted_samples"]
+        [::std::mem::offset_of!(SwrOutputContext, nb_converted_samples) - 16usize];
+};
+unsafe extern "C" {
+    pub fn swr_output_context_alloc(
+        dec_ctx: *mut AVCodecContext,
+        enc_ctx: *mut AVCodecContext,
+        out_stream_idx: ::std::os::raw::c_int,
+    ) -> *mut SwrOutputContext;
+}
+unsafe extern "C" {
+    pub fn swr_output_context_free(swr_out_ctx: *mut SwrOutputContext);
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct FrameSizeConversionContext {
+    pub sample_buffer: [*mut u8; 8usize],
+    pub sample_buffer_capacity: ::std::os::raw::c_int,
+    pub nb_samples_in_buffer: ::std::os::raw::c_int,
+    pub channels: ::std::os::raw::c_int,
+    pub bytes_per_sample: ::std::os::raw::c_int,
+    pub frame_size: ::std::os::raw::c_int,
+    pub frame: *mut AVFrame,
+    pub sample_fmt: AVSampleFormat,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of FrameSizeConversionContext"]
+        [::std::mem::size_of::<FrameSizeConversionContext>() - 104usize];
+    ["Alignment of FrameSizeConversionContext"]
+        [::std::mem::align_of::<FrameSizeConversionContext>() - 8usize];
+    ["Offset of field: FrameSizeConversionContext::sample_buffer"]
+        [::std::mem::offset_of!(FrameSizeConversionContext, sample_buffer) - 0usize];
+    ["Offset of field: FrameSizeConversionContext::sample_buffer_capacity"]
+        [::std::mem::offset_of!(FrameSizeConversionContext, sample_buffer_capacity) - 64usize];
+    ["Offset of field: FrameSizeConversionContext::nb_samples_in_buffer"]
+        [::std::mem::offset_of!(FrameSizeConversionContext, nb_samples_in_buffer) - 68usize];
+    ["Offset of field: FrameSizeConversionContext::channels"]
+        [::std::mem::offset_of!(FrameSizeConversionContext, channels) - 72usize];
+    ["Offset of field: FrameSizeConversionContext::bytes_per_sample"]
+        [::std::mem::offset_of!(FrameSizeConversionContext, bytes_per_sample) - 76usize];
+    ["Offset of field: FrameSizeConversionContext::frame_size"]
+        [::std::mem::offset_of!(FrameSizeConversionContext, frame_size) - 80usize];
+    ["Offset of field: FrameSizeConversionContext::frame"]
+        [::std::mem::offset_of!(FrameSizeConversionContext, frame) - 88usize];
+    ["Offset of field: FrameSizeConversionContext::sample_fmt"]
+        [::std::mem::offset_of!(FrameSizeConversionContext, sample_fmt) - 96usize];
+};
+unsafe extern "C" {
+    pub fn fsc_ctx_alloc(enc_ctx: *mut AVCodecContext) -> *mut FrameSizeConversionContext;
+}
+unsafe extern "C" {
+    pub fn fsc_ctx_alloc_buffer(
+        fsc_ctx: *mut FrameSizeConversionContext,
+        capacity: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn fsc_ctx_add_samples_to_buffer(
+        fsc_ctx: *mut FrameSizeConversionContext,
+        dec_frame: *mut AVFrame,
+        nb_converted_samples: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn fsc_ctx_make_frame(
+        fsc_ctx: *mut FrameSizeConversionContext,
+        timestamp: i64,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn fsc_ctx_free(fsc_ctx: *mut FrameSizeConversionContext);
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ProcessingContext {
+    pub idx_map: *mut ::std::os::raw::c_int,
+    pub nb_selected_streams: ::std::os::raw::c_int,
+    pub titles: *mut *mut ::std::os::raw::c_char,
+    pub passthrough: *mut ::std::os::raw::c_int,
+    pub deinterlace: ::std::os::raw::c_int,
+    pub burn_in_idx: ::std::os::raw::c_int,
+    pub gain_boost: *mut ::std::os::raw::c_int,
+    pub renditions: *mut ::std::os::raw::c_int,
+    pub swr_out_ctx: *mut *mut SwrOutputContext,
+    pub fsc_ctx: *mut *mut FrameSizeConversionContext,
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of ProcessingContext"][::std::mem::size_of::<ProcessingContext>() - 72usize];
+    ["Alignment of ProcessingContext"][::std::mem::align_of::<ProcessingContext>() - 8usize];
+    ["Offset of field: ProcessingContext::idx_map"]
+        [::std::mem::offset_of!(ProcessingContext, idx_map) - 0usize];
+    ["Offset of field: ProcessingContext::nb_selected_streams"]
+        [::std::mem::offset_of!(ProcessingContext, nb_selected_streams) - 8usize];
+    ["Offset of field: ProcessingContext::titles"]
+        [::std::mem::offset_of!(ProcessingContext, titles) - 16usize];
+    ["Offset of field: ProcessingContext::passthrough"]
+        [::std::mem::offset_of!(ProcessingContext, passthrough) - 24usize];
+    ["Offset of field: ProcessingContext::deinterlace"]
+        [::std::mem::offset_of!(ProcessingContext, deinterlace) - 32usize];
+    ["Offset of field: ProcessingContext::burn_in_idx"]
+        [::std::mem::offset_of!(ProcessingContext, burn_in_idx) - 36usize];
+    ["Offset of field: ProcessingContext::gain_boost"]
+        [::std::mem::offset_of!(ProcessingContext, gain_boost) - 40usize];
+    ["Offset of field: ProcessingContext::renditions"]
+        [::std::mem::offset_of!(ProcessingContext, renditions) - 48usize];
+    ["Offset of field: ProcessingContext::swr_out_ctx"]
+        [::std::mem::offset_of!(ProcessingContext, swr_out_ctx) - 56usize];
+    ["Offset of field: ProcessingContext::fsc_ctx"]
+        [::std::mem::offset_of!(ProcessingContext, fsc_ctx) - 64usize];
+};
+unsafe extern "C" {
+    pub fn get_input_file_nb_streams(
+        process_job_id: *mut ::std::os::raw::c_char,
+        db: *mut sqlite3,
+    ) -> ::std::os::raw::c_int;
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct InputContext {
     pub fmt_ctx: *mut AVFormatContext,
     pub dec_ctx: *mut *mut AVCodecContext,
-    pub pkt: *mut AVPacket,
+    pub init_pkt: *mut AVPacket,
     pub dec_frame: *mut AVFrame,
     pub map: *mut ::std::os::raw::c_int,
     pub titles: *mut *mut ::std::os::raw::c_char,
@@ -16326,7 +16459,8 @@ const _: () = {
         [::std::mem::offset_of!(InputContext, fmt_ctx) - 0usize];
     ["Offset of field: InputContext::dec_ctx"]
         [::std::mem::offset_of!(InputContext, dec_ctx) - 8usize];
-    ["Offset of field: InputContext::pkt"][::std::mem::offset_of!(InputContext, pkt) - 16usize];
+    ["Offset of field: InputContext::init_pkt"]
+        [::std::mem::offset_of!(InputContext, init_pkt) - 16usize];
     ["Offset of field: InputContext::dec_frame"]
         [::std::mem::offset_of!(InputContext, dec_frame) - 24usize];
     ["Offset of field: InputContext::map"][::std::mem::offset_of!(InputContext, map) - 32usize];
@@ -17856,66 +17990,6 @@ unsafe extern "C" {
 unsafe extern "C" {
     pub fn hdr_ctx_free(hdr_ctx: *mut HdrMetadataContext);
 }
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct FrameSizeConversionContext {
-    pub sample_buffer: [*mut u8; 8usize],
-    pub sample_buffer_capacity: ::std::os::raw::c_int,
-    pub nb_samples_in_buffer: ::std::os::raw::c_int,
-    pub channels: ::std::os::raw::c_int,
-    pub bytes_per_sample: ::std::os::raw::c_int,
-    pub frame_size: ::std::os::raw::c_int,
-    pub frame: *mut AVFrame,
-    pub sample_fmt: AVSampleFormat,
-}
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
-const _: () = {
-    ["Size of FrameSizeConversionContext"]
-        [::std::mem::size_of::<FrameSizeConversionContext>() - 104usize];
-    ["Alignment of FrameSizeConversionContext"]
-        [::std::mem::align_of::<FrameSizeConversionContext>() - 8usize];
-    ["Offset of field: FrameSizeConversionContext::sample_buffer"]
-        [::std::mem::offset_of!(FrameSizeConversionContext, sample_buffer) - 0usize];
-    ["Offset of field: FrameSizeConversionContext::sample_buffer_capacity"]
-        [::std::mem::offset_of!(FrameSizeConversionContext, sample_buffer_capacity) - 64usize];
-    ["Offset of field: FrameSizeConversionContext::nb_samples_in_buffer"]
-        [::std::mem::offset_of!(FrameSizeConversionContext, nb_samples_in_buffer) - 68usize];
-    ["Offset of field: FrameSizeConversionContext::channels"]
-        [::std::mem::offset_of!(FrameSizeConversionContext, channels) - 72usize];
-    ["Offset of field: FrameSizeConversionContext::bytes_per_sample"]
-        [::std::mem::offset_of!(FrameSizeConversionContext, bytes_per_sample) - 76usize];
-    ["Offset of field: FrameSizeConversionContext::frame_size"]
-        [::std::mem::offset_of!(FrameSizeConversionContext, frame_size) - 80usize];
-    ["Offset of field: FrameSizeConversionContext::frame"]
-        [::std::mem::offset_of!(FrameSizeConversionContext, frame) - 88usize];
-    ["Offset of field: FrameSizeConversionContext::sample_fmt"]
-        [::std::mem::offset_of!(FrameSizeConversionContext, sample_fmt) - 96usize];
-};
-unsafe extern "C" {
-    pub fn fsc_ctx_alloc(enc_ctx: *mut AVCodecContext) -> *mut FrameSizeConversionContext;
-}
-unsafe extern "C" {
-    pub fn fsc_ctx_alloc_buffer(
-        fsc_ctx: *mut FrameSizeConversionContext,
-        capacity: ::std::os::raw::c_int,
-    ) -> ::std::os::raw::c_int;
-}
-unsafe extern "C" {
-    pub fn fsc_ctx_add_samples_to_buffer(
-        fsc_ctx: *mut FrameSizeConversionContext,
-        dec_frame: *mut AVFrame,
-        nb_converted_samples: ::std::os::raw::c_int,
-    ) -> ::std::os::raw::c_int;
-}
-unsafe extern "C" {
-    pub fn fsc_ctx_make_frame(
-        fsc_ctx: *mut FrameSizeConversionContext,
-        timestamp: i64,
-    ) -> ::std::os::raw::c_int;
-}
-unsafe extern "C" {
-    pub fn fsc_ctx_free(fsc_ctx: *mut FrameSizeConversionContext);
-}
 pub const SwrDitherType_SWR_DITHER_NONE: SwrDitherType = 0;
 pub const SwrDitherType_SWR_DITHER_RECTANGULAR: SwrDitherType = 1;
 pub const SwrDitherType_SWR_DITHER_TRIANGULAR: SwrDitherType = 2;
@@ -17949,11 +18023,6 @@ pub const SwrFilterType_SWR_FILTER_TYPE_BLACKMAN_NUTTALL: SwrFilterType = 1;
 pub const SwrFilterType_SWR_FILTER_TYPE_KAISER: SwrFilterType = 2;
 #[doc = " Resampling Filter Types"]
 pub type SwrFilterType = ::std::os::raw::c_uint;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct SwrContext {
-    _unused: [u8; 0],
-}
 unsafe extern "C" {
     #[doc = " Get the AVClass for SwrContext. It can be used in combination with\n AV_OPT_SEARCH_FAKE_OBJ for examining options.\n\n @see av_opt_find().\n @return the AVClass of SwrContext"]
     pub fn swr_get_class() -> *const AVClass;
@@ -18157,9 +18226,21 @@ unsafe extern "C" {
     pub fn check_abort_status(batch_id: *const ::std::os::raw::c_char) -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
+    pub fn calculate_pct_complete(
+        in_ctx: *mut InputContext,
+        process_job_id: *mut ::std::os::raw::c_char,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
     pub fn update_pct_complete(
         pct: i64,
         process_job_id: *mut ::std::os::raw::c_char,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn update_process_job_status(
+        process_job_id: *mut ::std::os::raw::c_char,
+        status: ProcessJobStatus,
     ) -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
@@ -18311,5 +18392,10 @@ pub struct __locale_data {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct AVCodecInternal {
+    pub _address: u8,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct SwrContext {
     pub _address: u8,
 }
