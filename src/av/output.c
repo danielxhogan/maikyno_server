@@ -137,13 +137,13 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
   if ((ret = av_opt_set((*enc_ctx)->priv_data, "crf", "20", 0)) < 0) {
     fprintf(stderr, "Failed to set crf on video encoder for video: %s\n",
       in_filename);
-      goto end;
+    goto end;
   }
 
   if ((ret = av_opt_set((*enc_ctx)->priv_data, "preset", "ultrafast", 0)) < 0) {
     fprintf(stderr, "Failed to set preset on video encoder for video: %s\n",
       in_filename);
-      goto end;
+    goto end;
   }
 
   if ((ret = av_opt_set((*enc_ctx)->priv_data, "tune", "grain", 0)) < 0) {
@@ -694,17 +694,21 @@ OutputContext *open_output(InputContext *in_ctx, char *process_job_id, sqlite3 *
 
       if (codec_type == AVMEDIA_TYPE_AUDIO)
       {
-        if ((ret = initialize_swr(&out_ctx->swr_ctx[out_stream_idx], in_ctx->dec_ctx[in_stream_idx],
-          out_ctx->enc_ctx[out_stream_idx], &out_ctx->swr_frame[out_stream_idx])))
+        if ((ret = initialize_swr(&out_ctx->swr_ctx[out_stream_idx],
+          in_ctx->dec_ctx[in_stream_idx],
+          out_ctx->enc_ctx[out_stream_idx],
+          &out_ctx->swr_frame[out_stream_idx])))
         {
-          fprintf(stderr,
-            "Failed to initialize swr context for output stream: %d\n", out_stream_idx);
+          fprintf(stderr, "Failed to initialize swr context \
+            for output stream: %d\n", out_stream_idx);
           goto end;
         }
 
-        if (!(out_ctx->fsc_ctx[out_stream_idx] = fsc_ctx_alloc(out_ctx->enc_ctx[out_stream_idx]))) {
-          fprintf(stderr,
-            "Failed to allocate fsc context for output stream: %d\n", out_stream_idx);
+        if (!(out_ctx->fsc_ctx[out_stream_idx] =
+          fsc_ctx_alloc(out_ctx->enc_ctx[out_stream_idx])))
+        {
+          fprintf(stderr, "Failed to allocate fsc context \
+            for output stream: %d\n", out_stream_idx);
           ret = -ENOMEM;
           goto end;
         }
