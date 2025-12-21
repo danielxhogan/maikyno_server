@@ -132,10 +132,10 @@ int decode_packet(InputContext *in_ctx, OutputContext *out_ctx,
 {
   int ret = 0;
   enum AVMediaType codec_type =
-      in_ctx->fmt_ctx->streams[in_ctx->pkt->stream_index]->codecpar->codec_type;
+      in_ctx->fmt_ctx->streams[in_ctx->init_pkt->stream_index]->codecpar->codec_type;
 
   if ((ret =
-    avcodec_send_packet(in_ctx->dec_ctx[in_stream_idx], in_ctx->pkt)) < 0)
+    avcodec_send_packet(in_ctx->dec_ctx[in_stream_idx], in_ctx->init_pkt)) < 0)
   {
     fprintf(stderr, "Failed to send packet from input stream: %d to decoder.\n\
       Error: %s.\n", in_stream_idx, av_err2str(ret));
@@ -170,7 +170,7 @@ int decode_packet(InputContext *in_ctx, OutputContext *out_ctx,
 
   if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
     fprintf(stderr, "Failed to receive frame from input stream: %d \
-      from decoder.\nError: %s.\n", in_ctx->pkt->stream_index, av_err2str(ret));
+      from decoder.\nError: %s.\n", in_ctx->init_pkt->stream_index, av_err2str(ret));
     return ret;
   }
 
@@ -181,13 +181,13 @@ int transcode(InputContext *in_ctx, OutputContext *out_ctx,
   const char *batch_id, char *process_job_id)
 {
   int frame_count, ret = 0;
-  while ((ret = av_read_frame(in_ctx->fmt_ctx, in_ctx->pkt)) >= 0)
+  while ((ret = av_read_frame(in_ctx->fmt_ctx, in_ctx->init_pkt)) >= 0)
   {
-    int in_stream_idx = in_ctx->pkt->stream_index;
+    int in_stream_idx = in_ctx->init_pkt->stream_index;
     int out_stream_idx = in_ctx->map[in_stream_idx];
 
     if (out_stream_idx == INACTIVE_STREAM) {
-      av_packet_unref(in_ctx->pkt);
+      av_packet_unref(in_ctx->init_pkt);
       continue;
     }
 
@@ -203,10 +203,10 @@ int transcode(InputContext *in_ctx, OutputContext *out_ctx,
     }
 
     if (!in_ctx->dec_ctx[in_stream_idx]) {
-      in_ctx->pkt->stream_index = out_stream_idx;
+      in_ctx->init_pkt->stream_index = out_stream_idx;
 
       if ((ret =
-        av_interleaved_write_frame(out_ctx->fmt_ctx, in_ctx->pkt)) < 0)
+        av_interleaved_write_frame(out_ctx->fmt_ctx, in_ctx->init_pkt)) < 0)
       {
         fprintf(stderr, "Failed to write packet to file.\nError: %s.\n",
           av_err2str(ret));

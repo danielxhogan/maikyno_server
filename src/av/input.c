@@ -381,7 +381,7 @@ InputContext *open_input(char *process_job_id, sqlite3 *db)
 
   in_ctx->fmt_ctx = NULL;
   in_ctx->dec_ctx = NULL;
-  in_ctx->pkt = NULL;
+  in_ctx->init_pkt = NULL;
   in_ctx->dec_frame = NULL;
   in_ctx->map = NULL;
   in_ctx->titles = NULL;
@@ -460,13 +460,15 @@ InputContext *open_input(char *process_job_id, sqlite3 *db)
     goto end;
   }
 
-  if ((ret = open_subtitle_streams(in_ctx, process_job_id, db, out_stream_idx)) < 0) {
+  if ((ret = open_subtitle_streams(in_ctx,
+    process_job_id, db, out_stream_idx)) < 0)
+  {
     fprintf(stderr, "Failed to open subtitle stream for process job: %s",
       process_job_id);
     goto end;
   }
 
-  if (!(in_ctx->pkt = av_packet_alloc())) {
+  if (!(in_ctx->init_pkt = av_packet_alloc())) {
     fprintf(stderr, "Failed to allocate AVPacket.\n");
     ret = AVERROR(ENOMEM);
     goto end;
@@ -510,7 +512,7 @@ void close_input(InputContext *in_ctx)
 
   avformat_close_input(&in_ctx->fmt_ctx);
 
-  av_packet_free(&in_ctx->pkt);
+  av_packet_free(&in_ctx->init_pkt);
   av_frame_free(&in_ctx->dec_frame);
   free(in_ctx->map);
   free(in_ctx);
