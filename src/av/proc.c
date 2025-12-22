@@ -2,7 +2,8 @@
 
 int get_input_file_nb_streams(char *process_job_id, sqlite3 *db)
 {
-  int stream_count = 0, ret;
+  int nb_in_streams = 0, ret;
+
   char *select_input_stream_count_querey =
     "select streams.id \
     from streams \
@@ -25,7 +26,7 @@ int get_input_file_nb_streams(char *process_job_id, sqlite3 *db)
 
   while ((ret = sqlite3_step(select_input_stream_count_stmt)) == SQLITE_ROW)
   {
-    stream_count += 1;
+    nb_in_streams += 1;
   }
 
   if (ret != SQLITE_DONE) {
@@ -38,5 +39,6 @@ int get_input_file_nb_streams(char *process_job_id, sqlite3 *db)
 end:
   sqlite3_finalize(select_input_stream_count_stmt);
   if (ret < 0) { return ret; }
-  return stream_count;
+  return nb_in_streams;
 }
+
