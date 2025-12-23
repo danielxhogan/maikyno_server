@@ -6,6 +6,7 @@
 #include "input.h"
 #include "output.h"
 #include "hdr.h"
+#include "swr.h"
 #include "fsc.h"
 #include "utils.h"
 

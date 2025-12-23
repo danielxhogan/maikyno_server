@@ -5,7 +5,7 @@
 #include <libavutil/opt.h>
 
 SwrOutputContext *swr_output_context_alloc(AVCodecContext *dec_ctx,
-  AVCodecContext *enc_ctx, int out_stream_idx)
+  AVCodecContext *enc_ctx)
 {
   SwrOutputContext *swr_out_ctx;
 
