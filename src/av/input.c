@@ -53,10 +53,10 @@ end:
   return ret;
 }
 
-int get_stream_count(int *stream_count, char *process_job_id, sqlite3 *db)
+int get_stream_count(char *process_job_id, sqlite3 *db)
 {
   int ret;
-  int stream_count_tmp;
+  int stream_count;
 
   char *select_stream_count_query =
     "SELECT stream_count FROM process_jobs WHERE id = ?";
@@ -80,12 +80,12 @@ int get_stream_count(int *stream_count, char *process_job_id, sqlite3 *db)
     goto end;
   }
 
-  stream_count_tmp = sqlite3_column_int(select_stream_count_stmt, 0);
-  *stream_count = stream_count_tmp;
+  stream_count = sqlite3_column_int(select_stream_count_stmt, 0);
 
 end:
   sqlite3_finalize(select_stream_count_stmt);
-  return ret;
+  if (ret < 0) { return ret; }
+  return stream_count;
 }
 
 static int open_decoder(InputContext *in_ctx, int in_stream_idx)
@@ -429,7 +429,7 @@ InputContext *open_input(char *process_job_id, sqlite3 *db)
     goto end;
   }
 
-  if ((ret = get_stream_count(&stream_count, process_job_id, db)) < 0) {
+  if ((ret = stream_count = get_stream_count(process_job_id, db)) < 0) {
     fprintf(stderr, "Failed to get stream count for process job: %s\n",
       process_job_id);
     goto end;
