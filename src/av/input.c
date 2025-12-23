@@ -128,9 +128,10 @@ static int open_decoder(InputContext *in_ctx, int in_stream_idx)
   return ret;
 }
 
-int open_video_stream(InputContext *in_ctx, char *process_job_id, sqlite3 *db, int out_stream_idx)
+int open_video_stream(InputContext *in_ctx, char *process_job_id,
+  sqlite3 *db, int out_stream_idx)
 {
-  int ret;
+  int ret = 0;
 
   char *select_video_info_query =
     "SELECT streams.stream_idx, \
@@ -371,7 +372,6 @@ InputContext *open_input(char *process_job_id, sqlite3 *db)
   unsigned int i;
   char *input_file = NULL;
   int stream_count;
-
 
   InputContext *in_ctx = malloc(sizeof(InputContext));
   if (!in_ctx) {

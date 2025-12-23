@@ -270,7 +270,8 @@ int inject_hdr_metadta(HdrMetadataContext *hdr_ctx, AVCodecContext *enc_ctx,
 
     if (hdr_ctx->dovi) {
       if (!av_packet_side_data_add(&enc_ctx->coded_side_data,
-        &enc_ctx->nb_coded_side_data, (enum AVPacketSideDataType) AV_FRAME_DATA_DOVI_METADATA,
+        &enc_ctx->nb_coded_side_data,
+        (enum AVPacketSideDataType) AV_FRAME_DATA_DOVI_METADATA,
         (uint8_t *) hdr_ctx->dovi, sizeof(AVDOVIMetadata), 0))
       {
         fprintf(stderr,

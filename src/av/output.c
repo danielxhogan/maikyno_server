@@ -62,11 +62,10 @@ static int get_len_params_str(char *hdr_params_str, char *additional_params_str)
 static int open_video_encoder(AVCodecContext **enc_ctx,
   AVStream *in_stream, char *in_filename)
 {
-  int ret;
+  int len_params_str, ret = 0;
   const AVCodec *enc;
   HdrMetadataContext *hdr_ctx = NULL;
   char *params_str = NULL, *hdr_params_str = NULL, *additional_params_str;
-  int len_params_str;
 
   if (!(enc = avcodec_find_encoder_by_name("libx265"))) {
     fprintf(stderr, "Failed to find encoder.\n");
@@ -93,11 +92,10 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
   (*enc_ctx)->color_range = in_stream->codecpar->color_range;
   (*enc_ctx)->chroma_sample_location = in_stream->codecpar->chroma_location;
 
-
   (*enc_ctx)->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
   if (!(hdr_ctx = hdr_ctx_alloc())) {
-    fprintf(stderr, "Failed to allocate hdr metada.\n");
+    fprintf(stderr, "Failed to allocate hdr metadata.\n");
     ret = -ENOMEM;
     goto end;
   }
@@ -109,7 +107,7 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
 
   if ((ret = inject_hdr_metadta(hdr_ctx, *enc_ctx, &hdr_params_str)) < 0) {
     fprintf(stderr, "Failed to inject hdr metadata.\n");
-    return ret;
+    goto end;
   }
 
   additional_params_str =
@@ -126,12 +124,11 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
   if (hdr_params_str) { strcat(params_str, hdr_params_str); }
   strcat(params_str, additional_params_str);
 
-  if ((ret = av_opt_set((*enc_ctx)->priv_data, "x265-params",
-   params_str, 
-    0)) < 0)
+  if ((ret = av_opt_set((*enc_ctx)->priv_data,
+    "x265-params", params_str, 0)) < 0)
   {
     fprintf(stderr, "Failed to set x265-params.\n");
-    return ret;
+    goto end;
   }
 
   if ((ret = av_opt_set((*enc_ctx)->priv_data, "crf", "20", 0)) < 0) {
@@ -161,7 +158,9 @@ end:
   hdr_ctx_free(hdr_ctx);
   free(hdr_params_str);
   free(params_str);
-  return ret;
+
+  if (ret < 0) { return ret; }
+  return 0;
 }
 
 static int select_channel_layout(AVCodecContext *enc_ctx,
@@ -427,7 +426,6 @@ static int initialize_swr(struct SwrContext **swr_ctx, AVCodecContext *dec_ctx,
   av_opt_set_chlayout(*swr_ctx, "out_chlayout", &enc_ctx->ch_layout, 0);
   av_opt_set_int(*swr_ctx, "out_sample_rate", enc_ctx->sample_rate, 0);
   av_opt_set_sample_fmt(*swr_ctx, "out_sample_fmt", enc_ctx->sample_fmt, 0);
-
 
   if ((ret = swr_init(*swr_ctx)) < 0) {
     fprintf(stderr, "Failed to initialize SwrContext.\n");

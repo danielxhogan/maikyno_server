@@ -477,7 +477,7 @@ int process_media(const char *batch_id)
 
   if (ret != SQLITE_DONE) {
     fprintf(stderr, "Failed to step through select_batch_process_jobs_stmt \
-      for batch_id: %s\nError: %s.\n", batch_id,sqlite3_errmsg(db));
+      for batch_id: %s\nError: %s.\n", batch_id, sqlite3_errmsg(db));
     ret = -ret;
     goto end;
   }
