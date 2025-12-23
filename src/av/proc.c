@@ -1,5 +1,269 @@
 #include "proc.h"
 
+int get_video_processing_info(ProcessingContext *proc_ctx,
+  char *process_job_id, int *ctx_idx, int *out_stream_idx, sqlite3 *db)
+{
+  char *select_video_info_query =
+    "SELECT streams.stream_idx, \
+      process_job_video_streams.title, \
+      process_job_video_streams.passthrough, \
+      process_job_video_streams.deinterlace, \
+      process_job_video_streams.create_renditions \
+    FROM process_job_video_streams \
+    JOIN streams ON process_job_video_streams.stream_id = streams.id \
+    WHERE process_job_video_streams.process_job_id = ?;";
+
+  sqlite3_stmt *select_video_info_stmt = NULL;
+  char *title, *end;
+  int in_stream_idx, len_title, ret = 0;
+
+  if ((ret = sqlite3_prepare_v2(db, select_video_info_query, -1,
+    &select_video_info_stmt, 0)) != SQLITE_OK)
+  {
+    fprintf(stderr, "Failed to prepare select process job video streams statement\
+      for process job: %s.\nSqlite Error: %s.\n", process_job_id, sqlite3_errmsg(db));
+      ret = -ret;
+      goto end;
+  }
+
+  sqlite3_bind_text(select_video_info_stmt, 1, process_job_id,
+    -1, SQLITE_STATIC);
+
+  if ((ret = sqlite3_step(select_video_info_stmt)) != SQLITE_ROW) {
+    fprintf(stderr, "Failed to get video stream id for process job: %s.\n\
+      Sqlite Error: %s.\n", process_job_id, sqlite3_errmsg(db));
+      ret = -ret;
+    goto end;
+  }
+
+  *ctx_idx = 0;
+  *out_stream_idx = 0;
+
+  in_stream_idx = sqlite3_column_int(select_video_info_stmt, 0);
+  proc_ctx->ctx_map[in_stream_idx] = *ctx_idx;
+  proc_ctx->idx_map[in_stream_idx] = *out_stream_idx;
+
+  printf("\nInput stream %d is mapped to output stream %d.\n",
+    in_stream_idx, *out_stream_idx);
+
+  *ctx_idx = 1;
+  *out_stream_idx = 1;
+
+  title = (char *) sqlite3_column_text(select_video_info_stmt, 1);
+
+  if (title) {
+    printf("Output stream %d has title \"%s\".\n", *out_stream_idx, title);
+
+    for (end = title; *end; end++);
+    len_title = end - title;
+
+    if (!(proc_ctx->stream_titles_arr[*ctx_idx] =
+      calloc(len_title + 1, sizeof(char))))
+    {
+      fprintf(stderr, "Failed to allocate memory for title for stream: %d\n",
+        in_stream_idx);
+      ret = AVERROR(ENOMEM);
+      goto end;
+    }
+
+    strncat(proc_ctx->stream_titles_arr[*ctx_idx], title, len_title);
+  }
+
+  proc_ctx->passthrough_arr[*ctx_idx] =
+    sqlite3_column_int(select_video_info_stmt, 2);
+
+  proc_ctx->deinterlace =
+    sqlite3_column_int(select_video_info_stmt, 3);
+
+  proc_ctx->renditions_arr[*ctx_idx] =
+    sqlite3_column_int(select_video_info_stmt, 4);
+
+  if (proc_ctx->renditions_arr[*ctx_idx]) { *out_stream_idx += 1; }
+
+end:
+  sqlite3_finalize(select_video_info_stmt);
+  if (ret < 0) { return ret; }
+  return 0;
+}
+
+int get_audio_process_info(ProcessingContext *proc_ctx,
+  char *process_job_id, int *ctx_idx, int *out_stream_idx, sqlite3 *db)
+{
+  char *select_audio_stream_info_query =
+    "SELECT streams.stream_idx, \
+      process_job_audio_streams.title, \
+      process_job_audio_streams.passthrough, \
+      process_job_audio_streams.gain_boost, \
+      process_job_audio_streams.create_renditions \
+    FROM process_job_audio_streams \
+    JOIN streams ON process_job_audio_streams.stream_id = streams.id \
+    WHERE process_job_audio_streams.process_job_id = ?;";
+
+  sqlite3_stmt *select_audio_stream_info_stmt = NULL;
+  char *title, *end;
+  int in_stream_idx, len_title, ret = 0;
+
+  if ((ret = sqlite3_prepare_v2(db, select_audio_stream_info_query, -1,
+    &select_audio_stream_info_stmt, 0)) != SQLITE_OK)
+  {
+    fprintf(stderr, "Failed to prepare select process job audio streams statement \
+      for process job: %s\nSqlite Error: %s\n", process_job_id, sqlite3_errmsg(db));
+      ret = -ret;
+      goto end;
+  }
+
+  sqlite3_bind_text(select_audio_stream_info_stmt, 1, process_job_id,
+    -1, SQLITE_STATIC);
+
+  while ((ret = sqlite3_step(select_audio_stream_info_stmt)) == SQLITE_ROW)
+  {
+    in_stream_idx = sqlite3_column_int(select_audio_stream_info_stmt, 0);
+    proc_ctx->ctx_map[in_stream_idx] = *ctx_idx;
+    proc_ctx->idx_map[in_stream_idx] = *out_stream_idx;
+    printf("\nInput stream %d is mapped to output stream %d.\n",
+      in_stream_idx, *out_stream_idx);
+    *ctx_idx += 1;
+    *out_stream_idx += 1;
+
+    title = (char *) sqlite3_column_text(select_audio_stream_info_stmt, 1);
+    if (title) {
+      printf("Output stream %d has title \"%s\".\n", *out_stream_idx, title);
+      for (end = title; *end; end++);
+      len_title = end - title;
+
+      if (!(proc_ctx->stream_titles_arr[*ctx_idx] =
+        calloc(len_title + 1, sizeof(char))))
+      {
+        fprintf(stderr, "Failed to allocate memory for title for stream: %d\n",
+          in_stream_idx);
+        ret = AVERROR(ENOMEM);
+        goto end;
+      }
+
+      strncat(proc_ctx->stream_titles_arr[*ctx_idx], title, len_title);
+    }
+
+    proc_ctx->passthrough_arr[*ctx_idx] =
+      sqlite3_column_int(select_audio_stream_info_stmt, 2);
+
+    proc_ctx->gain_boost_arr[*ctx_idx] =
+      sqlite3_column_int(select_audio_stream_info_stmt, 3);
+
+    proc_ctx->renditions_arr[*ctx_idx] =
+      sqlite3_column_int(select_audio_stream_info_stmt, 3);
+
+    if (proc_ctx->renditions_arr[*ctx_idx]) { *out_stream_idx += 1; }
+  }
+
+  if (ret != SQLITE_DONE) {
+    fprintf(stderr, "Failed to step through audio info query.\n\
+      Sqlite Error: %s.\n", sqlite3_errmsg(db));
+    ret = -ret;
+  }
+
+end:
+  sqlite3_finalize(select_audio_stream_info_stmt);
+  if (ret < 0) { return ret; }
+  return 0;
+}
+
+int get_subtitle_process_info(ProcessingContext *proc_ctx,
+  char *process_job_id, int *ctx_idx, int *out_stream_idx, sqlite3 *db)
+{
+  char *select_subtitle_stream_idx_query =
+    "SELECT streams.stream_idx, \
+    process_job_subtitle_streams.title, \
+    process_job_subtitle_streams.burn_in \
+    FROM process_job_subtitle_streams \
+    JOIN streams ON process_job_subtitle_streams.stream_id = streams.id \
+    WHERE process_job_subtitle_streams.process_job_id = ?;";
+
+  sqlite3_stmt *select_subtitle_stream_idx_stmt = NULL;
+  char *title, *end;
+  int in_stream_idx, len_title, burn_in, ret = 0;
+
+  if ((ret = sqlite3_prepare_v2(db, select_subtitle_stream_idx_query, -1,
+    &select_subtitle_stream_idx_stmt, 0)) != SQLITE_OK)
+  {
+    fprintf(stderr, "Failed to prepare select process job subtitle streams statement \
+      for process job: %s\nError: %s\n", process_job_id, sqlite3_errmsg(db));
+      ret = -ret;
+      goto end;
+  }
+
+  sqlite3_bind_text(select_subtitle_stream_idx_stmt, 1, process_job_id,
+    -1, SQLITE_STATIC);
+
+  while ((ret = sqlite3_step(select_subtitle_stream_idx_stmt)) == SQLITE_ROW)
+  {
+    in_stream_idx = sqlite3_column_int(select_subtitle_stream_idx_stmt, 0);
+    proc_ctx->ctx_map[in_stream_idx] = *ctx_idx;
+    proc_ctx->idx_map[in_stream_idx] = *out_stream_idx;
+    printf("\nInput stream %d is mapped to output stream %d.\n",
+      in_stream_idx, *out_stream_idx);
+    *ctx_idx += 1;
+    *out_stream_idx += 1;
+
+    title = (char *) sqlite3_column_text(select_subtitle_stream_idx_stmt, 1);
+    if (title) {
+      printf("Output stream %d has title \"%s\".\n", *out_stream_idx, title);
+      for (end = title; *end; end++);
+      len_title = end - title;
+
+      if (!(proc_ctx->stream_titles_arr[*ctx_idx] =
+        calloc(len_title + 1, sizeof(char))))
+      {
+        fprintf(stderr, "Failed to allocate memory for title for stream: %d\n",
+          in_stream_idx);
+        ret = AVERROR(ENOMEM);
+        goto end;
+      }
+
+      strncat(proc_ctx->stream_titles_arr[*ctx_idx], title, len_title);
+    }
+
+    burn_in = sqlite3_column_int(select_subtitle_stream_idx_stmt, 2);
+    if (burn_in) { proc_ctx->burn_in_idx = in_stream_idx; }
+  }
+
+end:
+  sqlite3_finalize(select_subtitle_stream_idx_stmt);
+  if (ret < 0) { return ret; }
+  return 0;
+}
+
+int get_processing_info(ProcessingContext *proc_ctx,
+  char *process_job_id, sqlite3 *db)
+{
+  int ctx_idx = 0, out_stream_idx = 0, ret = 0;
+
+  if ((ret = get_video_processing_info(proc_ctx, process_job_id,
+    &ctx_idx, &out_stream_idx, db)) < 0)
+  {
+    fprintf(stderr, "Failed to get video processing info for\
+      process job: %s.\n", process_job_id);
+    return ret;
+  }
+
+  if ((ret = get_audio_process_info(proc_ctx, process_job_id,
+    &ctx_idx, &out_stream_idx, db)) < 0)
+  {
+    fprintf(stderr, "Failed to get audio processing info for\
+      process job: %s.\n", process_job_id);
+    return ret;
+  }
+
+  if ((ret = get_subtitle_process_info(proc_ctx, process_job_id,
+    &ctx_idx, &out_stream_idx, db)) < 0)
+  {
+    fprintf(stderr, "Failed to get subtitle processing info for\
+      process job: %s.\n", process_job_id);
+    return ret;
+  }
+
+  return 0;
+}
+
 int get_input_file_nb_streams(char *process_job_id, sqlite3 *db)
 {
   int nb_in_streams = 0, ret;
@@ -15,7 +279,7 @@ int get_input_file_nb_streams(char *process_job_id, sqlite3 *db)
   if ((ret = sqlite3_prepare_v2(db, select_input_stream_count_querey, -1,
     &select_input_stream_count_stmt, 0)) != SQLITE_OK)
   {
-    fprintf(stderr, "Failed to prepare select stream count statement.\nError%s\n",
+    fprintf(stderr, "Failed to prepare select stream count statement.\nSqlite Error%s\n",
       sqlite3_errmsg(db));
     ret = -ret;
     goto end;
@@ -31,7 +295,7 @@ int get_input_file_nb_streams(char *process_job_id, sqlite3 *db)
 
   if (ret != SQLITE_DONE) {
     fprintf(stderr, "Failed to get number of streams in input file \
-      for process_job: %s\nError: %s.\n", process_job_id, sqlite3_errmsg(db));
+      for process_job: %s\nSqlite Error: %s.\n", process_job_id, sqlite3_errmsg(db));
     ret = -ret;
     goto end;
   }
@@ -53,7 +317,7 @@ int get_nb_selected_streams(char *process_job_id, sqlite3 *db)
   if ((ret = sqlite3_prepare_v2(db, select_stream_count_query, -1,
     &select_stream_count_stmt, 0)) != SQLITE_OK)
   {
-    fprintf(stderr, "Failed to prepare select stream count statement.\nError%s\n",
+    fprintf(stderr, "Failed to prepare select stream count statement.\nSqlite Error%s\n",
       sqlite3_errmsg(db));
     ret = -ret;
     goto end;
@@ -62,7 +326,7 @@ int get_nb_selected_streams(char *process_job_id, sqlite3 *db)
   sqlite3_bind_text(select_stream_count_stmt, 1, process_job_id, -1, SQLITE_STATIC);
 
   if ((ret = sqlite3_step(select_stream_count_stmt)) != SQLITE_ROW) {
-    fprintf(stderr, "Failed to get stream count for process_job: %s\nError: %s\n",
+    fprintf(stderr, "Failed to get stream count for process_job: %s\nSqlite Error: %s\n",
       process_job_id, sqlite3_errmsg(db));
     ret = -ret;
     goto end;
@@ -78,40 +342,50 @@ end:
 
 ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
 {
-  int nb_in_streams, out_stream_idx = 0, ctx_idx = 0, i, ret = 0;
+  int ret = 0;
+  unsigned int i;
 
   ProcessingContext *proc_ctx = malloc(sizeof(ProcessingContext));
   if(!proc_ctx) {
     return NULL;
   }
 
+  proc_ctx->nb_in_streams = 0;
   proc_ctx->nb_selected_streams = 0;
-  proc_ctx->stream_titles_arr = NULL;
-  proc_ctx->passthrough = NULL;
-  proc_ctx->deinterlace = 0;
-  proc_ctx->burn_in_idx = -1;
-  proc_ctx->gain_boost = NULL;
-  proc_ctx->renditions = NULL;
-  proc_ctx->swr_out_ctx_arr = NULL;
-  proc_ctx->fsc_ctx_arr = NULL;
-  proc_ctx->ctx_map = NULL;
-  proc_ctx->idx_map = NULL;
   proc_ctx->nb_out_streams = 0;
 
-  if ((ret = nb_in_streams =
+  proc_ctx->stream_titles_arr = NULL;
+  proc_ctx->passthrough_arr = NULL;
+  proc_ctx->deinterlace = 0;
+  proc_ctx->burn_in_idx = -1;
+  proc_ctx->gain_boost_arr = NULL;
+  proc_ctx->renditions_arr = NULL;
+
+  proc_ctx->swr_out_ctx_arr = NULL;
+  proc_ctx->fsc_ctx_arr = NULL;
+
+  proc_ctx->ctx_map = NULL;
+  proc_ctx->idx_map = NULL;
+
+  if ((ret = proc_ctx->nb_in_streams =
     get_input_file_nb_streams(process_job_id, db)) < 0)
   {
     fprintf(stderr, "Failed to get number of streams in input file.\n");
     goto end;
   }
 
-  if (!(proc_ctx->idx_map = calloc(nb_in_streams, sizeof(int)))) {
+  if (!(proc_ctx->idx_map = calloc(proc_ctx->nb_in_streams, sizeof(int)))) {
     fprintf(stderr, "Failed to allocate map array.\n");
     goto end;
   }
 
-  for (i = 0; i < nb_in_streams; i++) {
+  for (i = 0; i < proc_ctx->nb_in_streams; i++) {
     proc_ctx->idx_map[i] = INACTIVE_STREAM;
+  }
+
+  if (!(proc_ctx->ctx_map = calloc(proc_ctx->nb_in_streams, sizeof(int)))) {
+    fprintf(stderr, "Failed to allocate context map.\n");
+    goto end;
   }
 
   if ((ret = proc_ctx->nb_selected_streams =
@@ -129,21 +403,21 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
     goto end;
   }
 
-  if (!(proc_ctx->passthrough =
+  if (!(proc_ctx->passthrough_arr =
     calloc(proc_ctx->nb_selected_streams, sizeof(int))))
   {
     fprintf(stderr, "Failed to allocate passthrough array.\n");
     goto end;
   }
 
-  if (!(proc_ctx->gain_boost =
+  if (!(proc_ctx->gain_boost_arr =
     calloc(proc_ctx->nb_selected_streams, sizeof(int))))
   {
     fprintf(stderr, "Failed to allocate gain boost array.\n");
     goto end;
   }
 
-  if (!(proc_ctx->renditions =
+  if (!(proc_ctx->renditions_arr =
     calloc(proc_ctx->nb_selected_streams, sizeof(int))))
   {
     fprintf(stderr, "Failed to allocate renditions array.\n");
@@ -166,21 +440,10 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
     goto end;
   }
 
-  if (!(proc_ctx->ctx_map = calloc(nb_in_streams, sizeof(int)))) {
-    fprintf(stderr, "Failed to allocate context map.\n");
-    goto end;
-  }
-
-  if (!(proc_ctx->idx_map = calloc(nb_in_streams, sizeof(int))))
-  {
-    fprintf(stderr, "Failed to allocate index map.\n");
-    goto end;
-  }
-
   return proc_ctx;
 
 end:
-  processing_context_free(proc_ctx);
+  processing_context_free(&proc_ctx);
   return NULL;
 }
 
@@ -196,9 +459,9 @@ void processing_context_free(ProcessingContext **proc_ctx)
     free((*proc_ctx)->stream_titles_arr);
   }
 
-  free((*proc_ctx)->passthrough);
-  free((*proc_ctx)->gain_boost);
-  free((*proc_ctx)->renditions);
+  free((*proc_ctx)->passthrough_arr);
+  free((*proc_ctx)->gain_boost_arr);
+  free((*proc_ctx)->renditions_arr);
 
   if ((*proc_ctx)->swr_out_ctx_arr) {
     for (i = 0; i < (*proc_ctx)->nb_selected_streams; i++) {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "proc.h"
 #include "input.h"
 #include "output.h"
 #include "utils.h"

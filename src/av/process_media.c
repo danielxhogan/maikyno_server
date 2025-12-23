@@ -238,6 +238,7 @@ int process_video(char *process_job_id, const char *batch_id)
   }
 
   int in_stream_idx, out_stream_idx;
+  ProcessingContext *proc_ctx = NULL;
   InputContext *in_ctx = NULL;
   OutputContext *out_ctx = NULL;
   enum AVMediaType codec_type;
@@ -253,6 +254,18 @@ int process_video(char *process_job_id, const char *batch_id)
     fprintf(stderr, "Failed to open database: %s\nError: %s\n",
       DATABASE_URL, sqlite3_errmsg(db));
     ret = -ret;
+    goto update_status;
+  }
+
+  if (!(proc_ctx = processing_context_alloc(process_job_id, db))) {
+    fprintf(stderr, "Failed to allocate processing context for\
+      process job: %s.\n", process_job_id);
+    goto update_status;
+  }
+
+  if ((ret = get_processing_info(proc_ctx, process_job_id, db)) < 0) {
+    fprintf(stderr, "Failed to get prcessing info for proces job: %s.\n",
+      process_job_id);
     goto update_status;
   }
 
@@ -388,6 +401,7 @@ update_status:
   }
 
   sqlite3_close(db);
+  processing_context_free(&proc_ctx);
   close_input(in_ctx);
   close_output(out_ctx);
 
