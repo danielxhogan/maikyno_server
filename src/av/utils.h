@@ -3,8 +3,7 @@
 #include "input.h"
 
 #include <sqlite3.h>
-#include <stdint.h>
-#include <string.h>
+#include <uuid/uuid.h>
 
 enum ProcessJobStatus {
   PENDING,
@@ -13,6 +12,8 @@ enum ProcessJobStatus {
   FAILED,
   ABORTED = -1024
 };
+
+#define LEN_UUID_STRING (sizeof(uuid_t) * 2) + 5
 
 int get_core_count();
 const char *job_status_enum_to_string(enum ProcessJobStatus status);
