@@ -1,12 +1,9 @@
 #include "swr.h"
-#include "input.h"
-#include "output.h"
-
-#include <libavutil/opt.h>
 
 SwrOutputContext *swr_output_context_alloc(AVCodecContext *dec_ctx,
   AVCodecContext *enc_ctx)
 {
+  int ret = 0;
   SwrOutputContext *swr_out_ctx;
 
   if (!(swr_out_ctx = malloc(sizeof(SwrOutputContext)))) {
@@ -36,8 +33,9 @@ SwrOutputContext *swr_output_context_alloc(AVCodecContext *dec_ctx,
   av_opt_set_sample_fmt(swr_out_ctx->swr_ctx,
     "out_sample_fmt", enc_ctx->sample_fmt, 0);
 
-  if (swr_init(swr_out_ctx->swr_ctx) < 0) {
-    fprintf(stderr, "Failed to initialize SwrContext.\n");
+  if ((ret = swr_init(swr_out_ctx->swr_ctx)) < 0) {
+    fprintf(stderr, "Failed to initialize SwrContext.\n\
+      Libav Error: %s\n", av_err2str(ret));
     return NULL;
   }
 
@@ -52,8 +50,9 @@ SwrOutputContext *swr_output_context_alloc(AVCodecContext *dec_ctx,
   swr_out_ctx->swr_frame->sample_rate = enc_ctx->sample_rate;
   swr_out_ctx->swr_frame->nb_samples = 1536;
 
-  if (av_frame_get_buffer(swr_out_ctx->swr_frame, 0) < 0) {
-    fprintf(stderr, "Failed to allocate buffers for frame.\n");
+  if ((ret = av_frame_get_buffer(swr_out_ctx->swr_frame, 0)) < 0) {
+    fprintf(stderr, "Failed to allocate buffers for frame.\n\
+      Libav Error: %s\n", av_err2str(ret));
     return NULL;
   }
 

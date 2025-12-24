@@ -410,48 +410,6 @@ static int open_encoder(AVCodecContext **enc_ctx,
   return 0;
 }
 
-static int initialize_swr(struct SwrContext **swr_ctx, AVCodecContext *dec_ctx,
-  AVCodecContext *enc_ctx, AVFrame **swr_frame)
-{
-  int ret = 0;
-
-  if (!(*swr_ctx = swr_alloc())) {
-    fprintf(stderr, "Failed to allocate SwrContext.\n");
-    ret = AVERROR(ENOMEM);
-    return ret;
-  }
-
-  av_opt_set_chlayout(*swr_ctx, "in_chlayout", &dec_ctx->ch_layout, 0);
-  av_opt_set_int(*swr_ctx, "in_sample_rate", dec_ctx->sample_rate, 0);
-  av_opt_set_sample_fmt(*swr_ctx, "in_sample_fmt", dec_ctx->sample_fmt, 0);
-  av_opt_set_chlayout(*swr_ctx, "out_chlayout", &enc_ctx->ch_layout, 0);
-  av_opt_set_int(*swr_ctx, "out_sample_rate", enc_ctx->sample_rate, 0);
-  av_opt_set_sample_fmt(*swr_ctx, "out_sample_fmt", enc_ctx->sample_fmt, 0);
-
-  if ((ret = swr_init(*swr_ctx)) < 0) {
-    fprintf(stderr, "Failed to initialize SwrContext.\n");
-    return ret;
-  }
-
-  if (!(*swr_frame = av_frame_alloc())) {
-    fprintf(stderr, "Failed to allocate AVFrame.\n");
-    ret = AVERROR(ENOMEM);
-    return ret;
-  }
-
-  (*swr_frame)->format = enc_ctx->sample_fmt;
-  av_channel_layout_copy(&(*swr_frame)->ch_layout, &enc_ctx->ch_layout);
-  (*swr_frame)->sample_rate = enc_ctx->sample_rate;
-  (*swr_frame)->nb_samples = 1536;
-
-  if ((ret = av_frame_get_buffer(*swr_frame, 0)) < 0) {
-    fprintf(stderr, "Failed to allocate buffers for frame.\n");
-    return ret;
-  }
-
-  return 0;
-}
-
 static int init_stream(AVFormatContext *fmt_ctx,
   AVCodecContext *enc_ctx, AVStream *in_stream, char *title)
 {
@@ -504,40 +462,39 @@ static int init_stream(AVFormatContext *fmt_ctx,
 OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
   char *process_job_id, sqlite3 *db)
 {
-  int ret, i, in_stream_idx, ctx_idx, out_stream_idx;
-  enum AVMediaType codec_type;
+  int in_stream_idx, ctx_idx, out_stream_idx,
+    extra, len_name, len_media_dir_path, ret = 0;
 
-  OutputContext *out_ctx = malloc(sizeof(OutputContext));
-  if (!out_ctx) {
+  const char *end;
+  char *select_video_info_query, *name, *media_dir_path,
+    *title, *out_filename = NULL;
+
+  sqlite3_stmt *select_video_info_stmt;
+  OutputContext *out_ctx;
+
+  if (!(out_ctx = malloc(sizeof(OutputContext)))) {
     ret = -ENOMEM;
-    goto end;
+    return NULL;
   }
 
   out_ctx->fmt_ctx = NULL;
   out_ctx->enc_ctx = NULL;
-  out_ctx->swr_ctx = NULL;
-  out_ctx->swr_frame = NULL;
-  out_ctx->fsc_ctx = NULL;
   out_ctx->enc_pkt = NULL;
-  out_ctx->nb_samples_encoded = NULL;
   out_ctx->nb_selected_streams = proc_ctx->nb_selected_streams;
 
-  char *select_video_info_query =
+  select_video_info_query  =
     "SELECT videos.name, videos.extra, media_dirs.real_path, process_jobs.title \
     FROM process_jobs \
     JOIN videos ON process_jobs.video_id = videos.id \
     JOIN media_dirs ON videos.media_dir_id = media_dirs.id \
     WHERE process_jobs.id = ?;";
-  sqlite3_stmt *select_video_info_stmt;
-  char *name, *media_dir_path, *title, *out_filename = NULL;
-  int extra, len_name, len_media_dir_path;
-  const char *end;
 
   if ((ret = sqlite3_prepare_v2(db, select_video_info_query, -1,
     &select_video_info_stmt, 0)) != SQLITE_OK)
   {
-    fprintf(stderr, "Failed to prepare video info statement while opening output \
-      for process job: %s\nError: %s\n", process_job_id, sqlite3_errmsg(db));
+    fprintf(stderr, "Failed to prepare video info statement while opening \
+       output for process job: %s\nSqlite Error: %s\n",
+       process_job_id, sqlite3_errmsg(db));
       ret = -ret;
       goto end;
   }
@@ -546,8 +503,8 @@ OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
     -1, SQLITE_STATIC);
 
   if ((ret = sqlite3_step(select_video_info_stmt)) != SQLITE_ROW) {
-    fprintf(stderr, "Failed to step through video info stmt while opening output \
-      for process job: %s\n", process_job_id);
+    fprintf(stderr, "Failed to step through video info stmt while opening \
+      output for process job: %s\n", process_job_id);
       ret = -ret;
     goto end;
   }
@@ -597,22 +554,25 @@ OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
   if ((ret = avformat_alloc_output_context2(
     &out_ctx->fmt_ctx, NULL, NULL, out_filename)))
   {
-    fprintf(stderr, "Failed to allocate output format context:\n\
-      video: %s\nprocess job:%s\n", name, process_job_id);
+    fprintf(stderr, "Failed to allocate output format context:\n video: %s\n\
+      process job:%s\nLivav Error: %s\n", name, process_job_id, av_err2str(ret));
     goto end;
   }
 
   if ((ret = av_dict_copy(&out_ctx->fmt_ctx->metadata,
     in_ctx->fmt_ctx->metadata, AV_DICT_DONT_OVERWRITE)) < 0)
   {
-    fprintf(stderr, "Failed to copy file metadata:\n\
-      video: %s\nprocess job: %s\n", name, process_job_id);
+    fprintf(stderr, "Failed to copy file metadata:\nvideo: %s\nprocess job: %s\n\
+      Libav Error: %s\n", name, process_job_id, av_err2str(ret));
     goto end;
   }
 
-  if ((ret = av_dict_set(&out_ctx->fmt_ctx->metadata, "title", title, 0)) < 0) {
-    fprintf(stderr, "Failed to set title for output format context.\n");
-    goto end;
+  if (title) {
+    if ((ret = av_dict_set(&out_ctx->fmt_ctx->metadata, "title", title, 0)) < 0) {
+      fprintf(stderr, "Failed to set title for output format context.\n\
+        Libav Error: %s\n", av_err2str(ret));
+      goto end;
+    }
   }
 
   if ((ret = copy_chapters(out_ctx->fmt_ctx, in_ctx->fmt_ctx)) < 0)
@@ -631,46 +591,6 @@ OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
     goto end;
   }
 
-  if (!(out_ctx->swr_ctx =
-    calloc(out_ctx->nb_selected_streams, sizeof(SwrContext *))))
-  {
-    fprintf(stderr, "Failed to allocate array for swr contexts:\n\
-      video: %s\nprocess job: %s\n", name, process_job_id);
-    ret = -ENOMEM;
-    goto end;
-  }
-
-  if (!(out_ctx->swr_frame =
-    calloc(out_ctx->nb_selected_streams, sizeof(AVFrame *))))
-  {
-    fprintf(stderr, "Failed to allocate array for swr frames:\n\
-      video: %s\nprocess job: %s\n", name, process_job_id);
-    ret = -ENOMEM;
-    goto end;
-  }
-
-  if (!(out_ctx->fsc_ctx =
-    calloc(out_ctx->nb_selected_streams, sizeof(FrameSizeConversionContext *))))
-  {
-    fprintf(stderr, "Failed to allocate array for fsc contexts:\n\
-      video: %s\nprocess job: %s\n", name, process_job_id);
-    ret = -ENOMEM;
-    goto end;
-  }
-
-  if (!(out_ctx->nb_samples_encoded =
-    calloc(out_ctx->nb_selected_streams, sizeof(uint64_t))))
-  {
-    fprintf(stderr, "Failed to allocate array for nb_samples_encoded:\n\
-      video: %s\nprocess job: %s\n", name, process_job_id);
-    ret = -ENOMEM;
-    goto end;
-  }
-
-  for (i = 0; i < out_ctx->nb_selected_streams; i++) {
-    out_ctx->nb_samples_encoded[i] = 0;
-  }
-
   for (
     in_stream_idx = 0;
     in_stream_idx < (int) in_ctx->fmt_ctx->nb_streams;
@@ -680,12 +600,8 @@ OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
 
     ctx_idx = proc_ctx->ctx_map[in_stream_idx];
     out_stream_idx = proc_ctx->idx_map[in_stream_idx];
-    printf("in_stream_idx: %d\n", in_stream_idx);
-    printf("ctx_idx: %d\n", ctx_idx);
-    printf("out_stream_idx: %d\n", out_stream_idx);
 
     if (in_ctx->dec_ctx[in_stream_idx]) {
-      codec_type = in_ctx->fmt_ctx->streams[in_stream_idx]->codecpar->codec_type;
 
       if ((ret = open_encoder(&out_ctx->enc_ctx[out_stream_idx],
         in_ctx->fmt_ctx->streams[in_stream_idx], in_ctx->fmt_ctx->url)) < 0)
@@ -694,28 +610,6 @@ OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
           output stream: %d\nvideo: %s\nprocess job: %s\n",
           in_stream_idx, name, process_job_id);
         goto end;
-      }
-
-      if (codec_type == AVMEDIA_TYPE_AUDIO)
-      {
-        if ((ret = initialize_swr(&out_ctx->swr_ctx[ctx_idx],
-          in_ctx->dec_ctx[in_stream_idx],
-          out_ctx->enc_ctx[out_stream_idx],
-          &out_ctx->swr_frame[ctx_idx])))
-        {
-          fprintf(stderr, "Failed to initialize swr context \
-            for output stream: %d\n", out_stream_idx);
-          goto end;
-        }
-
-        if (!(out_ctx->fsc_ctx[ctx_idx] =
-          fsc_ctx_alloc(out_ctx->enc_ctx[out_stream_idx])))
-        {
-          fprintf(stderr, "Failed to allocate fsc context \
-            for output stream: %d\n", out_stream_idx);
-          ret = -ENOMEM;
-          goto end;
-        }
       }
     }
 
@@ -755,7 +649,7 @@ end:
   free(out_filename);
 
   if (ret < 0 && ret != AVERROR_EOF && ret != AVERROR(EAGAIN)) {
-    fprintf(stderr, "\nLibav Error: %s\n", av_err2str(ret));
+    close_output(out_ctx);
     return NULL;
   }
 
@@ -779,28 +673,6 @@ void close_output(OutputContext *out_ctx)
     free(out_ctx->enc_ctx);
   }
 
-  if (out_ctx->swr_ctx) {
-    for (i = 0; i < out_ctx->nb_selected_streams; i++) {
-      swr_free(&out_ctx->swr_ctx[i]);
-    }
-    free(out_ctx->swr_ctx);
-  }
-
-  if (out_ctx->swr_frame) {
-    for (i = 0; i < out_ctx->nb_selected_streams; i++) {
-      av_frame_free(&out_ctx->swr_frame[i]);
-    }
-    free(out_ctx->swr_frame);
-  }
-
-  if (out_ctx->fsc_ctx) {
-    for (i = 0; i < out_ctx->nb_selected_streams; i++) {
-      fsc_ctx_free(out_ctx->fsc_ctx[i]);
-    }
-    free(out_ctx->fsc_ctx);
-  }
-
   av_packet_free(&out_ctx->enc_pkt);
-  free(out_ctx->nb_samples_encoded);
   free(out_ctx);
 }

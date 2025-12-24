@@ -74,30 +74,28 @@ int encode_audio_frame(OutputContext *out_ctx,
   return 0;
 }
 
-static int resample_audio_frame(InputContext *in_ctx, OutputContext *out_ctx,
-  int ctx_idx, int out_stream_idx)
+static int resample_audio_frame(ProcessingContext *proc_ctx, InputContext *in_ctx,
+  OutputContext *out_ctx, int ctx_idx, int out_stream_idx)
 {
   int ret, nb_converted_samples;
+  SwrOutputContext *swr_out_ctx = proc_ctx->swr_out_ctx_arr[ctx_idx];
+  FrameSizeConversionContext *fsc_ctx = proc_ctx->fsc_ctx_arr[ctx_idx];
 
-  AVFrame *swr_frame = out_ctx->swr_frame[ctx_idx];
-  FrameSizeConversionContext *fsc_ctx = out_ctx->fsc_ctx[ctx_idx];
-
-  if ((ret = av_frame_make_writable(swr_frame)) < 0) {
+  if ((ret = av_frame_make_writable(swr_out_ctx->swr_frame)) < 0) {
     fprintf(stderr, "Failed to make frame writable.\nError: %s.\n", av_err2str(ret));
     return ret;
   }
 
-  if ((ret = nb_converted_samples =
-    swr_convert(out_ctx->swr_ctx[ctx_idx], swr_frame->data,
-      swr_frame->nb_samples, (const uint8_t **) in_ctx->dec_frame->data,
-      in_ctx->dec_frame->nb_samples)) < 0)
+  if ((ret = nb_converted_samples = swr_convert(swr_out_ctx->swr_ctx,
+    swr_out_ctx->swr_frame->data, swr_out_ctx->swr_frame->nb_samples,
+    (const uint8_t **) in_ctx->dec_frame->data, in_ctx->dec_frame->nb_samples)) < 0)
   {
     fprintf(stderr, "Failed to convert audio frame.\nError: %s.\n", av_err2str(ret));
     return ret;
   }
 
   if ((ret = fsc_ctx_add_samples_to_buffer(
-    fsc_ctx, swr_frame, nb_converted_samples)) < 0)
+    fsc_ctx, swr_out_ctx->swr_frame, nb_converted_samples)) < 0)
   {
     fprintf(stderr, "Failed to add samples to buffer.\n");
     return ret;
@@ -107,13 +105,13 @@ static int resample_audio_frame(InputContext *in_ctx, OutputContext *out_ctx,
     out_ctx->enc_ctx[out_stream_idx]->frame_size)
   {
     if ((ret = fsc_ctx_make_frame(fsc_ctx,
-      out_ctx->nb_samples_encoded[ctx_idx])) < 0)
+      swr_out_ctx->nb_converted_samples)) < 0)
     {
       fprintf(stderr, "Failed to make frame for encoder.\n");
       return ret;
     }
 
-    out_ctx->nb_samples_encoded[out_stream_idx] +=
+    swr_out_ctx->nb_converted_samples +=
       out_ctx->enc_ctx[out_stream_idx]->frame_size;
 
     if ((ret = encode_audio_frame(out_ctx,
@@ -127,8 +125,8 @@ static int resample_audio_frame(InputContext *in_ctx, OutputContext *out_ctx,
   return 0;
 }
 
-int decode_packet(InputContext *in_ctx, OutputContext *out_ctx,
-  int in_stream_idx, int ctx_idx, int out_stream_idx)
+int decode_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
+  OutputContext *out_ctx, int in_stream_idx, int ctx_idx, int out_stream_idx)
 {
   int ret = 0;
   enum AVMediaType codec_type =
@@ -160,7 +158,8 @@ int decode_packet(InputContext *in_ctx, OutputContext *out_ctx,
       }
       else if (codec_type == AVMEDIA_TYPE_AUDIO)
       {
-        if ((ret = resample_audio_frame(in_ctx, out_ctx, ctx_idx, out_stream_idx)) < 0)
+        if ((ret = resample_audio_frame(proc_ctx, in_ctx,
+          out_ctx, ctx_idx, out_stream_idx)) < 0)
         {
           fprintf(stderr, "Failed to encode audio frame from input stream: %d.\n\n",
             in_stream_idx);
@@ -238,7 +237,7 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
       continue;
     }
 
-    if ((ret = decode_packet(in_ctx, out_ctx,
+    if ((ret = decode_packet(proc_ctx, in_ctx, out_ctx,
       in_stream_idx, ctx_idx, out_stream_idx)) < 0)
     {
       fprintf(stderr, "Failed to decode packet.\n");
@@ -262,11 +261,9 @@ int process_video(char *process_job_id, const char *batch_id)
     goto update_status;
   }
 
-  int in_stream_idx, out_stream_idx;
   ProcessingContext *proc_ctx = NULL;
   InputContext *in_ctx = NULL;
   OutputContext *out_ctx = NULL;
-  enum AVMediaType codec_type;
   sqlite3 *db;
 
   if (update_process_job_status(process_job_id, PROCESSING) < 0) {
@@ -305,6 +302,13 @@ int process_video(char *process_job_id, const char *batch_id)
     fprintf(stderr, "Failed to open output for process job: %s.\n",
       process_job_id);
     ret = -1;
+    goto update_status;
+  }
+
+  if ((ret = processing_context_init(proc_ctx, in_ctx, out_ctx,
+    process_job_id)) < 0)
+  {
+    fprintf(stderr, "Failed to initialize processing context.\n");
     goto update_status;
   }
 

@@ -490,3 +490,65 @@ int get_processing_info(ProcessingContext *proc_ctx,
 
   return 0;
 }
+
+int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
+  OutputContext *out_ctx, char *process_job_id)
+{
+  int in_stream_idx, ctx_idx, out_stream_idx, passthrough;
+  enum AVMediaType codec_type;
+  AVCodecContext *dec_ctx, *enc_ctx;
+
+  if (!(proc_ctx->swr_out_ctx_arr =
+    calloc(proc_ctx->nb_selected_streams, sizeof(SwrOutputContext *))))
+  {
+    fprintf(stderr, "Failed to allocate array for swr output contexts:\n\
+      process job: %s\n", process_job_id);
+    return -ENOMEM;
+  }
+
+  if (!(proc_ctx->fsc_ctx_arr =
+    calloc(proc_ctx->nb_selected_streams, sizeof(FrameSizeConversionContext *))))
+  {
+    fprintf(stderr, "Failed to allocate array for swr output contexts:\n\
+      process job: %s\n", process_job_id);
+    return -ENOMEM;
+  }
+
+  for (
+    in_stream_idx = 0;
+    in_stream_idx < (int) proc_ctx->nb_in_streams;
+    in_stream_idx++
+  ) {
+    ctx_idx = proc_ctx->ctx_map[in_stream_idx];
+    if (ctx_idx != INACTIVE_STREAM) {
+      passthrough = proc_ctx->passthrough_arr[ctx_idx];
+      if (passthrough) { continue; }
+    }
+    else { continue; }
+
+    codec_type = in_ctx->fmt_ctx->streams[in_stream_idx]->codecpar->codec_type;
+    if (codec_type == AVMEDIA_TYPE_AUDIO) {
+      dec_ctx = in_ctx->dec_ctx[in_stream_idx];
+    }
+    else { continue; }
+
+    out_stream_idx = proc_ctx->idx_map[in_stream_idx];
+    enc_ctx = out_ctx->enc_ctx[out_stream_idx];
+
+    if (!(proc_ctx->swr_out_ctx_arr[ctx_idx] =
+      swr_output_context_alloc(dec_ctx, enc_ctx)))
+    {
+      fprintf(stderr, "Failed to allocate swr output context for \
+        input stream: %d\nprocess job: %s\n", in_stream_idx, process_job_id);
+      return -1;
+    }
+
+    if (!(proc_ctx->fsc_ctx_arr[ctx_idx] = fsc_ctx_alloc(enc_ctx))) {
+      fprintf(stderr, "Failed to allocate fsc context for \
+        input stream: %d\nprocess job: %s\n", in_stream_idx, process_job_id);
+      return -1;
+    }
+  }
+
+  return 0;
+}
