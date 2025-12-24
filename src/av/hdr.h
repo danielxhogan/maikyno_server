@@ -1,7 +1,5 @@
 #pragma once
 
-#include "output.h"
-
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 #include <libavutil/opt.h>
