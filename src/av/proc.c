@@ -150,7 +150,7 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
       sqlite3_column_int(select_audio_stream_info_stmt, 3);
 
     proc_ctx->renditions_arr[*ctx_idx] =
-      sqlite3_column_int(select_audio_stream_info_stmt, 3);
+      sqlite3_column_int(select_audio_stream_info_stmt, 4);
 
     if (proc_ctx->renditions_arr[*ctx_idx]) { *out_stream_idx += 1; }
   }
@@ -386,6 +386,10 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   if (!(proc_ctx->ctx_map = calloc(proc_ctx->nb_in_streams, sizeof(int)))) {
     fprintf(stderr, "Failed to allocate context map.\n");
     goto end;
+  }
+
+  for (i = 0; i < proc_ctx->nb_in_streams; i++) {
+    proc_ctx->ctx_map[i] = INACTIVE_STREAM;
   }
 
   if ((ret = proc_ctx->nb_selected_streams =
