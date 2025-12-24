@@ -17,5 +17,6 @@ typedef struct InputContext {
   AVFrame *dec_frame;
 } InputContext;
 
-InputContext *open_input(char *process_job_id, sqlite3 *db);
+InputContext *open_input(ProcessingContext *proc_ctx,
+  char *process_job_id, sqlite3 *db);
 void close_input(InputContext *in_ctx);

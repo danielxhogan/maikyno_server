@@ -1,4 +1,5 @@
 #include "proc.h"
+#include "input.h"
 
 int get_video_processing_info(ProcessingContext *proc_ctx,
   char *process_job_id, int *ctx_idx, int *out_stream_idx, sqlite3 *db)
@@ -221,9 +222,11 @@ int get_subtitle_process_info(ProcessingContext *proc_ctx,
 
     burn_in = sqlite3_column_int(select_subtitle_stream_idx_stmt, 2);
     if (burn_in) { proc_ctx->burn_in_idx = in_stream_idx; }
-
-    *ctx_idx += 1;
-    *out_stream_idx += 1;
+    else {
+      proc_ctx->passthrough_arr[*ctx_idx] = 1;
+      *ctx_idx += 1;
+      *out_stream_idx += 1;
+    }
   }
 
 end:
