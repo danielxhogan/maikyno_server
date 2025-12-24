@@ -2,6 +2,8 @@
 
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
+#include <libswresample/swresample.h>
+#include <libavutil/opt.h>
 
 typedef struct SwrOutputContext {
   struct SwrContext *swr_ctx;

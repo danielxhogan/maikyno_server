@@ -1,24 +1,13 @@
 #pragma once
 
-#include "input.h"
+#include "types.h"
 #include "hdr.h"
-#include "fsc.h"
 
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
-#include <libswresample/swresample.h>
-#include <libavutil/opt.h>
-
-typedef struct OutputContext {
-  AVFormatContext *fmt_ctx;
-  AVCodecContext **enc_ctx;
-  SwrContext **swr_ctx;
-  FrameSizeConversionContext **fsc_ctx;
-  AVFrame **swr_frame;
-  AVPacket *enc_pkt;
-  uint64_t *nb_samples_encoded;
-  int nb_selected_streams;
-} OutputContext;
+// #include <libswresample/swresample.h>
+// #include <libavutil/opt.h>
+#include <sqlite3.h>
 
 OutputContext *open_output(ProcessingContext *proc_ctx,
   InputContext *in_ctx, char *process_job_id, sqlite3 *db);
