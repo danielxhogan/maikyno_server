@@ -7,11 +7,6 @@ use dotenvy::dotenv;
 
 fn main()
 {
-  println!("cargo::rerun-if-changed=src/av/make_clips.c");
-  println!("cargo::rerun-if-changed=src/av/make_clips.h");
-  println!("cargo::rerun-if-changed=src/av/test_difficulty.c");
-  println!("cargo::rerun-if-changed=src/av/test_difficulty.h");
-
   println!("cargo::rerun-if-changed=src/av/scan_media_streams.c");
   println!("cargo::rerun-if-changed=src/av/scan_media_streams.h");
   println!("cargo::rerun-if-changed=src/av/process_media.c");
@@ -55,9 +50,6 @@ fn main()
     std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
   let mut cc_builder = cc::Build::new();
-
-  cc_builder.file("src/av/make_clips.c");
-  cc_builder.file("src/av/test_difficulty.c");
 
   cc_builder.file("src/av/scan_media_streams.c");
   cc_builder.file("src/av/process_media.c");

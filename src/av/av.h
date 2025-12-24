@@ -9,6 +9,3 @@
 #include "swr.h"
 #include "fsc.h"
 #include "utils.h"
-
-#include "make_clips.h"
-#include "test_difficulty.h"
