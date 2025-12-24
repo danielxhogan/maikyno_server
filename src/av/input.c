@@ -141,8 +141,8 @@ int open_video_stream(InputContext *in_ctx, char *process_job_id,
     JOIN streams ON process_job_video_streams.stream_id = streams.id \
     WHERE process_job_video_streams.process_job_id = ?;";
   sqlite3_stmt *select_video_info_stmt = NULL;
-  char *title, *end;
-  int in_stream_idx, passthrough, len_title;
+  char *end;
+  int in_stream_idx, passthrough;
 
   if ((ret = sqlite3_prepare_v2(db, select_video_info_query, -1,
     &select_video_info_stmt, 0)) != SQLITE_OK)
@@ -164,26 +164,6 @@ int open_video_stream(InputContext *in_ctx, char *process_job_id,
   }
 
   in_stream_idx = sqlite3_column_int(select_video_info_stmt, 0);
-
-  title = (char *) sqlite3_column_text(select_video_info_stmt, 1);
-
-  if (title) {
-    printf("Output stream %d has title \"%s\".\n", out_stream_idx, title);
-
-    for (end = title; *end; end++);
-    len_title = end - title;
-
-    if (!(in_ctx->titles[in_stream_idx] =
-      calloc(len_title + 1, sizeof(char))))
-    {
-      fprintf(stderr, "Failed to allocate memory for title for stream: %d\n",
-        in_stream_idx);
-      ret = AVERROR(ENOMEM);
-      goto end;
-    }
-
-    strncat(in_ctx->titles[in_stream_idx], title, len_title);
-  }
 
   passthrough = sqlite3_column_int(select_video_info_stmt, 2);
 
@@ -221,8 +201,8 @@ int open_audio_streams(InputContext *in_ctx, char *process_job_id,
     JOIN streams ON process_job_audio_streams.stream_id = streams.id \
     WHERE process_job_audio_streams.process_job_id = ?;";
   sqlite3_stmt *select_audio_stream_info_stmt = NULL;
-  char *title, *end;
-  int in_stream_idx, passthrough, len_title;
+  char *end;
+  int in_stream_idx, passthrough;
 
   if ((ret = sqlite3_prepare_v2(db, select_audio_stream_info_query, -1,
     &select_audio_stream_info_stmt, 0)) != SQLITE_OK)
@@ -239,25 +219,6 @@ int open_audio_streams(InputContext *in_ctx, char *process_job_id,
   while ((ret = sqlite3_step(select_audio_stream_info_stmt)) == SQLITE_ROW)
   {
     in_stream_idx = sqlite3_column_int(select_audio_stream_info_stmt, 0);
-
-    title = (char *) sqlite3_column_text(select_audio_stream_info_stmt, 1);
-
-    if (title) {
-      printf("Output stream %d has title \"%s\".\n", out_stream_idx, title);
-      for (end = title; *end; end++);
-      len_title = end - title;
-
-      if (!(in_ctx->titles[in_stream_idx] =
-        calloc(len_title + 1, sizeof(char))))
-      {
-        fprintf(stderr, "Failed to allocate memory for title for stream: %d\n",
-          in_stream_idx);
-        ret = AVERROR(ENOMEM);
-        goto end;
-      }
-
-      strncat(in_ctx->titles[in_stream_idx], title, len_title);
-    }
 
     passthrough = sqlite3_column_int(select_audio_stream_info_stmt, 2);
 
@@ -298,8 +259,8 @@ int open_subtitle_streams(InputContext *in_ctx, char *process_job_id,
     JOIN streams ON process_job_subtitle_streams.stream_id = streams.id \
     WHERE process_job_subtitle_streams.process_job_id = ?;";
   sqlite3_stmt *select_subtitle_stream_idx_stmt = NULL;
-  char *title, *end;
-  int in_stream_idx, burn_in, len_title;
+  char *end;
+  int in_stream_idx, burn_in;
 
   if ((ret = sqlite3_prepare_v2(db, select_subtitle_stream_idx_query, -1,
     &select_subtitle_stream_idx_stmt, 0)) != SQLITE_OK)
@@ -316,25 +277,6 @@ int open_subtitle_streams(InputContext *in_ctx, char *process_job_id,
   while ((ret = sqlite3_step(select_subtitle_stream_idx_stmt)) == SQLITE_ROW)
   {
     in_stream_idx = sqlite3_column_int(select_subtitle_stream_idx_stmt, 0);
-
-    title = (char *) sqlite3_column_text(select_subtitle_stream_idx_stmt, 1);
-
-    if (title) {
-      printf("Output stream %d has title \"%s\".\n", out_stream_idx, title);
-      for (end = title; *end; end++);
-      len_title = end - title;
-
-      if (!(in_ctx->titles[in_stream_idx] =
-        calloc(len_title + 1, sizeof(char))))
-      {
-        fprintf(stderr, "Failed to allocate memory for title for stream: %d\n",
-          in_stream_idx);
-        ret = AVERROR(ENOMEM);
-        goto end;
-      }
-
-      strncat(in_ctx->titles[in_stream_idx], title, len_title);
-    }
 
     burn_in = sqlite3_column_int(select_subtitle_stream_idx_stmt, 2);
 
@@ -374,7 +316,6 @@ InputContext *open_input(char *process_job_id, sqlite3 *db)
   in_ctx->dec_ctx = NULL;
   in_ctx->init_pkt = NULL;
   in_ctx->dec_frame = NULL;
-  in_ctx->titles = NULL;
   in_ctx->nb_selected_streams = 0;
 
   if ((ret = get_input_file(&input_file, process_job_id, db)) < 0)
@@ -396,14 +337,6 @@ InputContext *open_input(char *process_job_id, sqlite3 *db)
   if ((ret = avformat_find_stream_info(in_ctx->fmt_ctx, NULL)) < 0) {
     fprintf(stderr, "Failed to retrieve input stream info for: %s\n",
       input_file);
-    goto end;
-  }
-
-  if (!(in_ctx->titles =
-    calloc(in_ctx->fmt_ctx->nb_streams, sizeof(char *))))
-  {
-    fprintf(stderr, "Failed to allocate titles array.\n");
-    ret = AVERROR(ENOMEM);
     goto end;
   }
 
@@ -473,13 +406,6 @@ void close_input(InputContext *in_ctx)
 {
   if (!in_ctx) return;
   unsigned int i;
-
-  if (in_ctx->titles) {
-    for (i = 0; i < in_ctx->fmt_ctx->nb_streams; i++) {
-      free(in_ctx->titles[i]);
-    }
-    free(in_ctx->titles);
-  }
 
   if (in_ctx->dec_ctx) {
     for (i = 0; i < in_ctx->fmt_ctx->nb_streams; i++) {

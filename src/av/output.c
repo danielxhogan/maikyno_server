@@ -719,7 +719,8 @@ OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
     }
 
     if ((ret = init_stream(out_ctx->fmt_ctx, out_ctx->enc_ctx[out_stream_idx],
-      in_ctx->fmt_ctx->streams[in_stream_idx], in_ctx->titles[in_stream_idx])) < 0)
+      in_ctx->fmt_ctx->streams[in_stream_idx],
+      proc_ctx->stream_titles_arr[ctx_idx])) < 0)
     {
       fprintf(stderr, "Failed to initialize stream:\n\
         output stream: %d\nvideo: %s\nprocess_job: %s\n",

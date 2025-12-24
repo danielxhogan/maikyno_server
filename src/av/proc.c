@@ -46,9 +46,6 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
   printf("\nInput stream %d is mapped to output stream %d.\n",
     in_stream_idx, *out_stream_idx);
 
-  *ctx_idx = 1;
-  *out_stream_idx = 1;
-
   title = (char *) sqlite3_column_text(select_video_info_stmt, 1);
 
   if (title) {
@@ -78,6 +75,8 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
   proc_ctx->renditions_arr[*ctx_idx] =
     sqlite3_column_int(select_video_info_stmt, 4);
 
+  *ctx_idx = 1;
+  *out_stream_idx = 1;
   if (proc_ctx->renditions_arr[*ctx_idx]) { *out_stream_idx += 1; }
 
 end:
@@ -122,8 +121,6 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
     proc_ctx->idx_map[in_stream_idx] = *out_stream_idx;
     printf("\nInput stream %d is mapped to output stream %d.\n",
       in_stream_idx, *out_stream_idx);
-    *ctx_idx += 1;
-    *out_stream_idx += 1;
 
     title = (char *) sqlite3_column_text(select_audio_stream_info_stmt, 1);
     if (title) {
@@ -152,6 +149,8 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
     proc_ctx->renditions_arr[*ctx_idx] =
       sqlite3_column_int(select_audio_stream_info_stmt, 4);
 
+    *ctx_idx += 1;
+    *out_stream_idx += 1;
     if (proc_ctx->renditions_arr[*ctx_idx]) { *out_stream_idx += 1; }
   }
 
@@ -201,8 +200,6 @@ int get_subtitle_process_info(ProcessingContext *proc_ctx,
     proc_ctx->idx_map[in_stream_idx] = *out_stream_idx;
     printf("\nInput stream %d is mapped to output stream %d.\n",
       in_stream_idx, *out_stream_idx);
-    *ctx_idx += 1;
-    *out_stream_idx += 1;
 
     title = (char *) sqlite3_column_text(select_subtitle_stream_idx_stmt, 1);
     if (title) {
@@ -224,6 +221,9 @@ int get_subtitle_process_info(ProcessingContext *proc_ctx,
 
     burn_in = sqlite3_column_int(select_subtitle_stream_idx_stmt, 2);
     if (burn_in) { proc_ctx->burn_in_idx = in_stream_idx; }
+
+    *ctx_idx += 1;
+    *out_stream_idx += 1;
   }
 
 end:
