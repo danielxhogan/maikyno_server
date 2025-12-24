@@ -519,7 +519,7 @@ OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
   out_ctx->fsc_ctx = NULL;
   out_ctx->enc_pkt = NULL;
   out_ctx->nb_samples_encoded = NULL;
-  out_ctx->nb_selected_streams = in_ctx->nb_selected_streams;
+  out_ctx->nb_selected_streams = proc_ctx->nb_selected_streams;
 
   char *select_video_info_query =
     "SELECT videos.name, videos.extra, media_dirs.real_path, process_jobs.title \

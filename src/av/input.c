@@ -53,41 +53,6 @@ end:
   return ret;
 }
 
-int get_stream_count(char *process_job_id, sqlite3 *db)
-{
-  int ret;
-  int stream_count;
-
-  char *select_stream_count_query =
-    "SELECT stream_count FROM process_jobs WHERE id = ?";
-  sqlite3_stmt *select_stream_count_stmt = NULL;
-
-  if ((ret = sqlite3_prepare_v2(db, select_stream_count_query, -1,
-    &select_stream_count_stmt, 0)) != SQLITE_OK)
-  {
-    fprintf(stderr, "Failed to prepare select stream count statement.\nError%s\n",
-      sqlite3_errmsg(db));
-    ret = -ret;
-    goto end;
-  }
-
-  sqlite3_bind_text(select_stream_count_stmt, 1, process_job_id, -1, SQLITE_STATIC);
-
-  if ((ret = sqlite3_step(select_stream_count_stmt)) != SQLITE_ROW) {
-    fprintf(stderr, "Failed to get stream count for process_job: %s\nError: %s\n",
-      process_job_id, sqlite3_errmsg(db));
-    ret = -ret;
-    goto end;
-  }
-
-  stream_count = sqlite3_column_int(select_stream_count_stmt, 0);
-
-end:
-  sqlite3_finalize(select_stream_count_stmt);
-  if (ret < 0) { return ret; }
-  return stream_count;
-}
-
 static int open_decoder(InputContext *in_ctx, int in_stream_idx)
 {
   int ret = 0;
@@ -316,7 +281,6 @@ InputContext *open_input(char *process_job_id, sqlite3 *db)
   in_ctx->dec_ctx = NULL;
   in_ctx->init_pkt = NULL;
   in_ctx->dec_frame = NULL;
-  in_ctx->nb_selected_streams = 0;
 
   if ((ret = get_input_file(&input_file, process_job_id, db)) < 0)
   {
@@ -339,14 +303,6 @@ InputContext *open_input(char *process_job_id, sqlite3 *db)
       input_file);
     goto end;
   }
-
-  if ((ret = stream_count = get_stream_count(process_job_id, db)) < 0) {
-    fprintf(stderr, "Failed to get stream count for process job: %s\n",
-      process_job_id);
-    goto end;
-  }
-
-  in_ctx->nb_selected_streams = stream_count;
 
   if (!(in_ctx->dec_ctx =
     calloc(in_ctx->fmt_ctx->nb_streams, sizeof(AVCodecContext *))))

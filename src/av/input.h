@@ -15,7 +15,6 @@ typedef struct InputContext {
   AVCodecContext **dec_ctx;
   AVPacket *init_pkt;
   AVFrame *dec_frame;
-  int nb_selected_streams;
 } InputContext;
 
 InputContext *open_input(char *process_job_id, sqlite3 *db);
