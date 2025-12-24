@@ -1,5 +1,6 @@
 #pragma once
 
+#include "input.h"
 #include "swr.h"
 #include "fsc.h"
 #include "utils.h"
