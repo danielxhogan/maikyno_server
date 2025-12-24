@@ -164,9 +164,6 @@ int open_video_stream(InputContext *in_ctx, char *process_job_id,
   }
 
   in_stream_idx = sqlite3_column_int(select_video_info_stmt, 0);
-  in_ctx->map[in_stream_idx] = (int) out_stream_idx;
-  printf("\nInput stream %d is mapped to output stream %d.\n",
-    in_stream_idx, out_stream_idx);
 
   title = (char *) sqlite3_column_text(select_video_info_stmt, 1);
 
@@ -242,9 +239,6 @@ int open_audio_streams(InputContext *in_ctx, char *process_job_id,
   while ((ret = sqlite3_step(select_audio_stream_info_stmt)) == SQLITE_ROW)
   {
     in_stream_idx = sqlite3_column_int(select_audio_stream_info_stmt, 0);
-    in_ctx->map[in_stream_idx] = out_stream_idx;
-    printf("\nInput stream %d is mapped to output stream %d.\n",
-      in_stream_idx, out_stream_idx);
 
     title = (char *) sqlite3_column_text(select_audio_stream_info_stmt, 1);
 
@@ -322,9 +316,6 @@ int open_subtitle_streams(InputContext *in_ctx, char *process_job_id,
   while ((ret = sqlite3_step(select_subtitle_stream_idx_stmt)) == SQLITE_ROW)
   {
     in_stream_idx = sqlite3_column_int(select_subtitle_stream_idx_stmt, 0);
-    in_ctx->map[in_stream_idx] = out_stream_idx;
-    printf("\nInput stream %d is mapped to output stream %d.\n",
-      in_stream_idx, out_stream_idx);
 
     title = (char *) sqlite3_column_text(select_subtitle_stream_idx_stmt, 1);
 
@@ -383,7 +374,6 @@ InputContext *open_input(char *process_job_id, sqlite3 *db)
   in_ctx->dec_ctx = NULL;
   in_ctx->init_pkt = NULL;
   in_ctx->dec_frame = NULL;
-  in_ctx->map = NULL;
   in_ctx->titles = NULL;
   in_ctx->nb_selected_streams = 0;
 
@@ -407,18 +397,6 @@ InputContext *open_input(char *process_job_id, sqlite3 *db)
     fprintf(stderr, "Failed to retrieve input stream info for: %s\n",
       input_file);
     goto end;
-  }
-
-  if (!(in_ctx->map =
-    calloc(in_ctx->fmt_ctx->nb_streams, sizeof(int))))
-  {
-    fprintf(stderr, "Failed to allocate map array.\n");
-    ret = AVERROR(ENOMEM);
-    goto end;
-  }
-
-  for (i = 0; i < in_ctx->fmt_ctx->nb_streams; i++) {
-    in_ctx->map[i] = INACTIVE_STREAM;
   }
 
   if (!(in_ctx->titles =
@@ -514,6 +492,5 @@ void close_input(InputContext *in_ctx)
 
   av_packet_free(&in_ctx->init_pkt);
   av_frame_free(&in_ctx->dec_frame);
-  free(in_ctx->map);
   free(in_ctx);
 }

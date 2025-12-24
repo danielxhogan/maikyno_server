@@ -500,9 +500,10 @@ static int init_stream(AVFormatContext *fmt_ctx,
   return 0;
 }
 
-OutputContext *open_output(InputContext *in_ctx, char *process_job_id, sqlite3 *db)
+OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
+  char *process_job_id, sqlite3 *db)
 {
-  int ret, i, in_stream_idx, out_stream_idx;
+  int ret, i, in_stream_idx, ctx_idx, out_stream_idx;
   enum AVMediaType codec_type;
 
   OutputContext *out_ctx = malloc(sizeof(OutputContext));
@@ -674,9 +675,13 @@ OutputContext *open_output(InputContext *in_ctx, char *process_job_id, sqlite3 *
     in_stream_idx < (int) in_ctx->fmt_ctx->nb_streams;
     in_stream_idx++
   ) {
-    if (in_ctx->map[in_stream_idx] == INACTIVE_STREAM) { continue; }
+    if (proc_ctx->ctx_map[in_stream_idx] == INACTIVE_STREAM) { continue; }
 
-    out_stream_idx = in_ctx->map[in_stream_idx];
+    ctx_idx = proc_ctx->ctx_map[in_stream_idx];
+    out_stream_idx = proc_ctx->idx_map[in_stream_idx];
+    printf("in_stream_idx: %d\n", in_stream_idx);
+    printf("ctx_idx: %d\n", ctx_idx);
+    printf("out_stream_idx: %d\n", out_stream_idx);
 
     if (in_ctx->dec_ctx[in_stream_idx]) {
       codec_type = in_ctx->fmt_ctx->streams[in_stream_idx]->codecpar->codec_type;
@@ -692,17 +697,17 @@ OutputContext *open_output(InputContext *in_ctx, char *process_job_id, sqlite3 *
 
       if (codec_type == AVMEDIA_TYPE_AUDIO)
       {
-        if ((ret = initialize_swr(&out_ctx->swr_ctx[out_stream_idx],
+        if ((ret = initialize_swr(&out_ctx->swr_ctx[ctx_idx],
           in_ctx->dec_ctx[in_stream_idx],
           out_ctx->enc_ctx[out_stream_idx],
-          &out_ctx->swr_frame[out_stream_idx])))
+          &out_ctx->swr_frame[ctx_idx])))
         {
           fprintf(stderr, "Failed to initialize swr context \
             for output stream: %d\n", out_stream_idx);
           goto end;
         }
 
-        if (!(out_ctx->fsc_ctx[out_stream_idx] =
+        if (!(out_ctx->fsc_ctx[ctx_idx] =
           fsc_ctx_alloc(out_ctx->enc_ctx[out_stream_idx])))
         {
           fprintf(stderr, "Failed to allocate fsc context \

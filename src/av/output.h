@@ -20,6 +20,6 @@ typedef struct OutputContext {
   int nb_selected_streams;
 } OutputContext;
 
-OutputContext *open_output(InputContext *in_ctx,
-  char *process_job_id, sqlite3 *db);
+OutputContext *open_output(ProcessingContext *proc_ctx,
+  InputContext *in_ctx, char *process_job_id, sqlite3 *db);
 void close_output(OutputContext *out_ctx);

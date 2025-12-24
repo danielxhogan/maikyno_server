@@ -75,12 +75,12 @@ int encode_audio_frame(OutputContext *out_ctx,
 }
 
 static int resample_audio_frame(InputContext *in_ctx, OutputContext *out_ctx,
-  int out_stream_idx)
+  int ctx_idx, int out_stream_idx)
 {
   int ret, nb_converted_samples;
 
-  AVFrame *swr_frame = out_ctx->swr_frame[out_stream_idx];
-  FrameSizeConversionContext *fsc_ctx = out_ctx->fsc_ctx[out_stream_idx];
+  AVFrame *swr_frame = out_ctx->swr_frame[ctx_idx];
+  FrameSizeConversionContext *fsc_ctx = out_ctx->fsc_ctx[ctx_idx];
 
   if ((ret = av_frame_make_writable(swr_frame)) < 0) {
     fprintf(stderr, "Failed to make frame writable.\nError: %s.\n", av_err2str(ret));
@@ -88,7 +88,7 @@ static int resample_audio_frame(InputContext *in_ctx, OutputContext *out_ctx,
   }
 
   if ((ret = nb_converted_samples =
-    swr_convert(out_ctx->swr_ctx[out_stream_idx], swr_frame->data,
+    swr_convert(out_ctx->swr_ctx[ctx_idx], swr_frame->data,
       swr_frame->nb_samples, (const uint8_t **) in_ctx->dec_frame->data,
       in_ctx->dec_frame->nb_samples)) < 0)
   {
@@ -107,7 +107,7 @@ static int resample_audio_frame(InputContext *in_ctx, OutputContext *out_ctx,
     out_ctx->enc_ctx[out_stream_idx]->frame_size)
   {
     if ((ret = fsc_ctx_make_frame(fsc_ctx,
-      out_ctx->nb_samples_encoded[out_stream_idx])) < 0)
+      out_ctx->nb_samples_encoded[ctx_idx])) < 0)
     {
       fprintf(stderr, "Failed to make frame for encoder.\n");
       return ret;
@@ -128,7 +128,7 @@ static int resample_audio_frame(InputContext *in_ctx, OutputContext *out_ctx,
 }
 
 int decode_packet(InputContext *in_ctx, OutputContext *out_ctx,
-  int in_stream_idx, int out_stream_idx)
+  int in_stream_idx, int ctx_idx, int out_stream_idx)
 {
   int ret = 0;
   enum AVMediaType codec_type =
@@ -159,7 +159,7 @@ int decode_packet(InputContext *in_ctx, OutputContext *out_ctx,
     }
     else if (codec_type == AVMEDIA_TYPE_AUDIO)
     {
-      if ((ret = resample_audio_frame(in_ctx, out_ctx, out_stream_idx)) < 0)
+      if ((ret = resample_audio_frame(in_ctx, out_ctx, ctx_idx, out_stream_idx)) < 0)
       {
         fprintf(stderr, "Failed to encode audio frame from input stream: %d.\n\n",
           in_stream_idx);
@@ -204,9 +204,10 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
   while ((ret = av_read_frame(in_ctx->fmt_ctx, in_ctx->init_pkt)) >= 0)
   {
     int in_stream_idx = in_ctx->init_pkt->stream_index;
-    int out_stream_idx = in_ctx->map[in_stream_idx];
+    int ctx_idx = proc_ctx->ctx_map[in_stream_idx];
+    int out_stream_idx = proc_ctx->idx_map[in_stream_idx];
 
-    if (out_stream_idx == INACTIVE_STREAM) {
+    if (ctx_idx == INACTIVE_STREAM) {
       av_packet_unref(in_ctx->init_pkt);
       continue;
     }
@@ -235,7 +236,9 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
       continue;
     }
 
-    if ((ret = decode_packet(in_ctx, out_ctx, in_stream_idx, out_stream_idx)) < 0) {
+    if ((ret = decode_packet(in_ctx, out_ctx,
+      in_stream_idx, ctx_idx, out_stream_idx)) < 0)
+    {
       fprintf(stderr, "Failed to decode packet.\n");
       return ret;
     }
@@ -296,7 +299,7 @@ int process_video(char *process_job_id, const char *batch_id)
     goto update_status;
   }
 
-  if (!(out_ctx = open_output(in_ctx, process_job_id, db))) {
+  if (!(out_ctx = open_output(proc_ctx, in_ctx, process_job_id, db))) {
     fprintf(stderr, "Failed to open output for process job: %s.\n",
       process_job_id);
     ret = -1;
@@ -306,86 +309,86 @@ int process_video(char *process_job_id, const char *batch_id)
   sqlite3_close(db);
   db = NULL;
 
-  if ((ret = transcode(in_ctx, out_ctx, batch_id, process_job_id)) < 0) {
+  if ((ret = transcode(proc_ctx, in_ctx, out_ctx, batch_id, process_job_id)) < 0) {
     fprintf(stderr, "Failed to transcode process job: %s.\n", process_job_id);
   }
 
-  for (
-    in_stream_idx = 0;
-    in_stream_idx < (int) in_ctx->fmt_ctx->nb_streams;
-    in_stream_idx++
-  ) {
-    out_stream_idx = in_ctx->map[in_stream_idx];
+  // for (
+  //   in_stream_idx = 0;
+  //   in_stream_idx < (int) in_ctx->fmt_ctx->nb_streams;
+  //   in_stream_idx++
+  // ) {
+  //   out_stream_idx = in_ctx->map[in_stream_idx];
 
-    if (in_ctx->dec_ctx[in_stream_idx]) {
-      if (avcodec_send_packet(in_ctx->dec_ctx[in_stream_idx], NULL) < 0)
-      {
-        fprintf(stderr, "Failed to send packet to decoder.\n");
-        continue;
-      }
+  //   if (in_ctx->dec_ctx[in_stream_idx]) {
+  //     if (avcodec_send_packet(in_ctx->dec_ctx[in_stream_idx], NULL) < 0)
+  //     {
+  //       fprintf(stderr, "Failed to send packet to decoder.\n");
+  //       continue;
+  //     }
 
-      while (avcodec_receive_frame(in_ctx->dec_ctx[in_stream_idx],
-          in_ctx->dec_frame) >= 0)
-      {
-        codec_type = in_ctx->dec_ctx[in_stream_idx]->codec_type;
+  //     while (avcodec_receive_frame(in_ctx->dec_ctx[in_stream_idx],
+  //         in_ctx->dec_frame) >= 0)
+  //     {
+  //       codec_type = in_ctx->dec_ctx[in_stream_idx]->codec_type;
 
-        if (codec_type == AVMEDIA_TYPE_VIDEO)
-        {
-          if (encode_video_frame(in_ctx, out_ctx,
-            in_stream_idx, out_stream_idx) < 0)
-          {
-            fprintf(stderr,
-              "Failed to encode video frame from input stream: %d.\n",
-              in_stream_idx);
-            break;
-          }
-        }
-        else if (codec_type == AVMEDIA_TYPE_AUDIO)
-        {
-          if (encode_audio_frame(out_ctx, out_stream_idx, NULL) < 0) {
-            fprintf(stderr,
-              "Failed to encode audio frame from input stream: %d.\n",
-              in_stream_idx);
-            break;
-          }
-        }
-      }
-    }
-  }
+  //       if (codec_type == AVMEDIA_TYPE_VIDEO)
+  //       {
+  //         if (encode_video_frame(in_ctx, out_ctx,
+  //           in_stream_idx, out_stream_idx) < 0)
+  //         {
+  //           fprintf(stderr,
+  //             "Failed to encode video frame from input stream: %d.\n",
+  //             in_stream_idx);
+  //           break;
+  //         }
+  //       }
+  //       else if (codec_type == AVMEDIA_TYPE_AUDIO)
+  //       {
+  //         if (encode_audio_frame(out_ctx, out_stream_idx, NULL) < 0) {
+  //           fprintf(stderr,
+  //             "Failed to encode audio frame from input stream: %d.\n",
+  //             in_stream_idx);
+  //           break;
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
 
-  for (
-    in_stream_idx = 0;
-    in_stream_idx < (int) in_ctx->fmt_ctx->nb_streams;
-    in_stream_idx++
-  ) {
-    out_stream_idx = in_ctx->map[in_stream_idx];
+  // for (
+  //   in_stream_idx = 0;
+  //   in_stream_idx < (int) in_ctx->fmt_ctx->nb_streams;
+  //   in_stream_idx++
+  // ) {
+  //   out_stream_idx = in_ctx->map[in_stream_idx];
 
-    if (in_ctx->dec_ctx[in_stream_idx])
-    {
-      codec_type = out_ctx->enc_ctx[out_stream_idx]->codec_type;
-      in_ctx->dec_frame = NULL;
+  //   if (in_ctx->dec_ctx[in_stream_idx])
+  //   {
+  //     codec_type = out_ctx->enc_ctx[out_stream_idx]->codec_type;
+  //     in_ctx->dec_frame = NULL;
 
-      if (codec_type == AVMEDIA_TYPE_VIDEO)
-      {
-        if (encode_video_frame(in_ctx, out_ctx,
-          in_stream_idx, out_stream_idx) < 0)
-        {
-          fprintf(stderr,
-            "Failed to encode video frame from input stream: %d.\n",
-            in_stream_idx);
-        }
-      }
-      else if (codec_type == AVMEDIA_TYPE_AUDIO)
-      {
-        if (encode_audio_frame(out_ctx, out_stream_idx, NULL) < 0)
-        {
-          fprintf(stderr,
-            "Failed to encode audio frame from input stream: %d.\n",
-            in_stream_idx);
-        }
-      }
-    }
-  }
+  //     if (codec_type == AVMEDIA_TYPE_VIDEO)
+  //     {
+  //       if (encode_video_frame(in_ctx, out_ctx,
+  //         in_stream_idx, out_stream_idx) < 0)
+  //       {
+  //         fprintf(stderr,
+  //           "Failed to encode video frame from input stream: %d.\n",
+  //           in_stream_idx);
+  //       }
+  //     }
+  //     else if (codec_type == AVMEDIA_TYPE_AUDIO)
+  //     {
+  //       if (encode_audio_frame(out_ctx, out_stream_idx, NULL) < 0)
+  //       {
+  //         fprintf(stderr,
+  //           "Failed to encode audio frame from input stream: %d.\n",
+  //           in_stream_idx);
+  //       }
+  //     }
+  //   }
+  // }
 
   if (av_write_trailer(out_ctx->fmt_ctx) < 0) {
     fprintf(stderr, "Failed to write trailer to file.\n");

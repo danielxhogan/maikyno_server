@@ -15,7 +15,6 @@ typedef struct InputContext {
   AVCodecContext **dec_ctx;
   AVPacket *init_pkt;
   AVFrame *dec_frame;
-  int *map;
   char **titles;
   int nb_selected_streams;
 } InputContext;
