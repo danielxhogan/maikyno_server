@@ -459,17 +459,189 @@ static int init_stream(AVFormatContext *fmt_ctx,
   return 0;
 }
 
+int get_file_data(char **name, int *extra, char **media_dir_path, char **title,
+  sqlite3 *db, char *process_job_id)
+{
+  *name = NULL;
+  *media_dir_path = NULL;
+  *title = NULL;
+
+  int len_name, len_media_dir_path, len_title, ret = 0;
+  char *tmp_name, *tmp_media_dir_path, *tmp_title, *select_video_info_query, *end;
+  sqlite3_stmt *select_video_info_stmt = NULL;
+
+  select_video_info_query =
+    "SELECT videos.name, videos.extra, media_dirs.real_path, process_jobs.title \
+    FROM process_jobs \
+    JOIN videos ON process_jobs.video_id = videos.id \
+    JOIN media_dirs ON videos.media_dir_id = media_dirs.id \
+    WHERE process_jobs.id = ?;";
+
+  if ((ret = sqlite3_prepare_v2(db, select_video_info_query, -1,
+    &select_video_info_stmt, 0)) != SQLITE_OK)
+  {
+    fprintf(stderr, "Failed to prepare video info statement while opening \
+       output for process job: %s.\nSqlite Error: %s.\n",
+       process_job_id, sqlite3_errmsg(db));
+    ret = -ret;
+    goto end;
+  }
+
+  sqlite3_bind_text(select_video_info_stmt, 1, process_job_id,
+    -1, SQLITE_STATIC);
+
+  if ((ret = sqlite3_step(select_video_info_stmt)) != SQLITE_ROW) {
+    fprintf(stderr, "Failed to step through video info stmt while opening \
+      output for process job: %s.\nSqlite Error: %s.\n",
+      process_job_id, sqlite3_errmsg(db));
+    ret = -ret;
+    goto end;
+  }
+
+  tmp_name = (char *) sqlite3_column_text(select_video_info_stmt, 0);
+  *extra = sqlite3_column_int(select_video_info_stmt, 1);
+  tmp_media_dir_path = (char *) sqlite3_column_text(select_video_info_stmt, 2);
+  tmp_title = (char *) sqlite3_column_text(select_video_info_stmt, 3);
+
+  for (end = tmp_name; *end; end++);
+  len_name = end - tmp_name;
+
+  if (!(*name = calloc(len_name, sizeof(char *))))
+  {
+    fprintf(stderr, "Failed to allocate name of file for process job: %s.\n",
+      process_job_id);
+    goto end;
+  }
+
+  memcpy(*name, tmp_name, len_name);
+
+  for (end = tmp_media_dir_path; *end; end++);
+  len_media_dir_path = end - tmp_media_dir_path;
+
+  if (!(*media_dir_path = calloc(len_media_dir_path, sizeof(char *))))
+  {
+    fprintf(stderr, "Failed to allocate media dir path of file for process job: %s.\n",
+      process_job_id);
+    goto end;
+  }
+
+  memcpy(*media_dir_path, tmp_media_dir_path, len_media_dir_path);
+
+  for (end = tmp_title; *end; end++);
+  len_title = end - tmp_title;
+
+  if (!(*title = calloc(len_title, sizeof(char *))))
+  {
+    fprintf(stderr, "Failed to allocate title of file for process job: %s.\n",
+      process_job_id);
+    goto end;
+  }
+
+  memcpy(*title, tmp_title, len_title);
+
+end:
+  sqlite3_finalize(select_video_info_stmt);
+
+  if (ret < 0) {
+    free(*name);
+    *name = NULL;
+    free(*media_dir_path);
+    *media_dir_path = NULL;
+    free(*title);
+    *title = NULL;
+    return ret;
+  }
+
+  return 0;
+}
+
+int make_output_filename_string(char **out_filename,
+  char *name, char *media_dir_path, int extra, char *process_job_id)
+{
+  char *end;
+  int len_name, len_media_dir_path;
+
+  for (end = name; *end; end++);
+  len_name = end - name;
+
+  for (end = media_dir_path; *end; end++);
+  len_media_dir_path = end - media_dir_path;
+
+  if (extra) {
+    if (!(*out_filename =
+      calloc(len_media_dir_path + len_name + 14, sizeof(char))))
+    {
+      fprintf(stderr, "Failed to allocate output filename for video: %s \
+        for process job: %s.\n", name, process_job_id);
+      return -ENOMEM;
+    }
+
+    strncat(*out_filename, media_dir_path, len_media_dir_path);
+    strcat(*out_filename, "/proc/extras/");
+    strncat(*out_filename, name, len_name);
+  }
+  else {
+    if (!(*out_filename =
+      calloc(len_media_dir_path + len_name + 7, sizeof(char))))
+    {
+      fprintf(stderr, "Failed to allocate output filename for video: %s \
+        for process job: %s.\n", name, process_job_id);
+      return -ENOMEM;
+    }
+
+    strncat(*out_filename, media_dir_path, len_media_dir_path);
+    strcat(*out_filename, "/proc/");
+    strncat(*out_filename, name, len_name);
+  }
+
+  return 0;
+}
+
+int open_encoders_and_streams(ProcessingContext *proc_ctx,
+  InputContext *in_ctx, OutputContext *out_ctx, char *process_job_id)
+{
+  int in_stream_idx, ctx_idx, out_stream_idx, ret = 0;
+  for (
+    in_stream_idx = 0;
+    in_stream_idx < (int) in_ctx->fmt_ctx->nb_streams;
+    in_stream_idx++
+  ) {
+    if (proc_ctx->ctx_map[in_stream_idx] == INACTIVE_STREAM) { continue; }
+
+    ctx_idx = proc_ctx->ctx_map[in_stream_idx];
+    out_stream_idx = proc_ctx->idx_map[in_stream_idx];
+
+    if (in_ctx->dec_ctx[in_stream_idx]) {
+
+      if ((ret = open_encoder(&out_ctx->enc_ctx[out_stream_idx],
+        in_ctx->fmt_ctx->streams[in_stream_idx], in_ctx->fmt_ctx->url)) < 0)
+      {
+        fprintf(stderr, "Failed to open encoder for output stream: %d.\n\
+          process job: %s.\nLibav Error: %s.\n",
+          in_stream_idx, process_job_id, av_err2str(ret));
+        return ret;
+      }
+    }
+
+    if ((ret = init_stream(out_ctx->fmt_ctx, out_ctx->enc_ctx[out_stream_idx],
+      in_ctx->fmt_ctx->streams[in_stream_idx],
+      proc_ctx->stream_titles_arr[ctx_idx])) < 0)
+    {
+      fprintf(stderr, "Failed to initialize stream for output stream: %d.\n\
+        process_job: %s.\nLibav Error: %s.\n",
+        in_stream_idx, process_job_id, av_err2str(ret));
+      return ret;
+    }
+  }
+
+  return 0;
+}
+
 OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
   char *process_job_id, sqlite3 *db)
 {
-  int in_stream_idx, ctx_idx, out_stream_idx,
-    extra, len_name, len_media_dir_path, ret = 0;
-
-  const char *end;
-  char *select_video_info_query, *name, *media_dir_path,
-    *title, *out_filename = NULL;
-
-  sqlite3_stmt *select_video_info_stmt;
+  int extra, ret = 0;
+  char *name = NULL, *media_dir_path = NULL, *title = NULL, *out_filename = NULL;
   OutputContext *out_ctx;
 
   if (!(out_ctx = malloc(sizeof(OutputContext)))) {
@@ -482,71 +654,20 @@ OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
   out_ctx->enc_pkt = NULL;
   out_ctx->nb_selected_streams = proc_ctx->nb_selected_streams;
 
-  select_video_info_query  =
-    "SELECT videos.name, videos.extra, media_dirs.real_path, process_jobs.title \
-    FROM process_jobs \
-    JOIN videos ON process_jobs.video_id = videos.id \
-    JOIN media_dirs ON videos.media_dir_id = media_dirs.id \
-    WHERE process_jobs.id = ?;";
-
-  if ((ret = sqlite3_prepare_v2(db, select_video_info_query, -1,
-    &select_video_info_stmt, 0)) != SQLITE_OK)
+  if ((ret = get_file_data(&name, &extra, &media_dir_path, &title,
+    db, process_job_id)) < 0)
   {
-    fprintf(stderr, "Failed to prepare video info statement while opening \
-       output for process job: %s\nSqlite Error: %s\n",
-       process_job_id, sqlite3_errmsg(db));
-      ret = -ret;
-      goto end;
-  }
-
-  sqlite3_bind_text(select_video_info_stmt, 1, process_job_id,
-    -1, SQLITE_STATIC);
-
-  if ((ret = sqlite3_step(select_video_info_stmt)) != SQLITE_ROW) {
-    fprintf(stderr, "Failed to step through video info stmt while opening \
-      output for process job: %s\n", process_job_id);
-      ret = -ret;
+    fprintf(stderr, "Failed to get file data for process job: %s.\n",
+      process_job_id);
     goto end;
   }
 
-  name = (char *) sqlite3_column_text(select_video_info_stmt, 0);
-  extra = sqlite3_column_int(select_video_info_stmt, 1);
-  media_dir_path = (char *) sqlite3_column_text(select_video_info_stmt, 2);
-  title = (char *) sqlite3_column_text(select_video_info_stmt, 3);
-
-  for (end = name; *end; end++);
-  len_name = end - name;
-
-  for (end = media_dir_path; *end; end++);
-  len_media_dir_path = end - media_dir_path;
-
-  if (extra) {
-    if (!(out_filename =
-      calloc(len_media_dir_path + len_name + 14, sizeof(char))))
-    {
-      fprintf(stderr, "Failed to allocate output filename for video: %s \
-        for process job: %s.\n", name, process_job_id);
-      ret = -ENOMEM;
-      goto end;
-    }
-
-    strncat(out_filename, media_dir_path, len_media_dir_path);
-    strcat(out_filename, "/proc/extras/");
-    strncat(out_filename, name, len_name);
-  }
-  else {
-    if (!(out_filename =
-      calloc(len_media_dir_path + len_name + 7, sizeof(char))))
-    {
-      fprintf(stderr, "Failed to allocate output filename for video: %s \
-        for process job: %s.\n", name, process_job_id);
-      ret = -ENOMEM;
-      goto end;
-    }
-
-    strncat(out_filename, media_dir_path, len_media_dir_path);
-    strcat(out_filename, "/proc/");
-    strncat(out_filename, name, len_name);
+  if ((ret = make_output_filename_string(&out_filename,
+    name, media_dir_path, extra, process_job_id)) < 0)
+  {
+    fprintf(stderr, "Failed to get output filename for process job: %s.\n",
+      process_job_id);
+    goto end;
   }
 
   printf("\nOpening output file \"%s\".\n", out_filename);
@@ -591,37 +712,12 @@ OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
     goto end;
   }
 
-  for (
-    in_stream_idx = 0;
-    in_stream_idx < (int) in_ctx->fmt_ctx->nb_streams;
-    in_stream_idx++
-  ) {
-    if (proc_ctx->ctx_map[in_stream_idx] == INACTIVE_STREAM) { continue; }
-
-    ctx_idx = proc_ctx->ctx_map[in_stream_idx];
-    out_stream_idx = proc_ctx->idx_map[in_stream_idx];
-
-    if (in_ctx->dec_ctx[in_stream_idx]) {
-
-      if ((ret = open_encoder(&out_ctx->enc_ctx[out_stream_idx],
-        in_ctx->fmt_ctx->streams[in_stream_idx], in_ctx->fmt_ctx->url)) < 0)
-      {
-        fprintf(stderr, "Failed to open encoder:\n\
-          output stream: %d\nvideo: %s\nprocess job: %s\n",
-          in_stream_idx, name, process_job_id);
-        goto end;
-      }
-    }
-
-    if ((ret = init_stream(out_ctx->fmt_ctx, out_ctx->enc_ctx[out_stream_idx],
-      in_ctx->fmt_ctx->streams[in_stream_idx],
-      proc_ctx->stream_titles_arr[ctx_idx])) < 0)
-    {
-      fprintf(stderr, "Failed to initialize stream:\n\
-        output stream: %d\nvideo: %s\nprocess_job: %s\n",
-        in_stream_idx, name, process_job_id);
-      goto end;
-    }
+  if ((ret = open_encoders_and_streams(proc_ctx,
+    in_ctx, out_ctx, process_job_id)) < 0)
+  {
+    fprintf(stderr, "Failed to open encoders and streams for process job: %s.\n",
+      process_job_id);
+    goto end;
   }
 
   if (!(out_ctx->enc_pkt = av_packet_alloc())) {
@@ -645,10 +741,12 @@ OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
   }
 
 end:
-  sqlite3_finalize(select_video_info_stmt);
   free(out_filename);
+  free(name);
+  free(media_dir_path);
+  free(title);
 
-  if (ret < 0 && ret != AVERROR_EOF && ret != AVERROR(EAGAIN)) {
+  if (ret < 0) {
     close_output(out_ctx);
     return NULL;
   }
