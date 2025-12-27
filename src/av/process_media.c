@@ -432,7 +432,7 @@ update_status:
   sqlite3_close(db);
   processing_context_free(&proc_ctx);
   close_input(in_ctx);
-  close_output(out_ctx);
+  close_output(&out_ctx);
 
   if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
     return ret;

@@ -11,4 +11,4 @@
 
 OutputContext *open_output(ProcessingContext *proc_ctx,
   InputContext *in_ctx, char *process_job_id, sqlite3 *db);
-void close_output(OutputContext *out_ctx);
+void close_output(OutputContext **out_ctx);

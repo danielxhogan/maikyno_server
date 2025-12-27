@@ -747,30 +747,31 @@ end:
   free(title);
 
   if (ret < 0) {
-    close_output(out_ctx);
+    close_output(&out_ctx);
     return NULL;
   }
 
   return out_ctx;
 }
 
-void close_output(OutputContext *out_ctx)
+void close_output(OutputContext **out_ctx)
 {
   int i;
 
-  if (!out_ctx) return;
+  if (!*out_ctx) { return; }
 
-  if (out_ctx->fmt_ctx && !(out_ctx->fmt_ctx->flags & AVFMT_NOFILE))
-    avio_closep(&out_ctx->fmt_ctx->pb);
-  avformat_free_context(out_ctx->fmt_ctx);
+  if ((*out_ctx)->fmt_ctx && !((*out_ctx)->fmt_ctx->flags & AVFMT_NOFILE))
+    avio_closep(&(*out_ctx)->fmt_ctx->pb);
+  avformat_free_context((*out_ctx)->fmt_ctx);
 
-  if (out_ctx->enc_ctx) {
-    for (i = 0; i < out_ctx->nb_selected_streams; i++) {
-      avcodec_free_context(&out_ctx->enc_ctx[i]);
+  if ((*out_ctx)->enc_ctx) {
+    for (i = 0; i < (*out_ctx)->nb_selected_streams; i++) {
+      avcodec_free_context(&(*out_ctx)->enc_ctx[i]);
     }
-    free(out_ctx->enc_ctx);
+    free((*out_ctx)->enc_ctx);
   }
 
-  av_packet_free(&out_ctx->enc_pkt);
-  free(out_ctx);
+  av_packet_free(&(*out_ctx)->enc_pkt);
+  free(*out_ctx);
+  *out_ctx = NULL;
 }
