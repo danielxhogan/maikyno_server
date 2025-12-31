@@ -172,8 +172,9 @@ InputContext *open_input(ProcessingContext *proc_ctx,
 end:
   free(input_file);
 
-  if (ret < 0 && ret != AVERROR_EOF && ret != AVERROR(EAGAIN)) {
+  if (ret < 0) {
     fprintf(stderr, "\nLibav Error: %s\n", av_err2str(ret));
+    close_input(&in_ctx);
     return NULL;
   }
 
