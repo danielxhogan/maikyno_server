@@ -119,15 +119,16 @@ int fsc_ctx_add_samples_to_buffer(FrameSizeConversionContext *fsc_ctx,
 
 int fsc_ctx_make_frame(FrameSizeConversionContext *fsc_ctx, int64_t timestamp)
 {
-  int ret = 0;
+  int nb_frames_copying, ret = 0;
 
   if (fsc_ctx->nb_samples_in_buffer < fsc_ctx->frame_size) {
-    fprintf(stderr, "Not enough samples in buffer to make a frame.\n");
-    return -1;
+    nb_frames_copying = fsc_ctx->nb_samples_in_buffer;
+  } else {
+    nb_frames_copying = fsc_ctx->frame_size;
   }
 
   ret = av_samples_copy(fsc_ctx->frame->data, fsc_ctx->sample_buffer, 0, 0,
-    fsc_ctx->frame_size, fsc_ctx->channels, fsc_ctx->sample_fmt);
+    nb_frames_copying, fsc_ctx->channels, fsc_ctx->sample_fmt);
 
   if (ret < 0) {
     fprintf(stderr, "Failed to copy samples from buffer into encoder frame.\n");
@@ -138,9 +139,9 @@ int fsc_ctx_make_frame(FrameSizeConversionContext *fsc_ctx, int64_t timestamp)
 
   memmove(fsc_ctx->sample_buffer[0],
     fsc_ctx->sample_buffer[0] + fsc_ctx->frame_size * fsc_ctx->bytes_per_sample,
-    (fsc_ctx->nb_samples_in_buffer - fsc_ctx->frame_size) * fsc_ctx->bytes_per_sample);
+    (fsc_ctx->nb_samples_in_buffer - nb_frames_copying) * fsc_ctx->bytes_per_sample);
 
-  fsc_ctx->nb_samples_in_buffer -= fsc_ctx->frame_size;
+  fsc_ctx->nb_samples_in_buffer -= nb_frames_copying;
   return ret;
 }
 

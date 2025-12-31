@@ -488,6 +488,8 @@ int get_processing_info(ProcessingContext *proc_ctx,
     return ret;
   }
 
+  proc_ctx->nb_out_streams = out_stream_idx + 1;
+
   return 0;
 }
 
@@ -520,17 +522,14 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
     in_stream_idx++
   ) {
     ctx_idx = proc_ctx->ctx_map[in_stream_idx];
-    if (ctx_idx != INACTIVE_STREAM) {
-      passthrough = proc_ctx->passthrough_arr[ctx_idx];
-      if (passthrough) { continue; }
-    }
-    else { continue; }
+    if (ctx_idx == INACTIVE_STREAM) { continue; }
+
+    passthrough = proc_ctx->passthrough_arr[ctx_idx];
+    if (passthrough) { continue; }
 
     codec_type = in_ctx->fmt_ctx->streams[in_stream_idx]->codecpar->codec_type;
-    if (codec_type == AVMEDIA_TYPE_AUDIO) {
-      dec_ctx = in_ctx->dec_ctx[in_stream_idx];
-    }
-    else { continue; }
+    if (codec_type != AVMEDIA_TYPE_AUDIO) { continue; }
+    dec_ctx = in_ctx->dec_ctx[ctx_idx];
 
     out_stream_idx = proc_ctx->idx_map[in_stream_idx];
     enc_ctx = out_ctx->enc_ctx[out_stream_idx];

@@ -87,11 +87,25 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
   (*enc_ctx)->height = in_stream->codecpar->height;
   (*enc_ctx)->pix_fmt = in_stream->codecpar->format;
 
+  (*enc_ctx)->color_range = in_stream->codecpar->color_range;
   (*enc_ctx)->color_primaries = in_stream->codecpar->color_primaries;
   (*enc_ctx)->color_trc = in_stream->codecpar->color_trc;
   (*enc_ctx)->colorspace = in_stream->codecpar->color_space;
-  (*enc_ctx)->color_range = in_stream->codecpar->color_range;
   (*enc_ctx)->chroma_sample_location = in_stream->codecpar->chroma_location;
+
+  // (*enc_ctx)->color_range = AVCOL_RANGE_UNSPECIFIED;
+  // (*enc_ctx)->pix_fmt = AV_PIX_FMT_YUV420P;
+  // (*enc_ctx)->color_primaries = AVCOL_PRI_UNSPECIFIED;
+  // (*enc_ctx)->color_trc = AVCOL_TRC_UNSPECIFIED;
+  // (*enc_ctx)->colorspace = AVCOL_SPC_UNSPECIFIED;
+  // (*enc_ctx)->chroma_sample_location = AVCHROMA_LOC_LEFT;
+
+  printf("in_stream->codecpar->format: %d\n", in_stream->codecpar->format);
+  printf("in_stream->codecpar->color_range: %d\n", in_stream->codecpar->color_range);
+  printf("in_stream->codecpar->color_primaries: %d\n", in_stream->codecpar->color_primaries);
+  printf("in_stream->codecpar->color_trc: %d\n", in_stream->codecpar->color_trc);
+  printf("in_stream->codecpar->color_space: %d\n", in_stream->codecpar->color_space);
+  printf("in_stream->codecpar->chroma_location: %d\n", in_stream->codecpar->chroma_location);
 
   (*enc_ctx)->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
@@ -624,8 +638,7 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
     ctx_idx = proc_ctx->ctx_map[in_stream_idx];
     out_stream_idx = proc_ctx->idx_map[in_stream_idx];
 
-    if (in_ctx->dec_ctx[in_stream_idx]) {
-
+    if (!proc_ctx->passthrough_arr[ctx_idx] && in_stream_idx != proc_ctx->burn_in_idx) {
       if ((ret = open_encoder(&out_ctx->enc_ctx[out_stream_idx],
         in_ctx->fmt_ctx->streams[in_stream_idx], in_ctx->fmt_ctx->url)) < 0)
       {
@@ -665,7 +678,7 @@ OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
   out_ctx->fmt_ctx = NULL;
   out_ctx->enc_ctx = NULL;
   out_ctx->enc_pkt = NULL;
-  out_ctx->nb_selected_streams = proc_ctx->nb_selected_streams;
+  out_ctx->nb_out_streams = proc_ctx->nb_out_streams;
 
   if ((ret = get_file_data(&name, &extra, &media_dir_path, &title,
     db, process_job_id)) < 0)
@@ -717,7 +730,7 @@ OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
   }
 
   if (!(out_ctx->enc_ctx =
-    calloc(out_ctx->nb_selected_streams, sizeof(AVCodecContext *))))
+    calloc(out_ctx->nb_out_streams, sizeof(AVCodecContext *))))
   {
     fprintf(stderr, "Failed to allocate array for encoder contexts:\n\
       video: %s\nprocess job: %s\n", name, process_job_id);
@@ -778,7 +791,7 @@ void close_output(OutputContext **out_ctx)
   avformat_free_context((*out_ctx)->fmt_ctx);
 
   if ((*out_ctx)->enc_ctx) {
-    for (i = 0; i < (*out_ctx)->nb_selected_streams; i++) {
+    for (i = 0; i < (*out_ctx)->nb_out_streams; i++) {
       avcodec_free_context(&(*out_ctx)->enc_ctx[i]);
     }
     free((*out_ctx)->enc_ctx);

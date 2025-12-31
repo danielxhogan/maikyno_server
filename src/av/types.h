@@ -30,11 +30,12 @@ typedef struct InputContext {
   AVCodecContext **dec_ctx;
   AVPacket *init_pkt;
   AVFrame *dec_frame;
+  int nb_selected_streams;
 } InputContext;
 
 typedef struct OutputContext {
   AVFormatContext *fmt_ctx;
   AVCodecContext **enc_ctx;
   AVPacket *enc_pkt;
-  int nb_selected_streams;
+  int nb_out_streams;
 } OutputContext;
