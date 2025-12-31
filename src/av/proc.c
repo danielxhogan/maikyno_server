@@ -213,7 +213,7 @@ void processing_context_free(ProcessingContext **proc_ctx)
 
   if ((*proc_ctx)->fsc_ctx_arr) {
     for (i = 0; i < (*proc_ctx)->nb_selected_streams; i++) {
-      fsc_ctx_free((*proc_ctx)->fsc_ctx_arr[i]);
+      fsc_ctx_free(&(*proc_ctx)->fsc_ctx_arr[i]);
     }
     free((*proc_ctx)->fsc_ctx_arr);
   }

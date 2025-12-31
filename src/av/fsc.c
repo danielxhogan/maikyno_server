@@ -20,6 +20,7 @@ FrameSizeConversionContext *fsc_ctx_alloc(AVCodecContext *enc_ctx)
 
   if (!(fsc_ctx->frame = av_frame_alloc())) {
     fprintf(stderr, "Failed to allocate AVFrame.\n");
+    fsc_ctx_free(&fsc_ctx);
     return NULL;
   }
 
@@ -30,6 +31,7 @@ FrameSizeConversionContext *fsc_ctx_alloc(AVCodecContext *enc_ctx)
 
   if ((av_frame_get_buffer(fsc_ctx->frame, 0)) < 0) {
     fprintf(stderr, "Failed to allocate buffers for frame.\n");
+    fsc_ctx_free(&fsc_ctx);
     return NULL;
   }
 
@@ -145,10 +147,11 @@ int fsc_ctx_make_frame(FrameSizeConversionContext *fsc_ctx, int64_t timestamp)
   return ret;
 }
 
-void fsc_ctx_free(FrameSizeConversionContext *fsc_ctx)
+void fsc_ctx_free(FrameSizeConversionContext **fsc_ctx)
 {
-  if (!fsc_ctx) return;
-  av_freep(&fsc_ctx->sample_buffer[0]);
-  av_frame_free(&fsc_ctx->frame);
-  free(fsc_ctx);
+  if (!*fsc_ctx) return;
+  av_freep(&(*fsc_ctx)->sample_buffer[0]);
+  av_frame_free(&(*fsc_ctx)->frame);
+  free(*fsc_ctx);
+  *fsc_ctx = NULL;
 }
