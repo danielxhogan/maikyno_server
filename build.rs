@@ -36,11 +36,14 @@ fn main()
   let avcodec = pkg_config::Config::new().probe("libavcodec")
     .expect("Failed to find libavcodec");
 
-  let avutil = pkg_config::Config::new().probe("libavutil")
-    .expect("Failed to find libavutil");
-
   let swresample = pkg_config::Config::new().probe("libswresample")
     .expect("Failed to find libswresample");
+
+  let avfilter = pkg_config::Config::new().probe("libavfilter")
+    .expect("Failed to find libavfilter");
+
+  let avutil = pkg_config::Config::new().probe("libavutil")
+    .expect("Failed to find libavutil");
 
   let sqlite3 = pkg_config::Config::new().probe("sqlite3")
     .expect("Failed to find sqlite3");
@@ -73,11 +76,15 @@ fn main()
     cc_builder.include(path);
   }
 
-  for path in &avutil.include_paths {
+  for path in &swresample.include_paths {
     cc_builder.include(path);
   }
 
-  for path in &swresample.include_paths {
+  for path in &avfilter.include_paths {
+    cc_builder.include(path);
+  }
+
+  for path in &avutil.include_paths {
     cc_builder.include(path);
   }
 
@@ -89,7 +96,7 @@ fn main()
     cc_builder.include(path);
   }
 
-  cc_builder.compile("scan_movie_streams.a");
+  cc_builder.compile("av.a");
 
   for path in &avformat.link_paths {
     println!("cargo:rustc-link-search={}", path.to_string_lossy());
@@ -107,19 +114,27 @@ fn main()
     println!("cargo:rustc-link-lib={}", library);
   }
 
-  for path in &avutil.link_paths {
-    println!("cargo:rustc-link-search={}", path.to_string_lossy());
-  }
-
-  for library in &avutil.libs {
-    println!("cargo:rustc-link-lib={}", library);
-  }
-
   for path in &swresample.link_paths {
     println!("cargo:rustc-link-search={}", path.to_string_lossy());
   }
 
   for library in &swresample.libs {
+    println!("cargo:rustc-link-lib={}", library);
+  }
+
+  for path in &avfilter.link_paths {
+    println!("cargo:rustc-link-search={}", path.to_string_lossy());
+  }
+
+  for library in &avfilter.libs {
+    println!("cargo:rustc-link-lib={}", library);
+  }
+
+  for path in &avutil.link_paths {
+    println!("cargo:rustc-link-search={}", path.to_string_lossy());
+  }
+
+  for library in &avutil.libs {
     println!("cargo:rustc-link-lib={}", library);
   }
 
@@ -158,12 +173,17 @@ fn main()
     builder = builder.clang_arg("-I").clang_arg(path.to_string_lossy());
   }
 
-  for path in &avutil.include_paths {
+  for path in &swresample.include_paths {
     println!("path: {}", path.to_string_lossy());
     builder = builder.clang_arg("-I").clang_arg(path.to_string_lossy());
   }
 
-  for path in &swresample.include_paths {
+  for path in &avfilter.include_paths {
+    println!("path: {}", path.to_string_lossy());
+    builder = builder.clang_arg("-I").clang_arg(path.to_string_lossy());
+  }
+
+  for path in &avutil.include_paths {
     println!("path: {}", path.to_string_lossy());
     builder = builder.clang_arg("-I").clang_arg(path.to_string_lossy());
   }
