@@ -5,8 +5,6 @@
 
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
-// #include <libswresample/swresample.h>
-// #include <libavutil/opt.h>
 #include <sqlite3.h>
 
 OutputContext *open_output(ProcessingContext *proc_ctx,

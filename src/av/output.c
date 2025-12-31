@@ -164,120 +164,120 @@ end:
   return 0;
 }
 
-static int select_channel_layout(AVCodecContext *enc_ctx,
-  AVChannelLayout *preferred_layout)
-{
-  const AVChannelLayout *layouts = NULL, *current_layout;
-  char preferred_layout_name[64], current_layout_name[64];
-  int preferred_nb_channels, ret = 0;
+// static int select_channel_layout(AVCodecContext *enc_ctx,
+//   AVChannelLayout *preferred_layout)
+// {
+//   const AVChannelLayout *layouts = NULL, *current_layout;
+//   char preferred_layout_name[64], current_layout_name[64];
+//   int preferred_nb_channels, ret = 0;
 
-  if ((ret = avcodec_get_supported_config(enc_ctx, NULL,
-    AV_CODEC_CONFIG_CHANNEL_LAYOUT, 0, (const void **) &layouts, NULL)) < 0)
-  {
-    fprintf(stderr, "Failed to get supported channel layouts.\n");
-    return ret;
-  }
+//   if ((ret = avcodec_get_supported_config(enc_ctx, NULL,
+//     AV_CODEC_CONFIG_CHANNEL_LAYOUT, 0, (const void **) &layouts, NULL)) < 0)
+//   {
+//     fprintf(stderr, "Failed to get supported channel layouts.\n");
+//     return ret;
+//   }
 
-  if ((ret = av_channel_layout_describe(preferred_layout,
-    preferred_layout_name, sizeof(preferred_layout_name))) < 0)
-  {
-    fprintf(stderr, "Failed to get name for preferred layout.\n");
-    return ret;
-  }
+//   if ((ret = av_channel_layout_describe(preferred_layout,
+//     preferred_layout_name, sizeof(preferred_layout_name))) < 0)
+//   {
+//     fprintf(stderr, "Failed to get name for preferred layout.\n");
+//     return ret;
+//   }
 
-  printf("preferred_layout: %s\n", preferred_layout_name);
+//   printf("preferred_layout: %s\n", preferred_layout_name);
 
-  if (!layouts) {
-    printf("No supported channel layouts list found. "
-      "Attempting to set preferred layout.\n");
+//   if (!layouts) {
+//     printf("No supported channel layouts list found. "
+//       "Attempting to set preferred layout.\n");
 
-    if ((ret = av_channel_layout_copy(&enc_ctx->ch_layout,
-      preferred_layout)) < 0)
-    {
-      fprintf(stderr, "Failed to copy preferred channel layout."
-        "Attempting to set stereo channel layout\n");
+//     if ((ret = av_channel_layout_copy(&enc_ctx->ch_layout,
+//       preferred_layout)) < 0)
+//     {
+//       fprintf(stderr, "Failed to copy preferred channel layout."
+//         "Attempting to set stereo channel layout\n");
 
-      goto set_stereo;
-    }
+//       goto set_stereo;
+//     }
     
-    printf("Channel layout set to %s.\n", preferred_layout_name);
-    return 0;
-  }
+//     printf("Channel layout set to %s.\n", preferred_layout_name);
+//     return 0;
+//   }
 
-  printf("Checking if preferred layout is supported by encoder.\n");
+//   printf("Checking if preferred layout is supported by encoder.\n");
 
-  current_layout = layouts;
+//   current_layout = layouts;
 
-  while (current_layout->nb_channels) {
-    if ((ret = av_channel_layout_describe(current_layout,
-      current_layout_name, sizeof(current_layout_name))) < 0)
-    {
-      fprintf(stderr, "Failed to get name for current layout.\n");
-      return ret;
-    }
+//   while (current_layout->nb_channels) {
+//     if ((ret = av_channel_layout_describe(current_layout,
+//       current_layout_name, sizeof(current_layout_name))) < 0)
+//     {
+//       fprintf(stderr, "Failed to get name for current layout.\n");
+//       return ret;
+//     }
 
-    printf("current_layout_name: %s\n", current_layout_name);
+//     printf("current_layout_name: %s\n", current_layout_name);
 
-    if (!strcmp(current_layout_name, preferred_layout_name)) {
-      if ((ret =
-        av_channel_layout_copy(&enc_ctx->ch_layout, current_layout)) < 0)
-      {
-        fprintf(stderr, "Failed to copy preferred channel layout.\n");
-        return ret;
-      }
+//     if (!strcmp(current_layout_name, preferred_layout_name)) {
+//       if ((ret =
+//         av_channel_layout_copy(&enc_ctx->ch_layout, current_layout)) < 0)
+//       {
+//         fprintf(stderr, "Failed to copy preferred channel layout.\n");
+//         return ret;
+//       }
 
-      printf("Channel layout set to preferred layout.\n");
-      return 0;
-    }
+//       printf("Channel layout set to preferred layout.\n");
+//       return 0;
+//     }
 
-    current_layout++;
-  }
+//     current_layout++;
+//   }
 
-  printf("Preferred layout not supported. Checking for supported layout "
-    "with equivalent number of channels.\n");
+//   printf("Preferred layout not supported. Checking for supported layout "
+//     "with equivalent number of channels.\n");
 
-  preferred_nb_channels = preferred_layout->nb_channels;
-  current_layout = layouts;
+//   preferred_nb_channels = preferred_layout->nb_channels;
+//   current_layout = layouts;
 
-  while (current_layout->nb_channels) {
-    if ((ret = av_channel_layout_describe(current_layout, current_layout_name,
-      sizeof(current_layout_name))) < 0)
-    {
-      fprintf(stderr, "Failed to get name of current layout.\n");
-      return ret;
-    }
+//   while (current_layout->nb_channels) {
+//     if ((ret = av_channel_layout_describe(current_layout, current_layout_name,
+//       sizeof(current_layout_name))) < 0)
+//     {
+//       fprintf(stderr, "Failed to get name of current layout.\n");
+//       return ret;
+//     }
 
-    printf("current_layout_name: %s\n", current_layout_name);
+//     printf("current_layout_name: %s\n", current_layout_name);
 
-    if (current_layout->nb_channels == preferred_nb_channels) {
-      if ((ret =
-        av_channel_layout_copy(&enc_ctx->ch_layout, current_layout)) < 0)
-      {
-        fprintf(stderr, "Failed to copy layout with preferred_nb_channels.\n");
-        return ret;
-      }
+//     if (current_layout->nb_channels == preferred_nb_channels) {
+//       if ((ret =
+//         av_channel_layout_copy(&enc_ctx->ch_layout, current_layout)) < 0)
+//       {
+//         fprintf(stderr, "Failed to copy layout with preferred_nb_channels.\n");
+//         return ret;
+//       }
 
-      printf("Channel layout set to %s.\n", current_layout_name);
-      return 0;
-    }
+//       printf("Channel layout set to %s.\n", current_layout_name);
+//       return 0;
+//     }
 
-    current_layout++;
-  }
+//     current_layout++;
+//   }
 
-  printf("No layout with equivalent number of channels supported. Attempting "
-  "to set channel layout to stereo.\n");
+//   printf("No layout with equivalent number of channels supported. Attempting "
+//   "to set channel layout to stereo.\n");
 
-set_stereo:
-  if ((ret = av_channel_layout_copy(&enc_ctx->ch_layout,
-    &(AVChannelLayout) AV_CHANNEL_LAYOUT_STEREO)) < 0)
-  {
-    fprintf(stderr, "Failed to copy stereo channel layout.\n");
-    return ret;
-  }
+// set_stereo:
+//   if ((ret = av_channel_layout_copy(&enc_ctx->ch_layout,
+//     &(AVChannelLayout) AV_CHANNEL_LAYOUT_STEREO)) < 0)
+//   {
+//     fprintf(stderr, "Failed to copy stereo channel layout.\n");
+//     return ret;
+//   }
 
-  printf("Channel layout set to stereo.\n");
-  return 0;
-}
+//   printf("Channel layout set to stereo.\n");
+//   return 0;
+// }
 
 int select_sample_fmt(AVCodecContext *enc_ctx,
   enum AVSampleFormat preferred_fmt)
@@ -347,6 +347,7 @@ static int open_audio_encoder(AVCodecContext **enc_ctx, AVStream *in_stream)
 {
   int ret;
   const AVCodec *enc;
+  AVChannelLayout *stereo = NULL;
 
   if (!(enc = avcodec_find_encoder_by_name("libfdk_aac"))) {
     fprintf(stderr, "Failed to find encoder.\n");
@@ -359,13 +360,25 @@ static int open_audio_encoder(AVCodecContext **enc_ctx, AVStream *in_stream)
     ret = AVERROR(ENOMEM);
     return ret;
   }
+  stereo = malloc(sizeof(AVChannelLayout));
+  av_channel_layout_from_string(stereo, "stereo");
 
-  if ((ret = select_channel_layout(*enc_ctx,
-    &in_stream->codecpar->ch_layout)) < 0)
-  {
-    fprintf(stderr, "Failed to select channel layout.\n");
+  if ((ret = av_channel_layout_copy(&(*enc_ctx)->ch_layout, stereo)) < 0) {
+    fprintf(stderr, "Failed to set output stream channel layout \
+      for input stream: %d.\nLibav Error: %s.\n",
+      in_stream->index, av_err2str(ret));
+
+    free(stereo);
     return ret;
   }
+  free(stereo);
+
+  // if ((ret = select_channel_layout(*enc_ctx,
+  //   &in_stream->codecpar->ch_layout)) < 0)
+  // {
+  //   fprintf(stderr, "Failed to select channel layout.\n");
+  //   return ret;
+  // }
 
   if ((ret = select_sample_fmt(*enc_ctx,
     in_stream->codecpar->format)) < 0)
