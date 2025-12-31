@@ -91,18 +91,19 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   proc_ctx->nb_selected_streams = 0;
   proc_ctx->nb_out_streams = 0;
 
+  proc_ctx->ctx_map = NULL;
+  proc_ctx->idx_map = NULL;
+
   proc_ctx->stream_titles_arr = NULL;
   proc_ctx->passthrough_arr = NULL;
-  proc_ctx->deinterlace = 0;
-  proc_ctx->burn_in_idx = -1;
-  proc_ctx->gain_boost_arr = NULL;
-  proc_ctx->renditions_arr = NULL;
 
   proc_ctx->swr_out_ctx_arr = NULL;
   proc_ctx->fsc_ctx_arr = NULL;
 
-  proc_ctx->ctx_map = NULL;
-  proc_ctx->idx_map = NULL;
+  proc_ctx->deint_ctx = NULL;
+  proc_ctx->burn_in_idx = -1;
+  proc_ctx->gain_boost_arr = NULL;
+  proc_ctx->renditions_arr = NULL;
 
   if ((ret = proc_ctx->nb_in_streams =
     get_input_file_nb_streams(process_job_id, db)) < 0)
@@ -151,20 +152,6 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
     goto end;
   }
 
-  if (!(proc_ctx->gain_boost_arr =
-    calloc(proc_ctx->nb_selected_streams, sizeof(int))))
-  {
-    fprintf(stderr, "Failed to allocate gain boost array.\n");
-    goto end;
-  }
-
-  if (!(proc_ctx->renditions_arr =
-    calloc(proc_ctx->nb_selected_streams, sizeof(int))))
-  {
-    fprintf(stderr, "Failed to allocate renditions array.\n");
-    goto end;
-  }
-
   if (!(proc_ctx->swr_out_ctx_arr =
     calloc(proc_ctx->nb_selected_streams, sizeof(SwrOutputContext *))))
   {
@@ -178,6 +165,20 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   {
     fprintf(stderr, "Failed to allocate array for frame size conversion contexts \
       for process job: %s\n", process_job_id);
+    goto end;
+  }
+
+  if (!(proc_ctx->gain_boost_arr =
+    calloc(proc_ctx->nb_selected_streams, sizeof(int))))
+  {
+    fprintf(stderr, "Failed to allocate gain boost array.\n");
+    goto end;
+  }
+
+  if (!(proc_ctx->renditions_arr =
+    calloc(proc_ctx->nb_selected_streams, sizeof(int))))
+  {
+    fprintf(stderr, "Failed to allocate renditions array.\n");
     goto end;
   }
 
@@ -201,8 +202,6 @@ void processing_context_free(ProcessingContext **proc_ctx)
   }
 
   free((*proc_ctx)->passthrough_arr);
-  free((*proc_ctx)->gain_boost_arr);
-  free((*proc_ctx)->renditions_arr);
 
   if ((*proc_ctx)->swr_out_ctx_arr) {
     for (i = 0; i < (*proc_ctx)->nb_selected_streams; i++) {
@@ -217,6 +216,11 @@ void processing_context_free(ProcessingContext **proc_ctx)
     }
     free((*proc_ctx)->fsc_ctx_arr);
   }
+
+  deint_filter_context_free(&(*proc_ctx)->deint_ctx);
+
+  free((*proc_ctx)->gain_boost_arr);
+  free((*proc_ctx)->renditions_arr);
 
   free((*proc_ctx)->ctx_map);
   free((*proc_ctx)->idx_map);
@@ -240,7 +244,7 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
 
   sqlite3_stmt *select_video_info_stmt = NULL;
   char *title, *end;
-  int in_stream_idx, len_title, ret = 0;
+  int in_stream_idx, len_title, deinterlace, ret = 0;
 
   if ((ret = sqlite3_prepare_v2(db, select_video_info_query, -1,
     &select_video_info_stmt, 0)) != SQLITE_OK)
@@ -294,8 +298,17 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
   proc_ctx->passthrough_arr[*ctx_idx] =
     sqlite3_column_int(select_video_info_stmt, 2);
 
-  proc_ctx->deinterlace =
-    sqlite3_column_int(select_video_info_stmt, 3);
+  deinterlace = sqlite3_column_int(select_video_info_stmt, 3);
+
+  if (deinterlace) {
+    if (!(proc_ctx->deint_ctx = malloc(sizeof(DeinterlaceFilterContext))))
+    {
+      fprintf(stderr, "Failed to allocate deinterlace filter context \
+        for process job: %s\n", process_job_id);
+      ret = -ENOMEM;
+      goto end;
+    }
+  }
 
   proc_ctx->renditions_arr[*ctx_idx] =
     sqlite3_column_int(select_video_info_stmt, 4);

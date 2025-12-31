@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.h"
+#include "deint.h"
 
 #include <sqlite3.h>
 
