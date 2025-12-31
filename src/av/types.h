@@ -5,6 +5,15 @@
 
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
+#include <libavfilter/buffersink.h>
+#include <libavfilter/buffersrc.h>
+
+typedef struct DeinterlaceFilterContext {
+  AVFilterContext *buffersink_ctx;
+  AVFilterContext *buffersrc_ctx;
+  AVFilterGraph *filter_graph;
+  AVFrame *filtered_frame;
+} DeinterlaceFilterContext;
 
 typedef struct ProcessingContext {
   unsigned int nb_in_streams;
@@ -16,13 +25,16 @@ typedef struct ProcessingContext {
 
   char **stream_titles_arr;
   int *passthrough_arr;
-  unsigned int deinterlace;
-  int burn_in_idx;
-  int *gain_boost_arr;
-  int *renditions_arr;
 
   SwrOutputContext **swr_out_ctx_arr;
   FrameSizeConversionContext **fsc_ctx_arr;
+
+  unsigned int deinterlace;
+  DeinterlaceFilterContext *deint_ctx;
+
+  int burn_in_idx;
+  int *gain_boost_arr;
+  int *renditions_arr;
 } ProcessingContext;
 
 typedef struct InputContext {

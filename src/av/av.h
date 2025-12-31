@@ -8,4 +8,5 @@
 #include "hdr.h"
 #include "swr.h"
 #include "fsc.h"
+#include "deint.h"
 #include "utils.h"

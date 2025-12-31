@@ -23,6 +23,8 @@ fn main()
   println!("cargo::rerun-if-changed=src/av/swr.h");
   println!("cargo::rerun-if-changed=src/av/fsc.c");
   println!("cargo::rerun-if-changed=src/av/fsc.h");
+  println!("cargo::rerun-if-changed=src/av/deint.c");
+  println!("cargo::rerun-if-changed=src/av/deint.h");
   println!("cargo::rerun-if-changed=src/av/utils.c");
   println!("cargo::rerun-if-changed=src/av/utils.h");
 
@@ -59,6 +61,7 @@ fn main()
   cc_builder.file("src/av/hdr.c");
   cc_builder.file("src/av/swr.c");
   cc_builder.file("src/av/fsc.c");
+  cc_builder.file("src/av/deint.c");
   cc_builder.file("src/av/utils.c");
   cc_builder.define("DATABASE_URL", format!("\"{}\"", database_url).as_str());
 
