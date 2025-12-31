@@ -206,7 +206,7 @@ void processing_context_free(ProcessingContext **proc_ctx)
 
   if ((*proc_ctx)->swr_out_ctx_arr) {
     for (i = 0; i < (*proc_ctx)->nb_selected_streams; i++) {
-      swr_output_context_free((*proc_ctx)->swr_out_ctx_arr[i]);
+      swr_output_context_free(&(*proc_ctx)->swr_out_ctx_arr[i]);
     }
     free((*proc_ctx)->swr_out_ctx_arr);
   }

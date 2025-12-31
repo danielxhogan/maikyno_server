@@ -13,4 +13,4 @@ typedef struct SwrOutputContext {
 
 SwrOutputContext *swr_output_context_alloc(AVCodecContext *dec_ctx,
   AVCodecContext *enc_ctx);
-void swr_output_context_free(SwrOutputContext *swr_out_ctx);
+void swr_output_context_free(SwrOutputContext **swr_out_ctx);

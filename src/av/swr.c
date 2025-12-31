@@ -17,7 +17,8 @@ SwrOutputContext *swr_output_context_alloc(AVCodecContext *dec_ctx,
 
   if (!(swr_out_ctx->swr_ctx = swr_alloc())) {
     fprintf(stderr, "Failed to allocate SwrContext.\n");
-    return NULL;
+    ret = -ENOMEM;
+    goto end;
   }
 
   av_opt_set_chlayout(swr_out_ctx->swr_ctx,
@@ -36,12 +37,13 @@ SwrOutputContext *swr_output_context_alloc(AVCodecContext *dec_ctx,
   if ((ret = swr_init(swr_out_ctx->swr_ctx)) < 0) {
     fprintf(stderr, "Failed to initialize SwrContext.\n\
       Libav Error: %s\n", av_err2str(ret));
-    return NULL;
+    goto end;
   }
 
   if (!(swr_out_ctx->swr_frame = av_frame_alloc())) {
     fprintf(stderr, "Failed to allocate AVFrame.\n");
-    return NULL;
+    ret = -ENOMEM;
+    goto end;
   }
 
   swr_out_ctx->swr_frame->format = enc_ctx->sample_fmt;
@@ -53,16 +55,23 @@ SwrOutputContext *swr_output_context_alloc(AVCodecContext *dec_ctx,
   if ((ret = av_frame_get_buffer(swr_out_ctx->swr_frame, 0)) < 0) {
     fprintf(stderr, "Failed to allocate buffers for frame.\n\
       Libav Error: %s\n", av_err2str(ret));
+    goto end;
+  }
+
+end:
+  if (ret < 0) {
+    swr_output_context_free(&swr_out_ctx);
     return NULL;
   }
 
   return swr_out_ctx;
 }
 
-void swr_output_context_free(SwrOutputContext *swr_out_ctx)
+void swr_output_context_free(SwrOutputContext **swr_out_ctx)
 {
-  if (!swr_out_ctx) return;
-  swr_free(&swr_out_ctx->swr_ctx);
-  av_frame_free(&swr_out_ctx->swr_frame);
-  free(swr_out_ctx);
+  if (!*swr_out_ctx) return;
+  swr_free(&(*swr_out_ctx)->swr_ctx);
+  av_frame_free(&(*swr_out_ctx)->swr_frame);
+  free(*swr_out_ctx);
+  *swr_out_ctx = NULL;
 }
