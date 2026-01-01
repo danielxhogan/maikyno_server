@@ -229,26 +229,6 @@ int decode_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
   return 0;
 }
 
-int calculate_pct_complete(InputContext *in_ctx, char *process_job_id)
-{
-  int ret;
-  int64_t duration, pct_complete;
-
-  duration = av_rescale_q(in_ctx->fmt_ctx->duration, AV_TIME_BASE_Q,
-    in_ctx->fmt_ctx->streams[in_ctx->init_pkt->stream_index]->time_base);
-
-  pct_complete = in_ctx->init_pkt->pts * 100 / duration;
-  printf("pct_complete: %ld%%\n", pct_complete);
-
-  if ((ret = update_pct_complete(pct_complete, process_job_id)) < 0) {
-    fprintf(stderr, "Failed to update pct_complete for process_job: %s\n",
-      process_job_id);
-    return ret;
-  }
-
-  return 0;
-}
-
 int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
   OutputContext *out_ctx, const char *batch_id, char *process_job_id)
 {
