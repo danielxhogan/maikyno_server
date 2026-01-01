@@ -29,6 +29,7 @@ typedef struct ProcessingContext {
   SwrOutputContext **swr_out_ctx_arr;
   FrameSizeConversionContext **fsc_ctx_arr;
 
+  int deint;
   DeinterlaceFilterContext *deint_ctx;
 
   int burn_in_idx;

@@ -1,7 +1,7 @@
 #include "process_media.h"
 
-static int encode_video_frame(InputContext *in_ctx, OutputContext *out_ctx,
-  int in_stream_idx, int out_stream_idx, AVFrame *frame)
+int encode_video_frame(ProcessingContext *proc_ctx, InputContext *in_ctx,
+  OutputContext *out_ctx, int in_stream_idx, int out_stream_idx, AVFrame *frame)
 {
   int ret;
 
@@ -21,6 +21,11 @@ static int encode_video_frame(InputContext *in_ctx, OutputContext *out_ctx,
       in_ctx->fmt_ctx->streams[in_stream_idx]->time_base,
       out_ctx->fmt_ctx->streams[out_stream_idx]->time_base);
 
+    if (proc_ctx->deint) {
+    out_ctx->enc_pkt->pts = out_ctx->enc_pkt->pts / 2;
+    out_ctx->enc_pkt->dts = out_ctx->enc_pkt->dts / 2;
+    }
+
     if ((ret = av_interleaved_write_frame(out_ctx->fmt_ctx, out_ctx->enc_pkt)) < 0) {
       fprintf(stderr, "Failed to write packet to file.\n");
       return ret;
@@ -29,6 +34,37 @@ static int encode_video_frame(InputContext *in_ctx, OutputContext *out_ctx,
 
   if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
     fprintf(stderr, "Failed to receive packet from encoder.\n");
+    return ret;
+  }
+
+  return 0;
+}
+
+int deinterlace_video_frame(ProcessingContext *proc_ctx, InputContext *in_ctx,
+  OutputContext *out_ctx, int in_stream_idx, int out_stream_idx)
+{
+  int ret = 0;
+
+  if ((ret = av_buffersrc_add_frame_flags(proc_ctx->deint_ctx->buffersrc_ctx,
+    in_ctx->dec_frame, AV_BUFFERSRC_FLAG_KEEP_REF)) < 0)
+  {
+    fprintf(stderr, "Failed to add frame to buffer source.\n");
+    return ret;
+  }
+
+  while ((ret = av_buffersink_get_frame(proc_ctx->deint_ctx->buffersink_ctx,
+    proc_ctx->deint_ctx->filtered_frame)) >= 0)
+  {
+    if ((ret = encode_video_frame(proc_ctx, in_ctx, out_ctx, in_stream_idx,
+      out_stream_idx, proc_ctx->deint_ctx->filtered_frame)) < 0)
+    {
+      fprintf(stderr, "Failed to encode video frame.\n");
+      return ret;
+    }
+  }
+
+  if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
+    fprintf(stderr, "Failed to get frame from buffer sink.\n");
     return ret;
   }
 
@@ -158,12 +194,17 @@ int decode_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
 
       if (codec_type == AVMEDIA_TYPE_VIDEO)
       {
-        if ((ret = encode_video_frame(in_ctx, out_ctx,
-          in_stream_idx, out_stream_idx, in_ctx->dec_frame)) < 0)
-        {
-          fprintf(stderr, "Failed to encode video frame from input stream: %d.\n",
-            in_stream_idx);
-          return ret;
+        if (proc_ctx->deint) {
+          deinterlace_video_frame(proc_ctx, in_ctx, out_ctx,
+            in_stream_idx, out_stream_idx);
+        } else {
+          if ((ret = encode_video_frame(proc_ctx, in_ctx, out_ctx,
+            in_stream_idx, out_stream_idx, in_ctx->dec_frame)) < 0)
+          {
+            fprintf(stderr, "Failed to encode video frame from input stream: %d.\n",
+              in_stream_idx);
+            return ret;
+          }
         }
       }
       else if (codec_type == AVMEDIA_TYPE_AUDIO)
@@ -196,16 +237,16 @@ int calculate_pct_complete(InputContext *in_ctx, char *process_job_id)
   duration = av_rescale_q(in_ctx->fmt_ctx->duration, AV_TIME_BASE_Q,
     in_ctx->fmt_ctx->streams[in_ctx->init_pkt->stream_index]->time_base);
 
-    pct_complete = in_ctx->init_pkt->pts * 100 / duration;
-    printf("pct_complete: %ld%%\n", pct_complete);
+  pct_complete = in_ctx->init_pkt->pts * 100 / duration;
+  printf("pct_complete: %ld%%\n", pct_complete);
 
-    if ((ret = update_pct_complete(pct_complete, process_job_id)) < 0) {
-      fprintf(stderr, "Failed to update pct_complete for process_job: %s\n",
-        process_job_id);
-      return ret;
-    }
+  if ((ret = update_pct_complete(pct_complete, process_job_id)) < 0) {
+    fprintf(stderr, "Failed to update pct_complete for process_job: %s\n",
+      process_job_id);
+    return ret;
+  }
 
-    return 0;
+  return 0;
 }
 
 int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
@@ -388,7 +429,7 @@ int process_video(char *process_job_id, const char *batch_id)
     codec_type = in_ctx->dec_ctx[ctx_idx]->codec_type;
 
     if (codec_type == AVMEDIA_TYPE_VIDEO) {
-      if ((ret = encode_video_frame(in_ctx, out_ctx,
+      if ((ret = encode_video_frame(proc_ctx, in_ctx, out_ctx,
         in_stream_idx, out_stream_idx, NULL)) < 0)
       {
         fprintf(stderr, "Failed to encode video frame from input stream: %d.\n",

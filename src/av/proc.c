@@ -100,7 +100,9 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   proc_ctx->swr_out_ctx_arr = NULL;
   proc_ctx->fsc_ctx_arr = NULL;
 
+  proc_ctx->deint = 0;
   proc_ctx->deint_ctx = NULL;
+
   proc_ctx->burn_in_idx = -1;
   proc_ctx->gain_boost_arr = NULL;
   proc_ctx->renditions_arr = NULL;
@@ -244,7 +246,7 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
 
   sqlite3_stmt *select_video_info_stmt = NULL;
   char *title, *end;
-  int in_stream_idx, len_title, deinterlace, ret = 0;
+  int in_stream_idx, len_title, ret = 0;
 
   if ((ret = sqlite3_prepare_v2(db, select_video_info_query, -1,
     &select_video_info_stmt, 0)) != SQLITE_OK)
@@ -298,17 +300,7 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
   proc_ctx->passthrough_arr[*ctx_idx] =
     sqlite3_column_int(select_video_info_stmt, 2);
 
-  deinterlace = sqlite3_column_int(select_video_info_stmt, 3);
-
-  if (deinterlace) {
-    if (!(proc_ctx->deint_ctx = malloc(sizeof(DeinterlaceFilterContext))))
-    {
-      fprintf(stderr, "Failed to allocate deinterlace filter context \
-        for process job: %s\n", process_job_id);
-      ret = -ENOMEM;
-      goto end;
-    }
-  }
+  proc_ctx->deint = sqlite3_column_int(select_video_info_stmt, 3);
 
   proc_ctx->renditions_arr[*ctx_idx] =
     sqlite3_column_int(select_video_info_stmt, 4);
@@ -540,25 +532,39 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
     passthrough = proc_ctx->passthrough_arr[ctx_idx];
     if (passthrough) { continue; }
 
-    codec_type = in_ctx->fmt_ctx->streams[in_stream_idx]->codecpar->codec_type;
-    if (codec_type != AVMEDIA_TYPE_AUDIO) { continue; }
     dec_ctx = in_ctx->dec_ctx[ctx_idx];
 
     out_stream_idx = proc_ctx->idx_map[in_stream_idx];
     enc_ctx = out_ctx->enc_ctx[out_stream_idx];
 
-    if (!(proc_ctx->swr_out_ctx_arr[ctx_idx] =
-      swr_output_context_alloc(dec_ctx, enc_ctx)))
-    {
-      fprintf(stderr, "Failed to allocate swr output context for \
-        input stream: %d\nprocess job: %s\n", in_stream_idx, process_job_id);
-      return -1;
-    }
+    codec_type = in_ctx->fmt_ctx->streams[in_stream_idx]->codecpar->codec_type;
 
-    if (!(proc_ctx->fsc_ctx_arr[ctx_idx] = fsc_ctx_alloc(enc_ctx))) {
-      fprintf(stderr, "Failed to allocate fsc context for \
-        input stream: %d\nprocess job: %s\n", in_stream_idx, process_job_id);
-      return -1;
+    if (codec_type == AVMEDIA_TYPE_AUDIO)
+    {
+      if (!(proc_ctx->swr_out_ctx_arr[ctx_idx] =
+        swr_output_context_alloc(dec_ctx, enc_ctx)))
+      {
+        fprintf(stderr, "Failed to allocate swr output context for \
+          input stream: %d\nprocess job: %s\n", in_stream_idx, process_job_id);
+        return -1;
+      }
+
+      if (!(proc_ctx->fsc_ctx_arr[ctx_idx] = fsc_ctx_alloc(enc_ctx))) {
+        fprintf(stderr, "Failed to allocate fsc context for \
+          input stream: %d\nprocess job: %s\n", in_stream_idx, process_job_id);
+        return -1;
+      }
+    } else if (codec_type == AVMEDIA_TYPE_VIDEO)
+    {
+      if (proc_ctx->deint) {
+        if (!(proc_ctx->deint_ctx =
+          deint_filter_context_init(in_ctx, in_stream_idx, ctx_idx)))
+        {
+          fprintf(stderr, "Failed to allocate deinterlace filter context \
+            for process job: %s\n", process_job_id);
+          return -1;
+        }
+      }
     }
   }
 

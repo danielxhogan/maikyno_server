@@ -456,9 +456,11 @@ static int init_stream(AVFormatContext *fmt_ctx,
     return ret;
   }
 
-  if ((ret = av_dict_set(&out_stream->metadata, "title", title, 0)) < 0) {
-    fprintf(stderr, "Failed to set title for output stream.\n");
-    return ret;
+  if (title) {
+    if ((ret = av_dict_set(&out_stream->metadata, "title", title, 0)) < 0) {
+      fprintf(stderr, "Failed to set title for output stream.\n");
+      return ret;
+    }
   }
 
   if (enc_ctx) {
