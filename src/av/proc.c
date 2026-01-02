@@ -110,6 +110,7 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
 
   proc_ctx->gain_boost_arr = NULL;
   proc_ctx->renditions_arr = NULL;
+  proc_ctx->rend_ctx_arr = NULL;
 
   if ((ret = proc_ctx->nb_in_streams =
     get_input_file_nb_streams(process_job_id, db)) < 0)
@@ -188,6 +189,13 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
     goto end;
   }
 
+  if (!(proc_ctx->rend_ctx_arr =
+    calloc(proc_ctx->nb_selected_streams, sizeof(RenditionFilterContext *))))
+  {
+    fprintf(stderr, "Failed to allocate renditions context array.\n");
+    goto end;
+  }
+
   return proc_ctx;
 
 end:
@@ -226,8 +234,17 @@ void processing_context_free(ProcessingContext **proc_ctx)
   deint_filter_context_free(&(*proc_ctx)->deint_ctx);
   burn_in_filter_context_free(&(*proc_ctx)->burn_in_ctx);
 
+
   free((*proc_ctx)->gain_boost_arr);
+
   free((*proc_ctx)->renditions_arr);
+
+  if ((*proc_ctx)->rend_ctx_arr) {
+    for (i = 0; i < (*proc_ctx)->nb_selected_streams; i++) {
+      rendition_filter_context_free(&(*proc_ctx)->rend_ctx_arr[i]);
+    }
+    free((*proc_ctx)->rend_ctx_arr);
+  }
 
   free((*proc_ctx)->ctx_map);
   free((*proc_ctx)->idx_map);
@@ -311,9 +328,9 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
   proc_ctx->renditions_arr[*ctx_idx] =
     sqlite3_column_int(select_video_info_stmt, 4);
 
-  *ctx_idx = 1;
-  *out_stream_idx = 1;
   if (proc_ctx->renditions_arr[*ctx_idx]) { *out_stream_idx += 1; }
+  *out_stream_idx += 1;
+  *ctx_idx = 1;
 
 end:
   sqlite3_finalize(select_video_info_stmt);
@@ -324,6 +341,7 @@ end:
 int get_audio_process_info(ProcessingContext *proc_ctx,
   char *process_job_id, int *ctx_idx, int *out_stream_idx, sqlite3 *db)
 {
+  printf("out_stream_idx: %d\n\n\n", *out_stream_idx);
   char *select_audio_stream_info_query =
     "SELECT streams.stream_idx, \
       process_job_audio_streams.title, \
@@ -514,23 +532,6 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
   enum AVMediaType codec_type;
   AVCodecContext *dec_ctx, *enc_ctx;
 
-  if (!(proc_ctx->swr_out_ctx_arr =
-    calloc(proc_ctx->nb_selected_streams, sizeof(SwrOutputContext *))))
-  {
-    fprintf(stderr, "Failed to allocate array for swr output contexts:\n\
-      process job: %s\n", process_job_id);
-    return -ENOMEM;
-  }
-
-  if (!(proc_ctx->fsc_ctx_arr =
-    calloc(proc_ctx->nb_selected_streams, sizeof(FrameSizeConversionContext *))))
-  {
-    fprintf(stderr, "Failed to allocate array for swr output contexts:\n\
-      process job: %s\n", process_job_id);
-    return -ENOMEM;
-  }
-
-
   for (
     in_stream_idx = 0;
     in_stream_idx < (int) proc_ctx->nb_in_streams;
@@ -549,8 +550,9 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
 
     codec_type = in_ctx->fmt_ctx->streams[in_stream_idx]->codecpar->codec_type;
 
-    if (codec_type == AVMEDIA_TYPE_AUDIO)
-    {
+    if (codec_type == AVMEDIA_TYPE_AUDIO) {
+      if (proc_ctx->renditions_arr[ctx_idx]) { out_stream_idx += 1; }
+
       if (!(proc_ctx->swr_out_ctx_arr[ctx_idx] =
         swr_output_context_alloc(dec_ctx, enc_ctx)))
       {
@@ -587,6 +589,17 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
     {
       fprintf(stderr, "Failed to allocate burn in filter context \
         for process job: %s\n", process_job_id);
+      return -1;
+    }
+  }
+
+  if (proc_ctx->renditions_arr[ctx_idx]) {
+    if (!(proc_ctx->rend_ctx_arr[ctx_idx] =
+      video_rendition_filter_context_init(in_ctx->dec_ctx[ctx_idx],
+        in_ctx->fmt_ctx->streams[proc_ctx->v_stream_idx])))
+    {
+      fprintf(stderr, "Failed to allocate video rendition context for \
+        input stream: %d\nprocess job: %s\n", proc_ctx->v_stream_idx, process_job_id);
       return -1;
     }
   }

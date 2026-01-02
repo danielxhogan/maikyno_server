@@ -10,4 +10,5 @@
 #include "fsc.h"
 #include "deint.h"
 #include "burn_in.h"
+#include "rendition.h"
 #include "utils.h"

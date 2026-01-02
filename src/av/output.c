@@ -412,23 +412,40 @@ static int open_audio_encoder(AVCodecContext **enc_ctx, AVStream *in_stream)
   return 0;
 }
 
-static int open_encoder(AVCodecContext **enc_ctx,
-  AVStream *in_stream, char *in_filename)
+static int open_encoder(ProcessingContext *proc_ctx, OutputContext *out_ctx,
+  int ctx_idx, int out_stream_idx, AVStream *in_stream, char *in_filename)
 {
   int ret;
   enum AVMediaType stream_type = in_stream->codecpar->codec_type;
 
   if (stream_type == AVMEDIA_TYPE_VIDEO) {
     if ((ret =
-      open_video_encoder(enc_ctx, in_stream, in_filename)) < 0)
+      open_video_encoder(&out_ctx->enc_ctx[out_stream_idx], in_stream, in_filename)) < 0)
     {
       fprintf(stderr, "Failed to open video encoder for output stream.\n");
       return ret;
     }
+
+    if (proc_ctx->renditions_arr[ctx_idx]) {
+      out_stream_idx += 1;
+
+      if ((ret = open_video_encoder(&out_ctx->enc_ctx[out_stream_idx],
+        in_stream, in_filename)) < 0)
+      {
+        fprintf(stderr, "Failed to open video encoder for output stream.\n");
+        return ret;
+      }
+    }
   }
 
   else if (stream_type == AVMEDIA_TYPE_AUDIO) {
-    if ((ret = open_audio_encoder(enc_ctx, in_stream)) < 0) {
+    if (proc_ctx->renditions_arr[ctx_idx]) {
+      out_stream_idx += 1;
+    }
+
+    if ((ret = open_audio_encoder(&out_ctx->enc_ctx[out_stream_idx],
+      in_stream)) < 0)
+    {
       fprintf(stderr, "Failed to open audio encoder for output stream.\n");
       return ret;
     }
@@ -642,7 +659,7 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
     out_stream_idx = proc_ctx->idx_map[in_stream_idx];
 
     if (!proc_ctx->passthrough_arr[ctx_idx]) {
-      if ((ret = open_encoder(&out_ctx->enc_ctx[out_stream_idx],
+      if ((ret = open_encoder(proc_ctx, out_ctx, ctx_idx, out_stream_idx,
         in_ctx->fmt_ctx->streams[in_stream_idx], in_ctx->fmt_ctx->url)) < 0)
       {
         fprintf(stderr, "Failed to open encoder for output stream: %d.\n\
@@ -660,6 +677,18 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
         process_job: %s.\nLibav Error: %s.\n",
         in_stream_idx, process_job_id, av_err2str(ret));
       return ret;
+    }
+
+    if (proc_ctx->renditions_arr[ctx_idx]) {
+      if ((ret = init_stream(out_ctx->fmt_ctx, out_ctx->enc_ctx[out_stream_idx + 1],
+        in_ctx->fmt_ctx->streams[in_stream_idx],
+        proc_ctx->stream_titles_arr[ctx_idx])) < 0)
+      {
+        fprintf(stderr, "Failed to initialize stream for output stream: %d.\n\
+          process_job: %s.\nLibav Error: %s.\n",
+          in_stream_idx, process_job_id, av_err2str(ret));
+        return ret;
+      }
     }
   }
 

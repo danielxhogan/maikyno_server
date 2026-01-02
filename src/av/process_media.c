@@ -1,11 +1,10 @@
 #include "process_media.h"
 
 int encode_video_frame(ProcessingContext *proc_ctx, InputContext *in_ctx,
-  OutputContext *out_ctx, AVFrame *frame)
+  OutputContext *out_ctx, AVFrame *frame, int out_stream_idx)
 {
   int ret;
   int in_stream_idx = proc_ctx->v_stream_idx;
-  int out_stream_idx = proc_ctx->idx_map[in_stream_idx];
 
   if ((ret = avcodec_send_frame(
     out_ctx->enc_ctx[out_stream_idx], frame)) < 0)
@@ -28,7 +27,9 @@ int encode_video_frame(ProcessingContext *proc_ctx, InputContext *in_ctx,
     out_ctx->enc_pkt->dts = out_ctx->enc_pkt->dts / 2;
     }
 
-    if ((ret = av_interleaved_write_frame(out_ctx->fmt_ctx, out_ctx->enc_pkt)) < 0) {
+    if ((ret = av_interleaved_write_frame(out_ctx->fmt_ctx,
+      out_ctx->enc_pkt)) < 0)
+    {
       fprintf(stderr, "Failed to write packet to file.\n");
       return ret;
     }
@@ -36,6 +37,54 @@ int encode_video_frame(ProcessingContext *proc_ctx, InputContext *in_ctx,
 
   if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
     fprintf(stderr, "Failed to receive packet from encoder.\n");
+    return ret;
+  }
+
+  return 0;
+}
+
+int make_rendtion(ProcessingContext *proc_ctx, InputContext *in_ctx,
+  OutputContext *out_ctx, int ctx_idx, AVFrame *frame)
+{
+  int ret = 0;
+  RenditionFilterContext *rend_ctx = proc_ctx->rend_ctx_arr[ctx_idx];
+
+  if ((ret = av_buffersrc_add_frame_flags(rend_ctx->buffersrc_ctx,
+    frame, AV_BUFFERSRC_FLAG_KEEP_REF)) < 0)
+  {
+    fprintf(stderr, "Failed to add frame to buffer source.\n");
+    return ret;
+  }
+
+  while ((ret = av_buffersink_get_frame(rend_ctx->buffersink_ctx1,
+    rend_ctx->filtered_frame1)) >= 0)
+  {
+    if ((ret = encode_video_frame(proc_ctx, in_ctx, out_ctx,
+      rend_ctx->filtered_frame1, 0)) < 0)
+    {
+      fprintf(stderr, "Failed to encode video frame.\n");
+      return ret;
+    }
+  }
+
+  if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
+    fprintf(stderr, "Failed to get frame from first buffer sink.\n");
+    return ret;
+  }
+
+  while ((ret = av_buffersink_get_frame(rend_ctx->buffersink_ctx2,
+    rend_ctx->filtered_frame2)) >= 0)
+  {
+    if ((ret = encode_video_frame(proc_ctx, in_ctx, out_ctx,
+      rend_ctx->filtered_frame2, 1)) < 0)
+    {
+      fprintf(stderr, "Failed to encode video frame.\n");
+      return ret;
+    }
+  }
+
+  if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
+    fprintf(stderr, "Failed to get frame from first buffer sink.\n");
     return ret;
   }
 
@@ -58,7 +107,7 @@ int burn_in_subtitles(ProcessingContext *proc_ctx, InputContext *in_ctx, OutputC
     proc_ctx->burn_in_ctx->filtered_frame)) >= 0)
   {
     if ((ret = encode_video_frame(proc_ctx, in_ctx, out_ctx,
-      proc_ctx->burn_in_ctx->filtered_frame)) < 0)
+      proc_ctx->burn_in_ctx->filtered_frame, 0)) < 0)
     {
       fprintf(stderr, "Failed to encode video frame.\n");
       return ret;
@@ -98,7 +147,7 @@ int deinterlace_video_frame(ProcessingContext *proc_ctx, InputContext *in_ctx,
       }
     } else {
       if ((ret = encode_video_frame(proc_ctx, in_ctx, out_ctx,
-        proc_ctx->deint_ctx->filtered_frame)) < 0)
+        proc_ctx->deint_ctx->filtered_frame, 0)) < 0)
       {
         fprintf(stderr, "Failed to encode video frame.\n");
         return ret;
@@ -284,9 +333,17 @@ int decode_av_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
           return ret;
         }
       }
+      else if (proc_ctx->rend_ctx_arr[ctx_idx]) {
+        if ((ret = make_rendtion(proc_ctx, in_ctx, out_ctx,
+          ctx_idx, in_ctx->dec_frame)) < 0)
+        {
+          fprintf(stderr, "Failed to make video renditions.\n");
+          return ret;
+        }
+      }
       else {
         if ((ret = encode_video_frame(proc_ctx, in_ctx, out_ctx,
-          in_ctx->dec_frame)) < 0)
+          in_ctx->dec_frame, 0)) < 0)
         {
           fprintf(stderr, "Failed to encode video frame from input stream: %d.\n",
             in_stream_idx);
@@ -353,7 +410,6 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
     int out_stream_idx = proc_ctx->idx_map[in_stream_idx];
 
     if (ctx_idx == INACTIVE_STREAM) {
-      printf("in_ctx->init_pkt->stream_index: %d\n", in_ctx->init_pkt->stream_index);
       av_packet_unref(in_ctx->init_pkt);
       continue;
     }
@@ -451,6 +507,7 @@ int process_video(char *process_job_id, const char *batch_id)
     goto update_status;
   }
 
+
   if ((ret = processing_context_init(proc_ctx, in_ctx, out_ctx,
     process_job_id)) < 0)
   {
@@ -542,7 +599,7 @@ int process_video(char *process_job_id, const char *batch_id)
 
     if (codec_type == AVMEDIA_TYPE_VIDEO) {
       if ((ret = encode_video_frame(proc_ctx, in_ctx, out_ctx,
-        NULL)) < 0)
+        NULL, 0)) < 0)
       {
         fprintf(stderr, "Failed to encode video frame from input stream: %d.\n",
           in_stream_idx);

@@ -34,6 +34,15 @@ typedef struct BurnInFilterContext {
   SubToFrameContext *stf_ctx;
 } BurnInFilterContext;
 
+typedef struct RenditionFilterContext {
+  AVFilterContext *buffersrc_ctx;
+  AVFilterContext *buffersink_ctx1;
+  AVFilterContext *buffersink_ctx2;
+  AVFilterGraph *filter_graph;
+  AVFrame *filtered_frame1;
+  AVFrame *filtered_frame2;
+} RenditionFilterContext;
+
 typedef struct ProcessingContext {
   unsigned int nb_in_streams;
   unsigned int nb_selected_streams;
@@ -57,7 +66,9 @@ typedef struct ProcessingContext {
   BurnInFilterContext *burn_in_ctx;
 
   int *gain_boost_arr;
+
   int *renditions_arr;
+  RenditionFilterContext **rend_ctx_arr;
 } ProcessingContext;
 
 typedef struct InputContext {

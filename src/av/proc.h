@@ -3,6 +3,7 @@
 #include "types.h"
 #include "deint.h"
 #include "burn_in.h"
+#include "rendition.h"
 
 #include <sqlite3.h>
 
