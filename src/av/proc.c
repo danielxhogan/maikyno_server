@@ -91,6 +91,8 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   proc_ctx->nb_selected_streams = 0;
   proc_ctx->nb_out_streams = 0;
 
+  proc_ctx->v_stream_idx = -1;
+
   proc_ctx->ctx_map = NULL;
   proc_ctx->idx_map = NULL;
 
@@ -104,6 +106,8 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   proc_ctx->deint_ctx = NULL;
 
   proc_ctx->burn_in_idx = -1;
+  proc_ctx->burn_in_ctx = NULL;
+
   proc_ctx->gain_boost_arr = NULL;
   proc_ctx->renditions_arr = NULL;
 
@@ -220,6 +224,7 @@ void processing_context_free(ProcessingContext **proc_ctx)
   }
 
   deint_filter_context_free(&(*proc_ctx)->deint_ctx);
+  burn_in_filter_context_free(&(*proc_ctx)->burn_in_ctx);
 
   free((*proc_ctx)->gain_boost_arr);
   free((*proc_ctx)->renditions_arr);
@@ -271,6 +276,7 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
   *out_stream_idx = 0;
 
   in_stream_idx = sqlite3_column_int(select_video_info_stmt, 0);
+  proc_ctx->v_stream_idx = in_stream_idx;
   proc_ctx->ctx_map[in_stream_idx] = *ctx_idx;
   proc_ctx->idx_map[in_stream_idx] = *out_stream_idx;
 
@@ -427,13 +433,10 @@ int get_subtitle_process_info(ProcessingContext *proc_ctx,
   {
     in_stream_idx = sqlite3_column_int(select_subtitle_stream_idx_stmt, 0);
     proc_ctx->ctx_map[in_stream_idx] = *ctx_idx;
-    proc_ctx->idx_map[in_stream_idx] = *out_stream_idx;
-    printf("\nInput stream %d is mapped to output stream %d.\n",
-      in_stream_idx, *out_stream_idx);
 
     title = (char *) sqlite3_column_text(select_subtitle_stream_idx_stmt, 1);
     if (title) {
-      printf("Output stream %d has title \"%s\".\n", *out_stream_idx, title);
+      printf("\nOutput stream %d has title \"%s\".\n", *out_stream_idx, title);
       for (end = title; *end; end++);
       len_title = end - title;
 
@@ -450,12 +453,18 @@ int get_subtitle_process_info(ProcessingContext *proc_ctx,
     }
 
     burn_in = sqlite3_column_int(select_subtitle_stream_idx_stmt, 2);
-    if (burn_in) { proc_ctx->burn_in_idx = in_stream_idx; }
+    if (burn_in) {
+      proc_ctx->burn_in_idx = in_stream_idx;
+    }
     else {
       proc_ctx->passthrough_arr[*ctx_idx] = 1;
-      *ctx_idx += 1;
+      proc_ctx->idx_map[in_stream_idx] = *out_stream_idx;
+      printf("\nInput stream %d is mapped to output stream %d.\n",
+        in_stream_idx, *out_stream_idx);
       *out_stream_idx += 1;
     }
+
+    *ctx_idx += 1;
   }
 
 end:
@@ -521,6 +530,7 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
     return -ENOMEM;
   }
 
+
   for (
     in_stream_idx = 0;
     in_stream_idx < (int) proc_ctx->nb_in_streams;
@@ -554,17 +564,30 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
           input stream: %d\nprocess job: %s\n", in_stream_idx, process_job_id);
         return -1;
       }
-    } else if (codec_type == AVMEDIA_TYPE_VIDEO)
+    }
+   }
+
+  ctx_idx = proc_ctx->ctx_map[proc_ctx->v_stream_idx];
+
+  if (proc_ctx->deint) {
+    if (!(proc_ctx->deint_ctx =
+      deint_filter_context_init(in_ctx, proc_ctx->v_stream_idx, ctx_idx)))
     {
-      if (proc_ctx->deint) {
-        if (!(proc_ctx->deint_ctx =
-          deint_filter_context_init(in_ctx, in_stream_idx, ctx_idx)))
-        {
-          fprintf(stderr, "Failed to allocate deinterlace filter context \
-            for process job: %s\n", process_job_id);
-          return -1;
-        }
-      }
+      fprintf(stderr, "Failed to allocate deinterlace filter context \
+        for process job: %s\n", process_job_id);
+      return -1;
+    }
+  }
+
+  if (
+    proc_ctx->burn_in_idx != -1 &&
+    !proc_ctx->passthrough_arr[proc_ctx->v_stream_idx]
+  ) {
+    if (!(proc_ctx->burn_in_ctx = burn_in_filter_context_init(proc_ctx, in_ctx)))
+    {
+      fprintf(stderr, "Failed to allocate burn in filter context \
+        for process job: %s\n", process_job_id);
+      return -1;
     }
   }
 

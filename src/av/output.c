@@ -636,11 +636,12 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
     in_stream_idx++
   ) {
     if (proc_ctx->ctx_map[in_stream_idx] == INACTIVE_STREAM) { continue; }
+    if (in_stream_idx == proc_ctx->burn_in_idx) { continue; }
 
     ctx_idx = proc_ctx->ctx_map[in_stream_idx];
     out_stream_idx = proc_ctx->idx_map[in_stream_idx];
 
-    if (!proc_ctx->passthrough_arr[ctx_idx] && in_stream_idx != proc_ctx->burn_in_idx) {
+    if (!proc_ctx->passthrough_arr[ctx_idx]) {
       if ((ret = open_encoder(&out_ctx->enc_ctx[out_stream_idx],
         in_ctx->fmt_ctx->streams[in_stream_idx], in_ctx->fmt_ctx->url)) < 0)
       {

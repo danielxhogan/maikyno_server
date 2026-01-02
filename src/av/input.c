@@ -99,6 +99,7 @@ InputContext *open_input(ProcessingContext *proc_ctx,
   int ctx_idx, ret = 0;
   char *input_file = NULL;
   unsigned int in_stream_idx;
+  AVDictionary *opts = NULL;
 
   InputContext *in_ctx = malloc(sizeof(InputContext));
   if (!in_ctx) {
@@ -121,8 +122,18 @@ InputContext *open_input(ProcessingContext *proc_ctx,
 
   printf("\nOpening input file \"%s\".\n", input_file);
 
+  if ((ret = av_dict_set(&opts, "probesize", "50000000", 0)) < 0) {
+    fprintf(stderr, "Failed to set probesize option.\n");
+    return NULL;
+  }
+
+  if ((ret = av_dict_set(&opts, "analyzeduration", "10000000", 0)) < 0) {
+      fprintf(stderr, "Failed to set analyzeduration option.\n");
+      return NULL;
+  }
+
   if ((ret =
-    avformat_open_input(&in_ctx->fmt_ctx, input_file, NULL, NULL)) < 0)
+    avformat_open_input(&in_ctx->fmt_ctx, input_file, NULL, &opts)) < 0)
   {
     fprintf(stderr, "Failed to open input video file: '%s'.\n", input_file);
     goto end;
@@ -169,6 +180,12 @@ InputContext *open_input(ProcessingContext *proc_ctx,
     goto end;
   }
 
+  if (!(in_ctx->dec_sub = av_mallocz(sizeof(AVSubtitle)))) {
+    fprintf(stderr, "Failed to allocate AVSubtitle.\n");
+    ret = AVERROR(ENOMEM);
+    return NULL;
+  }
+
 end:
   free(input_file);
 
@@ -197,6 +214,7 @@ void close_input(InputContext **in_ctx)
 
   av_packet_free(&(*in_ctx)->init_pkt);
   av_frame_free(&(*in_ctx)->dec_frame);
+  avsubtitle_free((*in_ctx)->dec_sub);
   free(*in_ctx);
   *in_ctx = NULL;
 }

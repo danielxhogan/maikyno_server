@@ -9,4 +9,5 @@
 #include "swr.h"
 #include "fsc.h"
 #include "deint.h"
+#include "burn_in.h"
 #include "utils.h"

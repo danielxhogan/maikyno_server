@@ -15,10 +15,31 @@ typedef struct DeinterlaceFilterContext {
   AVFrame *filtered_frame;
 } DeinterlaceFilterContext;
 
+typedef struct SubToFrameContext {
+  struct SwsContext *sws_ctx;
+  enum AVPixelFormat in_pix_fmt;
+  enum AVPixelFormat out_pix_fmt;
+  long width_ratio;
+  long height_ratio;
+  int scale_algo;
+  AVFrame *subtitle_frame;
+} SubToFrameContext;
+
+typedef struct BurnInFilterContext {
+  AVFilterContext *v_buffersrc_ctx;
+  AVFilterContext *s_buffersrc_ctx;
+  AVFilterContext *buffersink_ctx;
+  AVFilterGraph *filter_graph;
+  AVFrame *filtered_frame;
+  SubToFrameContext *stf_ctx;
+} BurnInFilterContext;
+
 typedef struct ProcessingContext {
   unsigned int nb_in_streams;
   unsigned int nb_selected_streams;
   unsigned int nb_out_streams;
+
+  unsigned int v_stream_idx;
 
   int *ctx_map;
   int *idx_map;
@@ -33,6 +54,8 @@ typedef struct ProcessingContext {
   DeinterlaceFilterContext *deint_ctx;
 
   int burn_in_idx;
+  BurnInFilterContext *burn_in_ctx;
+
   int *gain_boost_arr;
   int *renditions_arr;
 } ProcessingContext;
@@ -42,6 +65,7 @@ typedef struct InputContext {
   AVCodecContext **dec_ctx;
   AVPacket *init_pkt;
   AVFrame *dec_frame;
+  AVSubtitle *dec_sub;
   int nb_selected_streams;
 } InputContext;
 

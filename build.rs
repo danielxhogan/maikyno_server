@@ -25,6 +25,8 @@ fn main()
   println!("cargo::rerun-if-changed=src/av/fsc.h");
   println!("cargo::rerun-if-changed=src/av/deint.c");
   println!("cargo::rerun-if-changed=src/av/deint.h");
+  println!("cargo::rerun-if-changed=src/av/burn_in.c");
+  println!("cargo::rerun-if-changed=src/av/burn_in.h");
   println!("cargo::rerun-if-changed=src/av/utils.c");
   println!("cargo::rerun-if-changed=src/av/utils.h");
 
@@ -35,6 +37,9 @@ fn main()
 
   let avcodec = pkg_config::Config::new().probe("libavcodec")
     .expect("Failed to find libavcodec");
+
+  let swscale = pkg_config::Config::new().probe("libswscale")
+    .expect("Failed to find libswresample");
 
   let swresample = pkg_config::Config::new().probe("libswresample")
     .expect("Failed to find libswresample");
@@ -65,6 +70,7 @@ fn main()
   cc_builder.file("src/av/swr.c");
   cc_builder.file("src/av/fsc.c");
   cc_builder.file("src/av/deint.c");
+  cc_builder.file("src/av/burn_in.c");
   cc_builder.file("src/av/utils.c");
   cc_builder.define("DATABASE_URL", format!("\"{}\"", database_url).as_str());
 
@@ -73,6 +79,10 @@ fn main()
   }
 
   for path in &avcodec.include_paths {
+    cc_builder.include(path);
+  }
+
+  for path in &swscale.include_paths {
     cc_builder.include(path);
   }
 
@@ -111,6 +121,14 @@ fn main()
   }
 
   for library in &avcodec.libs {
+    println!("cargo:rustc-link-lib={}", library);
+  }
+
+  for path in &swscale.link_paths {
+    println!("cargo:rustc-link-search={}", path.to_string_lossy());
+  }
+
+  for library in &swscale.libs {
     println!("cargo:rustc-link-lib={}", library);
   }
 
@@ -169,6 +187,11 @@ fn main()
   }
 
   for path in &avcodec.include_paths {
+    println!("path: {}", path.to_string_lossy());
+    builder = builder.clang_arg("-I").clang_arg(path.to_string_lossy());
+  }
+
+  for path in &swscale.include_paths {
     println!("path: {}", path.to_string_lossy());
     builder = builder.clang_arg("-I").clang_arg(path.to_string_lossy());
   }
