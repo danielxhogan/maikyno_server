@@ -12,6 +12,8 @@ pub struct ProcessVideoStreamInfo {
   pub title: Option<String>,
   pub passthrough: bool,
   pub create_renditions: bool,
+  pub title2: Option<String>,
+  pub tonemap: bool,
   pub deinterlace: bool
 }
 

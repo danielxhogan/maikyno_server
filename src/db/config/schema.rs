@@ -99,6 +99,8 @@ diesel::table! {
         title -> Nullable<Text>,
         passthrough -> Bool,
         create_renditions -> Bool,
+        title2 -> Nullable<Text>,
+        tonemap -> Bool,
         deinterlace -> Bool,
         stream_id -> Text,
         process_job_id -> Text,

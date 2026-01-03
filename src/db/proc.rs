@@ -140,6 +140,8 @@ pub async fn create_process_job(batch_id: String, video_info: ProcessVideoInfo,
       title: video_info.video_stream.title,
       passthrough: video_info.video_stream.passthrough,
       create_renditions: video_info.video_stream.create_renditions,
+      title2: video_info.video_stream.title2,
+      tonemap: video_info.video_stream.tonemap,
       deinterlace: video_info.video_stream.deinterlace,
       stream_id: video_info.video_stream.id,
       process_job_id: process_job.id.clone()

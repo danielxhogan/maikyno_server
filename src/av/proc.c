@@ -97,6 +97,7 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   proc_ctx->idx_map = NULL;
 
   proc_ctx->stream_titles_arr = NULL;
+  proc_ctx->stream_rend_titles_arr = NULL;
   proc_ctx->passthrough_arr = NULL;
 
   proc_ctx->swr_out_ctx_arr = NULL;
@@ -146,6 +147,13 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   }
 
   if (!(proc_ctx->stream_titles_arr =
+    calloc(proc_ctx->nb_selected_streams, sizeof(char *))))
+  {
+    fprintf(stderr, "Failed to allocate titles array.\n");
+    goto end;
+  }
+
+  if (!(proc_ctx->stream_rend_titles_arr =
     calloc(proc_ctx->nb_selected_streams, sizeof(char *))))
   {
     fprintf(stderr, "Failed to allocate titles array.\n");
@@ -215,6 +223,13 @@ void processing_context_free(ProcessingContext **proc_ctx)
     free((*proc_ctx)->stream_titles_arr);
   }
 
+  if ((*proc_ctx)->stream_rend_titles_arr) {
+    for (i = 0; i < (*proc_ctx)->nb_selected_streams; i++) {
+      free((*proc_ctx)->stream_rend_titles_arr[i]);
+    }
+    free((*proc_ctx)->stream_rend_titles_arr);
+  }
+
   free((*proc_ctx)->passthrough_arr);
 
   if ((*proc_ctx)->swr_out_ctx_arr) {
@@ -261,14 +276,16 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
       process_job_video_streams.title, \
       process_job_video_streams.passthrough, \
       process_job_video_streams.deinterlace, \
-      process_job_video_streams.create_renditions \
+      process_job_video_streams.create_renditions, \
+      process_job_video_streams.title2, \
+      process_job_video_streams.tonemap \
     FROM process_job_video_streams \
     JOIN streams ON process_job_video_streams.stream_id = streams.id \
     WHERE process_job_video_streams.process_job_id = ?;";
 
   sqlite3_stmt *select_video_info_stmt = NULL;
-  char *title, *end;
-  int in_stream_idx, len_title, ret = 0;
+  char *title, *title2, *end;
+  int in_stream_idx, len_title, len_title2, ret = 0;
 
   if ((ret = sqlite3_prepare_v2(db, select_video_info_query, -1,
     &select_video_info_stmt, 0)) != SQLITE_OK)
@@ -327,6 +344,28 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
 
   proc_ctx->renditions_arr[*ctx_idx] =
     sqlite3_column_int(select_video_info_stmt, 4);
+
+  title2 = (char *) sqlite3_column_text(select_video_info_stmt, 5);
+
+  if (title2) {
+    printf("Output stream %d has title \"%s\".\n", *out_stream_idx, title);
+
+    for (end = title2; *end; end++);
+    len_title2 = end - title2;
+
+    if (!(proc_ctx->stream_rend_titles_arr[*ctx_idx] =
+      calloc(len_title2 + 1, sizeof(char))))
+    {
+      fprintf(stderr, "Failed to allocate memory for title2 for stream: %d\n",
+        in_stream_idx);
+      ret = AVERROR(ENOMEM);
+      goto end;
+    }
+
+    strncat(proc_ctx->stream_rend_titles_arr[*ctx_idx], title2, len_title2);
+  }
+
+  proc_ctx->tonemap = sqlite3_column_int(select_video_info_stmt, 6);
 
   if (proc_ctx->renditions_arr[*ctx_idx]) { *out_stream_idx += 1; }
   *out_stream_idx += 1;

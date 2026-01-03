@@ -54,6 +54,7 @@ typedef struct ProcessingContext {
   int *idx_map;
 
   char **stream_titles_arr;
+  char **stream_rend_titles_arr;
   int *passthrough_arr;
 
   SwrOutputContext **swr_out_ctx_arr;
@@ -68,6 +69,7 @@ typedef struct ProcessingContext {
   int *gain_boost_arr;
 
   int *renditions_arr;
+  int tonemap;
   RenditionFilterContext **rend_ctx_arr;
 } ProcessingContext;
 

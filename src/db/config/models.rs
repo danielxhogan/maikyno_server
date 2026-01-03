@@ -303,6 +303,8 @@ pub struct  ProcessJobVideoStream {
   pub title: Option<String>,
   pub passthrough: bool,
   pub create_renditions: bool,
+  pub title2: Option<String>,
+  pub tonemap: bool,
   pub deinterlace: bool,
   pub stream_id: String,
   pub process_job_id: String
