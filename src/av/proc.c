@@ -341,7 +341,6 @@ end:
 int get_audio_process_info(ProcessingContext *proc_ctx,
   char *process_job_id, int *ctx_idx, int *out_stream_idx, sqlite3 *db)
 {
-  printf("out_stream_idx: %d\n\n\n", *out_stream_idx);
   char *select_audio_stream_info_query =
     "SELECT streams.stream_idx, \
       process_job_audio_streams.title, \

@@ -23,8 +23,8 @@ int encode_video_frame(ProcessingContext *proc_ctx, InputContext *in_ctx,
       out_ctx->fmt_ctx->streams[out_stream_idx]->time_base);
 
     if (proc_ctx->deint) {
-    out_ctx->enc_pkt->pts = out_ctx->enc_pkt->pts / 2;
-    out_ctx->enc_pkt->dts = out_ctx->enc_pkt->dts / 2;
+      out_ctx->enc_pkt->pts = out_ctx->enc_pkt->pts / 2;
+      out_ctx->enc_pkt->dts = out_ctx->enc_pkt->dts / 2;
     }
 
     if ((ret = av_interleaved_write_frame(out_ctx->fmt_ctx,
@@ -91,8 +91,8 @@ int make_rendtion(ProcessingContext *proc_ctx, InputContext *in_ctx,
   return 0;
 }
 
-int burn_in_subtitles(ProcessingContext *proc_ctx, InputContext *in_ctx, OutputContext *out_ctx,
-  AVFilterContext *buffersrc_ctx, AVFrame *frame)
+int burn_in_subtitles(ProcessingContext *proc_ctx, InputContext *in_ctx,
+  OutputContext *out_ctx, AVFilterContext *buffersrc_ctx, AVFrame *frame)
 {
   int ret = 0;
 
@@ -106,11 +106,21 @@ int burn_in_subtitles(ProcessingContext *proc_ctx, InputContext *in_ctx, OutputC
   while ((ret = av_buffersink_get_frame(proc_ctx->burn_in_ctx->buffersink_ctx,
     proc_ctx->burn_in_ctx->filtered_frame)) >= 0)
   {
-    if ((ret = encode_video_frame(proc_ctx, in_ctx, out_ctx,
-      proc_ctx->burn_in_ctx->filtered_frame, 0)) < 0)
-    {
-      fprintf(stderr, "Failed to encode video frame.\n");
-      return ret;
+    if (proc_ctx->rend_ctx_arr[0]) {
+      if ((ret = make_rendtion(proc_ctx, in_ctx, out_ctx,
+        0, proc_ctx->burn_in_ctx->filtered_frame)) < 0)
+      {
+        fprintf(stderr, "Failed to make video renditions.\n");
+        return ret;
+      }
+    }
+    else {
+      if ((ret = encode_video_frame(proc_ctx, in_ctx, out_ctx,
+        proc_ctx->burn_in_ctx->filtered_frame, 0)) < 0)
+      {
+        fprintf(stderr, "Failed to encode video frame.\n");
+        return ret;
+      }
     }
   }
 
@@ -137,7 +147,8 @@ int deinterlace_video_frame(ProcessingContext *proc_ctx, InputContext *in_ctx,
   while ((ret = av_buffersink_get_frame(proc_ctx->deint_ctx->buffersink_ctx,
     proc_ctx->deint_ctx->filtered_frame)) >= 0)
   {
-    if (proc_ctx->burn_in_ctx) {
+    if (proc_ctx->burn_in_ctx)
+    {
       if ((ret = burn_in_subtitles(proc_ctx, in_ctx, out_ctx,
         proc_ctx->burn_in_ctx->v_buffersrc_ctx,
         proc_ctx->deint_ctx->filtered_frame)) < 0)
@@ -145,7 +156,17 @@ int deinterlace_video_frame(ProcessingContext *proc_ctx, InputContext *in_ctx,
         fprintf(stderr, "Failed to burn in subtitles.\n");
         return ret;
       }
-    } else {
+    }
+    else if (proc_ctx->rend_ctx_arr[0])
+    {
+      if ((ret = make_rendtion(proc_ctx, in_ctx, out_ctx,
+        0, proc_ctx->deint_ctx->filtered_frame)) < 0)
+      {
+        fprintf(stderr, "Failed to make video renditions.\n");
+        return ret;
+      }
+    }
+    else {
       if ((ret = encode_video_frame(proc_ctx, in_ctx, out_ctx,
         proc_ctx->deint_ctx->filtered_frame, 0)) < 0)
       {

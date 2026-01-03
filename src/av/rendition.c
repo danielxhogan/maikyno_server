@@ -14,7 +14,6 @@ int buffersink_ctx_init(AVFilterContext **buffersink_ctx,
     return ret;
   }
 
-  // pix_fmt = av_get_pix_fmt_name(in_stream->codecpar->format);
 
   if ((ret = av_opt_set(*buffersink_ctx, "pixel_formats",
     pix_fmt, AV_OPT_SEARCH_CHILDREN)))
@@ -36,6 +35,7 @@ RenditionFilterContext *video_rendition_filter_context_init(
 {
   int ret = 0;
   char args[512], *flt_str = "[in]split[out1][out2]";
+  const char *pix_fmt;
 
   const AVFilter *buffersrc = avfilter_get_by_name("buffer");
 
@@ -87,15 +87,17 @@ RenditionFilterContext *video_rendition_filter_context_init(
     goto end;
   }
 
+  pix_fmt = av_get_pix_fmt_name(in_stream->codecpar->format);
+
   if ((ret = buffersink_ctx_init(&v_rend_ctx->buffersink_ctx1,
-    v_rend_ctx->filter_graph, in_stream, "yuv420p")) < 0)
+    v_rend_ctx->filter_graph, in_stream, pix_fmt)) < 0)
   {
     fprintf(stderr, "Failed to initialize first buffer sink context.\n");
     goto end;
   }
 
   if ((ret = buffersink_ctx_init(&v_rend_ctx->buffersink_ctx2,
-    v_rend_ctx->filter_graph, in_stream, "yuv420p")) < 0)
+    v_rend_ctx->filter_graph, in_stream, pix_fmt)) < 0)
   {
     fprintf(stderr, "Failed to initialize first buffer sink context.\n");
     goto end;
