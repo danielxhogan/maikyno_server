@@ -212,7 +212,9 @@ void close_input(InputContext **in_ctx)
 
   avformat_close_input(&(*in_ctx)->fmt_ctx);
 
+  if ((*in_ctx)->init_pkt) { av_packet_unref((*in_ctx)->init_pkt); }
   av_packet_free(&(*in_ctx)->init_pkt);
+  av_frame_unref((*in_ctx)->dec_frame);
   av_frame_free(&(*in_ctx)->dec_frame);
   avsubtitle_free((*in_ctx)->dec_sub);
   free(*in_ctx);

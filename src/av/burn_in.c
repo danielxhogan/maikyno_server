@@ -125,6 +125,7 @@ void sub_to_frame_context_free(SubToFrameContext **stf_ctx)
 {
   if (*stf_ctx == NULL) return;
   sws_freeContext((*stf_ctx)->sws_ctx);
+  av_frame_unref((*stf_ctx)->subtitle_frame);
   av_frame_free(&(*stf_ctx)->subtitle_frame);
   free(*stf_ctx);
   *stf_ctx = NULL;
@@ -290,6 +291,7 @@ void burn_in_filter_context_free(BurnInFilterContext **burn_in_ctx)
 {
   if (!*burn_in_ctx) return;
   avfilter_graph_free(&(*burn_in_ctx)->filter_graph);
+  av_frame_unref((*burn_in_ctx)->filtered_frame);
   av_frame_free(&(*burn_in_ctx)->filtered_frame);
   sub_to_frame_context_free(&(*burn_in_ctx)->stf_ctx);
   free(*burn_in_ctx);

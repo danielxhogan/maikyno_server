@@ -71,6 +71,7 @@ void swr_output_context_free(SwrOutputContext **swr_out_ctx)
 {
   if (!*swr_out_ctx) return;
   swr_free(&(*swr_out_ctx)->swr_ctx);
+  av_frame_unref((*swr_out_ctx)->swr_frame);
   av_frame_free(&(*swr_out_ctx)->swr_frame);
   free(*swr_out_ctx);
   *swr_out_ctx = NULL;

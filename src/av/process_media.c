@@ -33,6 +33,8 @@ int encode_video_frame(ProcessingContext *proc_ctx, InputContext *in_ctx,
       fprintf(stderr, "Failed to write packet to file.\n");
       return ret;
     }
+
+    if (out_ctx->enc_pkt) { av_packet_unref(out_ctx->enc_pkt); }
   }
 
   if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
@@ -65,6 +67,8 @@ int make_rendtion(ProcessingContext *proc_ctx, InputContext *in_ctx,
       fprintf(stderr, "Failed to encode video frame.\n");
       return ret;
     }
+
+    av_frame_unref(rend_ctx->filtered_frame1);
   }
 
   if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
@@ -81,6 +85,8 @@ int make_rendtion(ProcessingContext *proc_ctx, InputContext *in_ctx,
       fprintf(stderr, "Failed to encode video frame.\n");
       return ret;
     }
+
+    av_frame_unref(rend_ctx->filtered_frame2);
   }
 
   if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
@@ -122,6 +128,8 @@ int burn_in_subtitles(ProcessingContext *proc_ctx, InputContext *in_ctx,
         return ret;
       }
     }
+
+    av_frame_unref(proc_ctx->burn_in_ctx->filtered_frame);
   }
 
   if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
@@ -174,6 +182,8 @@ int deinterlace_video_frame(ProcessingContext *proc_ctx, InputContext *in_ctx,
         return ret;
       }
     }
+
+    av_frame_unref(proc_ctx->deint_ctx->filtered_frame);
   }
 
   if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
@@ -212,6 +222,8 @@ int encode_audio_frame(OutputContext *out_ctx,
         av_err2str(ret));
       return ret;
     }
+
+    if (out_ctx->enc_pkt) { av_packet_unref(out_ctx->enc_pkt); }
   }
 
   if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
@@ -298,7 +310,7 @@ int decode_sub_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
     return ret;
   }
 
-  in_ctx->dec_sub->pts = in_ctx->init_pkt->pts;
+  in_ctx->dec_sub->pts = in_ctx->init_pkt->pts * 2;
 
   if ((ret = sub_to_frame_convert(proc_ctx->burn_in_ctx->stf_ctx, in_ctx)))
   {
@@ -382,6 +394,8 @@ int decode_av_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
         return ret;
       }
     }
+
+    av_frame_unref(in_ctx->dec_frame);
   }
 
   if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
@@ -411,7 +425,7 @@ int decode_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
   } else if (codec_type == AVMEDIA_TYPE_SUBTITLE && in_ctx->init_pkt)
   {
     if ((ret = decode_sub_packet(proc_ctx, in_ctx, out_ctx, ctx_idx)) < 0) {
-      fprintf(stderr, "Failed to subtitle packet \
+      fprintf(stderr, "Failed to decode subtitle packet \
         for input stream: %d.\n", in_stream_idx);
       return ret;
     }
@@ -431,7 +445,7 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
     int out_stream_idx = proc_ctx->idx_map[in_stream_idx];
 
     if (ctx_idx == INACTIVE_STREAM) {
-      av_packet_unref(in_ctx->init_pkt);
+      if(in_ctx->init_pkt) { av_packet_unref(in_ctx->init_pkt); }
       continue;
     }
 
@@ -456,6 +470,8 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
           av_err2str(ret));
         return ret;
       }
+
+      if(in_ctx->init_pkt) { av_packet_unref(in_ctx->init_pkt); }
       continue;
     }
 
@@ -465,6 +481,8 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
       fprintf(stderr, "Failed to decode packet.\n");
       return ret;
     }
+
+    if(in_ctx->init_pkt) { av_packet_unref(in_ctx->init_pkt); }
   }
 
   if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
@@ -543,6 +561,8 @@ int process_video(char *process_job_id, const char *batch_id)
     fprintf(stderr, "Failed to transcode process job: %s.\n", process_job_id);
   }
 
+  if (in_ctx->init_pkt) { av_packet_unref(in_ctx->init_pkt); }
+  av_packet_free(&in_ctx->init_pkt);
   in_ctx->init_pkt = NULL;
 
   for (
@@ -564,6 +584,8 @@ int process_video(char *process_job_id, const char *batch_id)
     }
   }
 
+  av_frame_unref(in_ctx->dec_frame);
+  av_frame_free(&in_ctx->dec_frame);
   in_ctx->dec_frame = NULL;
 
   for (

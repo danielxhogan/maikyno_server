@@ -121,6 +121,7 @@ void deint_filter_context_free(DeinterlaceFilterContext **deint_ctx)
 {
   if (!*deint_ctx) return;
   avfilter_graph_free(&(*deint_ctx)->filter_graph);
+  av_frame_unref((*deint_ctx)->filtered_frame);
   av_frame_free(&(*deint_ctx)->filtered_frame);
   free(*deint_ctx);
   *deint_ctx = NULL;

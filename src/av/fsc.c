@@ -94,19 +94,19 @@ int fsc_ctx_alloc_buffer(FrameSizeConversionContext *fsc_ctx, int capacity)
 }
 
 int fsc_ctx_add_samples_to_buffer(FrameSizeConversionContext *fsc_ctx,
-  AVFrame *dec_frame, int nb_converted_samples)
+  AVFrame *frame, int nb_converted_samples)
 {
   int ret = 0;
 
   if ((ret = fsc_ctx_alloc_buffer(fsc_ctx,
-    fsc_ctx->frame_size + dec_frame->nb_samples)) < 0)
+    fsc_ctx->frame_size + frame->nb_samples)) < 0)
   {
     fprintf(stderr, "Failed to allocate sample buffer for fsc_ctx.\n");
     return ret;
   }
 
-  ret = av_samples_copy(fsc_ctx->sample_buffer, dec_frame->data,
-    fsc_ctx->nb_samples_in_buffer, 0, dec_frame->nb_samples,
+  ret = av_samples_copy(fsc_ctx->sample_buffer, frame->data,
+    fsc_ctx->nb_samples_in_buffer, 0, frame->nb_samples,
     fsc_ctx->channels, fsc_ctx->sample_fmt);
 
   if (ret < 0) {
@@ -151,6 +151,7 @@ void fsc_ctx_free(FrameSizeConversionContext **fsc_ctx)
 {
   if (!*fsc_ctx) return;
   av_freep(&(*fsc_ctx)->sample_buffer[0]);
+  av_frame_unref((*fsc_ctx)->frame);
   av_frame_free(&(*fsc_ctx)->frame);
   free(*fsc_ctx);
   *fsc_ctx = NULL;

@@ -126,7 +126,7 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
   }
 
   additional_params_str =
-    "pools=3:keyint=120:min-keyint=120:no-open-gop=true:no-scenecut=true";
+    "pools=2:keyint=120:min-keyint=120:no-open-gop=true:no-scenecut=true";
   len_params_str = get_len_params_str(hdr_params_str, additional_params_str);
 
   if (!(params_str = calloc(len_params_str + 1, sizeof(char))))
@@ -829,6 +829,7 @@ void close_output(OutputContext **out_ctx)
     free((*out_ctx)->enc_ctx);
   }
 
+  if ((*out_ctx)->enc_pkt) { av_packet_unref((*out_ctx)->enc_pkt); }
   av_packet_free(&(*out_ctx)->enc_pkt);
   free(*out_ctx);
   *out_ctx = NULL;

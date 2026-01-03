@@ -1,7 +1,7 @@
 #include "rendition.h"
 
 int buffersink_ctx_init(AVFilterContext **buffersink_ctx,
-  AVFilterGraph *filter_graph, AVStream *in_stream, const char *pix_fmt)
+  AVFilterGraph *filter_graph, const char *pix_fmt)
 {
   int ret = 0;
   const AVFilter *buffersink = avfilter_get_by_name("buffersink");
@@ -90,14 +90,14 @@ RenditionFilterContext *video_rendition_filter_context_init(
   pix_fmt = av_get_pix_fmt_name(in_stream->codecpar->format);
 
   if ((ret = buffersink_ctx_init(&v_rend_ctx->buffersink_ctx1,
-    v_rend_ctx->filter_graph, in_stream, pix_fmt)) < 0)
+    v_rend_ctx->filter_graph, pix_fmt)) < 0)
   {
     fprintf(stderr, "Failed to initialize first buffer sink context.\n");
     goto end;
   }
 
   if ((ret = buffersink_ctx_init(&v_rend_ctx->buffersink_ctx2,
-    v_rend_ctx->filter_graph, in_stream, pix_fmt)) < 0)
+    v_rend_ctx->filter_graph, pix_fmt)) < 0)
   {
     fprintf(stderr, "Failed to initialize first buffer sink context.\n");
     goto end;
@@ -156,7 +156,9 @@ void rendition_filter_context_free(RenditionFilterContext **rend_ctx)
 {
   if (!*rend_ctx) return;
   avfilter_graph_free(&(*rend_ctx)->filter_graph);
+  av_frame_unref((*rend_ctx)->filtered_frame1);
   av_frame_free(&(*rend_ctx)->filtered_frame1);
+  av_frame_unref((*rend_ctx)->filtered_frame2);
   av_frame_free(&(*rend_ctx)->filtered_frame2);
   free(*rend_ctx);
   *rend_ctx = NULL;

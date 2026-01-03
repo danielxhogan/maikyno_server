@@ -132,13 +132,12 @@ int extract_hdr_metadata(HdrMetadataContext *hdr_ctx, const char *filename)
   while (av_read_frame(fmt_ctx, pkt) >= 0 && frames_decoded < FRAME_DECODE_LIMIT)
   {
     if (pkt->stream_index != v_stream_idx) {
-      av_packet_unref(pkt);
+      if (pkt) { av_packet_unref(pkt); }
       continue;
     }
 
     if ((ret = avcodec_send_packet(dec_ctx, pkt)) < 0) {
       fprintf(stderr, "Failed to send video packet to decoder.\n");
-      av_packet_unref(pkt);
       goto end;
     }
 
@@ -222,6 +221,8 @@ int extract_hdr_metadata(HdrMetadataContext *hdr_ctx, const char *filename)
     if (hdr_ctx->mdm && hdr_ctx->cll && hdr_ctx->dovi) {
       break;
     }
+
+      if (pkt) { av_packet_unref(pkt); }
   }
 
   if ((ret < 0 && ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
@@ -232,7 +233,9 @@ int extract_hdr_metadata(HdrMetadataContext *hdr_ctx, const char *filename)
 end:
   avformat_close_input(&fmt_ctx);
   avcodec_free_context(&dec_ctx);
+  if (pkt) { av_packet_unref(pkt); }
   av_packet_free(&pkt);
+  av_frame_unref(frame);
   av_frame_free(&frame);
 
   if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) return 0;
