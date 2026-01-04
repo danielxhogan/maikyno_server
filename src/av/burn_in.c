@@ -37,11 +37,17 @@ SubToFrameContext *sub_to_frame_context_alloc(ProcessingContext *proc_ctx,
   stf_ctx->subtitle_frame->width = v_dec_ctx->width;
   stf_ctx->subtitle_frame->height = v_dec_ctx->height;
   stf_ctx->subtitle_frame->format = out_pix_fmt;
+  stf_ctx->subtitle_frame->color_primaries = v_dec_ctx->color_primaries;
+  stf_ctx->subtitle_frame->color_trc = v_dec_ctx->color_trc;
+  stf_ctx->subtitle_frame->colorspace = v_dec_ctx->colorspace;
+  stf_ctx->subtitle_frame->chroma_location = v_dec_ctx->chroma_sample_location;
+  stf_ctx->subtitle_frame->color_range = v_dec_ctx->color_range;
 
   if ((ret = av_frame_get_buffer(stf_ctx->subtitle_frame, 0)) < 0) {
     fprintf(stderr, "Failed to allocate buffers for frame.\n");
     goto end;
   }
+
 
   stf_ctx->width_ratio = v_dec_ctx->width / s_dec_ctx->width;
   stf_ctx->height_ratio = v_dec_ctx->height / s_dec_ctx->height;
@@ -202,7 +208,7 @@ BurnInFilterContext *burn_in_filter_context_init(ProcessingContext *proc_ctx,
 
   snprintf(s_args, sizeof(s_args),
     "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=%d/%d",
-    v_dec_ctx->width, v_dec_ctx->height, AV_PIX_FMT_RGBA,
+    v_dec_ctx->width, v_dec_ctx->height, v_dec_ctx->pix_fmt,
     v_stream->time_base.num, v_stream->time_base.den,
     v_dec_ctx->sample_aspect_ratio.num,
     v_dec_ctx->sample_aspect_ratio.den);
@@ -222,7 +228,7 @@ BurnInFilterContext *burn_in_filter_context_init(ProcessingContext *proc_ctx,
     goto end;
   }
 
-  pix_fmt = av_get_pix_fmt_name( v_stream->codecpar->format);
+  pix_fmt = av_get_pix_fmt_name(v_stream->codecpar->format);
 
   if ((ret = av_opt_set(burn_in_ctx->buffersink_ctx, "pixel_formats",
     pix_fmt, AV_OPT_SEARCH_CHILDREN)))
@@ -267,6 +273,15 @@ BurnInFilterContext *burn_in_filter_context_init(ProcessingContext *proc_ctx,
     ret = AVERROR(ENOMEM);
     goto end;
   }
+
+  burn_in_ctx->filtered_frame->width = v_dec_ctx->width;
+  burn_in_ctx->filtered_frame->height = v_dec_ctx->height;
+  burn_in_ctx->filtered_frame->format = v_dec_ctx->pix_fmt;
+  burn_in_ctx->filtered_frame->color_primaries = v_dec_ctx->color_primaries;
+  burn_in_ctx->filtered_frame->color_trc = v_dec_ctx->color_trc;
+  burn_in_ctx->filtered_frame->colorspace = v_dec_ctx->colorspace;
+  burn_in_ctx->filtered_frame->chroma_location = v_dec_ctx->chroma_sample_location;
+  burn_in_ctx->filtered_frame->color_range = v_dec_ctx->color_range;
 
   if (!(burn_in_ctx->stf_ctx = sub_to_frame_context_alloc(proc_ctx, in_ctx))) {
     fprintf(stderr,

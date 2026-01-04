@@ -101,6 +101,7 @@ int burn_in_subtitles(ProcessingContext *proc_ctx, InputContext *in_ctx,
   OutputContext *out_ctx, AVFilterContext *buffersrc_ctx, AVFrame *frame)
 {
   int ret = 0;
+  AVCodecContext *v_dec_ctx = in_ctx->dec_ctx[proc_ctx->v_stream_idx];
 
   if ((ret = av_buffersrc_add_frame_flags(buffersrc_ctx,
     frame, AV_BUFFERSRC_FLAG_KEEP_REF)) < 0)
@@ -112,6 +113,12 @@ int burn_in_subtitles(ProcessingContext *proc_ctx, InputContext *in_ctx,
   while ((ret = av_buffersink_get_frame(proc_ctx->burn_in_ctx->buffersink_ctx,
     proc_ctx->burn_in_ctx->filtered_frame)) >= 0)
   {
+    proc_ctx->burn_in_ctx->filtered_frame->color_primaries = v_dec_ctx->color_primaries;
+    proc_ctx->burn_in_ctx->filtered_frame->color_trc = v_dec_ctx->color_trc;
+    proc_ctx->burn_in_ctx->filtered_frame->colorspace = v_dec_ctx->colorspace;
+    proc_ctx->burn_in_ctx->filtered_frame->chroma_location = v_dec_ctx->chroma_sample_location;
+    proc_ctx->burn_in_ctx->filtered_frame->color_range = v_dec_ctx->color_range;
+
     if (proc_ctx->rend_ctx_arr[0]) {
       if ((ret = make_rendtion(proc_ctx, in_ctx, out_ctx,
         0, proc_ctx->burn_in_ctx->filtered_frame)) < 0)

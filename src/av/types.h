@@ -70,6 +70,7 @@ typedef struct ProcessingContext {
 
   int *renditions_arr;
   int tonemap;
+  int hdr;
   RenditionFilterContext **rend_ctx_arr;
 } ProcessingContext;
 

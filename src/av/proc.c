@@ -111,6 +111,7 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
 
   proc_ctx->gain_boost_arr = NULL;
   proc_ctx->renditions_arr = NULL;
+  proc_ctx->hdr = 0;
   proc_ctx->rend_ctx_arr = NULL;
 
   if ((ret = proc_ctx->nb_in_streams =
@@ -608,6 +609,7 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
    }
 
   ctx_idx = proc_ctx->ctx_map[proc_ctx->v_stream_idx];
+  out_stream_idx = proc_ctx->idx_map[in_stream_idx];
 
   if (proc_ctx->deint) {
     if (!(proc_ctx->deint_ctx =
@@ -633,7 +635,8 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
 
   if (proc_ctx->renditions_arr[ctx_idx]) {
     if (!(proc_ctx->rend_ctx_arr[ctx_idx] =
-      video_rendition_filter_context_init(in_ctx->dec_ctx[ctx_idx],
+      video_rendition_filter_context_init(proc_ctx, in_ctx->dec_ctx[ctx_idx],
+        out_ctx->enc_ctx[out_stream_idx], out_ctx->enc_ctx[out_stream_idx + 1],
         in_ctx->fmt_ctx->streams[proc_ctx->v_stream_idx])))
     {
       fprintf(stderr, "Failed to allocate video rendition context for \

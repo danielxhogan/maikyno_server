@@ -60,8 +60,8 @@ static int get_len_params_str(char *hdr_params_str, char *additional_params_str)
   return len_hdr_params_str + len_additional_params_str;
 }
 
-static int open_video_encoder(AVCodecContext **enc_ctx,
-  AVStream *in_stream, char *in_filename)
+static int open_video_encoder(AVCodecContext **enc_ctx, ProcessingContext *proc_ctx,
+  AVStream *in_stream, char *in_filename, int rendition2)
 {
   int len_params_str, ret = 0;
   const AVCodec *enc;
@@ -80,35 +80,6 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
     goto end;
   }
 
-  (*enc_ctx)->time_base = in_stream->time_base;
-  (*enc_ctx)->framerate = in_stream->avg_frame_rate;
-
-  (*enc_ctx)->width = in_stream->codecpar->width;
-  (*enc_ctx)->height = in_stream->codecpar->height;
-  (*enc_ctx)->pix_fmt = in_stream->codecpar->format;
-
-  (*enc_ctx)->color_range = in_stream->codecpar->color_range;
-  (*enc_ctx)->color_primaries = in_stream->codecpar->color_primaries;
-  (*enc_ctx)->color_trc = in_stream->codecpar->color_trc;
-  (*enc_ctx)->colorspace = in_stream->codecpar->color_space;
-  (*enc_ctx)->chroma_sample_location = in_stream->codecpar->chroma_location;
-
-  // (*enc_ctx)->color_range = AVCOL_RANGE_UNSPECIFIED;
-  // (*enc_ctx)->pix_fmt = AV_PIX_FMT_YUV420P;
-  // (*enc_ctx)->color_primaries = AVCOL_PRI_UNSPECIFIED;
-  // (*enc_ctx)->color_trc = AVCOL_TRC_UNSPECIFIED;
-  // (*enc_ctx)->colorspace = AVCOL_SPC_UNSPECIFIED;
-  // (*enc_ctx)->chroma_sample_location = AVCHROMA_LOC_LEFT;
-
-  printf("in_stream->codecpar->format: %d\n", in_stream->codecpar->format);
-  printf("in_stream->codecpar->color_range: %d\n", in_stream->codecpar->color_range);
-  printf("in_stream->codecpar->color_primaries: %d\n", in_stream->codecpar->color_primaries);
-  printf("in_stream->codecpar->color_trc: %d\n", in_stream->codecpar->color_trc);
-  printf("in_stream->codecpar->color_space: %d\n", in_stream->codecpar->color_space);
-  printf("in_stream->codecpar->chroma_location: %d\n", in_stream->codecpar->chroma_location);
-
-  (*enc_ctx)->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
-
   if (!(hdr_ctx = hdr_ctx_alloc())) {
     fprintf(stderr, "Failed to allocate hdr metadata.\n");
     ret = -ENOMEM;
@@ -120,10 +91,45 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
     goto end;
   }
 
-  if ((ret = inject_hdr_metadta(hdr_ctx, *enc_ctx, &hdr_params_str)) < 0) {
-    fprintf(stderr, "Failed to inject hdr metadata.\n");
-    goto end;
+  if (hdr_ctx->mdm && hdr_ctx->cll) {
+    proc_ctx->hdr = 1;
+
+    if (!rendition2) {
+      if ((ret = inject_hdr_metadta(hdr_ctx, *enc_ctx, &hdr_params_str)) < 0) {
+        fprintf(stderr, "Failed to inject hdr metadata.\n");
+        goto end;
+      }
+    }
   }
+
+  (*enc_ctx)->time_base = in_stream->time_base;
+  (*enc_ctx)->framerate = in_stream->avg_frame_rate;
+
+  if (rendition2) {
+    (*enc_ctx)->width = in_stream->codecpar->width / 2;
+    (*enc_ctx)->height = in_stream->codecpar->height / 2;
+  } else {
+    (*enc_ctx)->width = in_stream->codecpar->width;
+    (*enc_ctx)->height = in_stream->codecpar->height;
+  }
+
+  if (rendition2 && proc_ctx->tonemap && proc_ctx->hdr) {
+    (*enc_ctx)->pix_fmt = AV_PIX_FMT_YUV420P;
+    (*enc_ctx)->color_primaries = AVCOL_PRI_BT709;
+    (*enc_ctx)->color_trc = AVCOL_TRC_BT709;
+    (*enc_ctx)->colorspace = AVCOL_SPC_BT709;
+    (*enc_ctx)->color_range = AVCOL_RANGE_UNSPECIFIED;
+    (*enc_ctx)->chroma_sample_location = AVCHROMA_LOC_LEFT;
+  } else {
+    (*enc_ctx)->pix_fmt = in_stream->codecpar->format;
+    (*enc_ctx)->color_range = in_stream->codecpar->color_range;
+    (*enc_ctx)->color_primaries = in_stream->codecpar->color_primaries;
+    (*enc_ctx)->color_trc = in_stream->codecpar->color_trc;
+    (*enc_ctx)->colorspace = in_stream->codecpar->color_space;
+    (*enc_ctx)->chroma_sample_location = in_stream->codecpar->chroma_location;
+  }
+
+  (*enc_ctx)->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
   additional_params_str =
     "pools=2:keyint=120:min-keyint=120:no-open-gop=true:no-scenecut=true";
@@ -420,7 +426,7 @@ static int open_encoder(ProcessingContext *proc_ctx, OutputContext *out_ctx,
 
   if (stream_type == AVMEDIA_TYPE_VIDEO) {
     if ((ret =
-      open_video_encoder(&out_ctx->enc_ctx[out_stream_idx], in_stream, in_filename)) < 0)
+      open_video_encoder(&out_ctx->enc_ctx[out_stream_idx], proc_ctx, in_stream, in_filename, 0)) < 0)
     {
       fprintf(stderr, "Failed to open video encoder for output stream.\n");
       return ret;
@@ -429,8 +435,8 @@ static int open_encoder(ProcessingContext *proc_ctx, OutputContext *out_ctx,
     if (proc_ctx->renditions_arr[ctx_idx]) {
       out_stream_idx += 1;
 
-      if ((ret = open_video_encoder(&out_ctx->enc_ctx[out_stream_idx],
-        in_stream, in_filename)) < 0)
+      if ((ret = open_video_encoder(&out_ctx->enc_ctx[out_stream_idx], proc_ctx,
+        in_stream, in_filename, 1)) < 0)
       {
         fprintf(stderr, "Failed to open video encoder for output stream.\n");
         return ret;
