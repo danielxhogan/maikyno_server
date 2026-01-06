@@ -482,6 +482,25 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
       continue;
     }
 
+    if (
+      in_ctx->dec_ctx[ctx_idx]->codec_type == AVMEDIA_TYPE_AUDIO &&
+      proc_ctx->renditions_arr[ctx_idx]
+    ) {
+      in_ctx->init_pkt_cpy = av_packet_clone(in_ctx->init_pkt);
+      in_ctx->init_pkt_cpy->stream_index = out_stream_idx;
+
+      if ((ret =
+        av_interleaved_write_frame(out_ctx->fmt_ctx, in_ctx->init_pkt_cpy)) < 0)
+      {
+        fprintf(stderr, "Failed to write packet to file.\nError: %s.\n",
+          av_err2str(ret));
+        return ret;
+      }
+
+      av_packet_unref(in_ctx->init_pkt_cpy);
+      out_stream_idx += 1;
+    }
+
     if ((ret = decode_packet(proc_ctx, in_ctx, out_ctx,
       in_stream_idx, ctx_idx, out_stream_idx)) < 0)
     {
@@ -553,7 +572,6 @@ int process_video(char *process_job_id, const char *batch_id)
     goto update_status;
   }
 
-
   if ((ret = processing_context_init(proc_ctx, in_ctx, out_ctx,
     process_job_id)) < 0)
   {
@@ -583,12 +601,19 @@ int process_video(char *process_job_id, const char *batch_id)
     if (ctx_idx == INACTIVE_STREAM) { continue; }
     if (proc_ctx->passthrough_arr[ctx_idx]) { continue; }
 
-    if ((ret = decode_packet(proc_ctx, in_ctx, out_ctx,
-      in_stream_idx, ctx_idx, out_stream_idx)) < 0)
-    {
-      fprintf(stderr, "Failed to decode packet.\n");
-      return ret;
+    if (
+      proc_ctx->renditions_arr[ctx_idx] &&
+      in_ctx->dec_ctx[ctx_idx]->codec_type == AVMEDIA_TYPE_AUDIO
+    ) {
+      out_stream_idx += 1;
     }
+
+      if ((ret = decode_packet(proc_ctx, in_ctx, out_ctx,
+        in_stream_idx, ctx_idx, out_stream_idx)) < 0)
+      {
+        fprintf(stderr, "Failed to decode packet.\n");
+        return ret;
+      }
   }
 
   av_frame_unref(in_ctx->dec_frame);
@@ -602,6 +627,7 @@ int process_video(char *process_job_id, const char *batch_id)
   ) {
     ctx_idx = proc_ctx->ctx_map[in_stream_idx];
     out_stream_idx = proc_ctx->idx_map[in_stream_idx];
+    if (proc_ctx->renditions_arr[ctx_idx]) { out_stream_idx += 1; }
 
     if (ctx_idx == INACTIVE_STREAM) { continue; }
     if (proc_ctx->passthrough_arr[ctx_idx]) { continue; }
@@ -656,6 +682,8 @@ int process_video(char *process_job_id, const char *batch_id)
         return ret;
       }
     } else if (codec_type == AVMEDIA_TYPE_AUDIO) {
+      if (proc_ctx->renditions_arr[ctx_idx]) { out_stream_idx += 1; }
+
       if ((ret = encode_audio_frame(out_ctx,
         out_stream_idx, NULL)) < 0)
       {

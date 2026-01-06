@@ -408,7 +408,7 @@ static int open_audio_encoder(AVCodecContext **enc_ctx, AVStream *in_stream)
   }
 
   (*enc_ctx)->sample_rate = in_stream->codecpar->sample_rate;
-  (*enc_ctx)->bit_rate = in_stream->codecpar->bit_rate;
+  (*enc_ctx)->bit_rate = 224000;
 
   if ((ret = avcodec_open2(*enc_ctx, enc, NULL)) < 0) {
     fprintf(stderr, "Failed to open encoder.\n");

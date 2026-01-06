@@ -110,6 +110,7 @@ InputContext *open_input(ProcessingContext *proc_ctx,
   in_ctx->fmt_ctx = NULL;
   in_ctx->dec_ctx = NULL;
   in_ctx->init_pkt = NULL;
+  in_ctx->init_pkt_cpy = NULL;
   in_ctx->dec_frame = NULL;
   in_ctx->nb_selected_streams = proc_ctx->nb_selected_streams;
 
@@ -214,6 +215,8 @@ void close_input(InputContext **in_ctx)
 
   if ((*in_ctx)->init_pkt) { av_packet_unref((*in_ctx)->init_pkt); }
   av_packet_free(&(*in_ctx)->init_pkt);
+  if ((*in_ctx)->init_pkt_cpy) { av_packet_unref((*in_ctx)->init_pkt_cpy); }
+  av_packet_free(&(*in_ctx)->init_pkt_cpy);
   av_frame_unref((*in_ctx)->dec_frame);
   av_frame_free(&(*in_ctx)->dec_frame);
   avsubtitle_free((*in_ctx)->dec_sub);

@@ -442,9 +442,9 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
     proc_ctx->renditions_arr[*ctx_idx] =
       sqlite3_column_int(select_audio_stream_info_stmt, 4);
 
-    *ctx_idx += 1;
     *out_stream_idx += 1;
     if (proc_ctx->renditions_arr[*ctx_idx]) { *out_stream_idx += 1; }
+    *ctx_idx += 1;
   }
 
   if (ret != SQLITE_DONE) {
@@ -582,15 +582,18 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
     passthrough = proc_ctx->passthrough_arr[ctx_idx];
     if (passthrough) { continue; }
 
-    dec_ctx = in_ctx->dec_ctx[ctx_idx];
-
-    out_stream_idx = proc_ctx->idx_map[in_stream_idx];
-    enc_ctx = out_ctx->enc_ctx[out_stream_idx];
-
     codec_type = in_ctx->fmt_ctx->streams[in_stream_idx]->codecpar->codec_type;
 
-    if (codec_type == AVMEDIA_TYPE_AUDIO) {
-      if (proc_ctx->renditions_arr[ctx_idx]) { out_stream_idx += 1; }
+    if (codec_type == AVMEDIA_TYPE_AUDIO)
+    {
+      dec_ctx = in_ctx->dec_ctx[ctx_idx];
+      out_stream_idx = proc_ctx->idx_map[in_stream_idx];
+
+      if (proc_ctx->renditions_arr[ctx_idx]) {
+        out_stream_idx += 1;
+      }
+
+      enc_ctx = out_ctx->enc_ctx[out_stream_idx];
 
       if (!(proc_ctx->swr_out_ctx_arr[ctx_idx] =
         swr_output_context_alloc(dec_ctx, enc_ctx)))

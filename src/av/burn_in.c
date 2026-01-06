@@ -48,7 +48,6 @@ SubToFrameContext *sub_to_frame_context_alloc(ProcessingContext *proc_ctx,
     goto end;
   }
 
-
   stf_ctx->width_ratio = v_dec_ctx->width / s_dec_ctx->width;
   stf_ctx->height_ratio = v_dec_ctx->height / s_dec_ctx->height;
 
