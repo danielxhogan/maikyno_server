@@ -37,9 +37,7 @@ RenditionFilterContext *video_rendition_filter_context_init(
   int ret = 0;
   char args[512], flt_str[512];
   const char *pix_fmt_str1 = av_get_pix_fmt_name(enc_ctx1->pix_fmt);
-  printf("pix_fmt_str1: %s\n", pix_fmt_str1);
   const char *pix_fmt_str2 = av_get_pix_fmt_name(enc_ctx2->pix_fmt);
-  printf("pix_fmt_str2: %s\n", pix_fmt_str2);
 
   if (proc_ctx->tonemap && proc_ctx->hdr) {
     snprintf(flt_str, sizeof(flt_str),

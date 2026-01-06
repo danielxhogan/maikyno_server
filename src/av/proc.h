@@ -4,6 +4,7 @@
 #include "deint.h"
 #include "burn_in.h"
 #include "rendition.h"
+#include "volume.h"
 
 #include <sqlite3.h>
 

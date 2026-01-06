@@ -242,6 +242,37 @@ int encode_audio_frame(OutputContext *out_ctx,
   return 0;
 }
 
+int boost_gain(ProcessingContext *proc_ctx, OutputContext *out_ctx,
+  int ctx_idx, int out_stream_idx, AVFrame *frame)
+{
+  int ret = 0;
+
+  if ((ret = av_buffersrc_add_frame_flags(proc_ctx->vol_ctx_arr[ctx_idx]->buffersrc_ctx,
+    frame, AV_BUFFERSRC_FLAG_KEEP_REF)) < 0)
+  {
+    fprintf(stderr, "Failed to add frame to buffer source.\n");
+    return ret;
+  }
+
+  while ((ret = av_buffersink_get_frame(proc_ctx->vol_ctx_arr[ctx_idx]->buffersink_ctx,
+    proc_ctx->vol_ctx_arr[ctx_idx]->filtered_frame)) >= 0)
+  {
+    if ((ret = encode_audio_frame(out_ctx, out_stream_idx,
+      proc_ctx->vol_ctx_arr[ctx_idx]->filtered_frame)))
+    {
+      fprintf(stderr, "Failed to write audio frame after boosting gain.\n");
+      return ret;
+    }
+  }
+
+  if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
+    fprintf(stderr, "Failed to get frame from volume filter buffer sink.\n");
+    return ret;
+  }
+
+  return 0;
+}
+
 static int convert_audio_frame(ProcessingContext *proc_ctx, InputContext *in_ctx,
   OutputContext *out_ctx, int ctx_idx, int out_stream_idx)
 {
@@ -291,11 +322,21 @@ flush:
     swr_out_ctx->nb_converted_samples +=
       out_ctx->enc_ctx[out_stream_idx]->frame_size;
 
-    if ((ret = encode_audio_frame(out_ctx,
-      out_stream_idx, fsc_ctx->frame)) < 0)
+    if (proc_ctx->gain_boost_arr[ctx_idx] > 0)
     {
-      fprintf(stderr, "Failed to write audio frame.\n");
-      return ret;
+      if ((ret = boost_gain(proc_ctx, out_ctx,
+        ctx_idx, out_stream_idx, fsc_ctx->frame)))
+      {
+        fprintf(stderr, "Failed to boost gain.\n");
+        return ret;
+      }
+    } else {
+      if ((ret = encode_audio_frame(out_ctx,
+        out_stream_idx, fsc_ctx->frame)) < 0)
+      {
+        fprintf(stderr, "Failed to write audio frame.\n");
+        return ret;
+      }
     }
 
     if (!in_ctx->dec_frame) { break; }
@@ -571,6 +612,7 @@ int process_video(char *process_job_id, const char *batch_id)
     ret = -1;
     goto update_status;
   }
+
 
   if ((ret = processing_context_init(proc_ctx, in_ctx, out_ctx,
     process_job_id)) < 0)

@@ -184,127 +184,10 @@ end:
   return 0;
 }
 
-// static int select_channel_layout(AVCodecContext *enc_ctx,
-//   AVChannelLayout *preferred_layout)
-// {
-//   const AVChannelLayout *layouts = NULL, *current_layout;
-//   char preferred_layout_name[64], current_layout_name[64];
-//   int preferred_nb_channels, ret = 0;
-
-//   if ((ret = avcodec_get_supported_config(enc_ctx, NULL,
-//     AV_CODEC_CONFIG_CHANNEL_LAYOUT, 0, (const void **) &layouts, NULL)) < 0)
-//   {
-//     fprintf(stderr, "Failed to get supported channel layouts.\n");
-//     return ret;
-//   }
-
-//   if ((ret = av_channel_layout_describe(preferred_layout,
-//     preferred_layout_name, sizeof(preferred_layout_name))) < 0)
-//   {
-//     fprintf(stderr, "Failed to get name for preferred layout.\n");
-//     return ret;
-//   }
-
-//   printf("preferred_layout: %s\n", preferred_layout_name);
-
-//   if (!layouts) {
-//     printf("No supported channel layouts list found. "
-//       "Attempting to set preferred layout.\n");
-
-//     if ((ret = av_channel_layout_copy(&enc_ctx->ch_layout,
-//       preferred_layout)) < 0)
-//     {
-//       fprintf(stderr, "Failed to copy preferred channel layout."
-//         "Attempting to set stereo channel layout\n");
-
-//       goto set_stereo;
-//     }
-    
-//     printf("Channel layout set to %s.\n", preferred_layout_name);
-//     return 0;
-//   }
-
-//   printf("Checking if preferred layout is supported by encoder.\n");
-
-//   current_layout = layouts;
-
-//   while (current_layout->nb_channels) {
-//     if ((ret = av_channel_layout_describe(current_layout,
-//       current_layout_name, sizeof(current_layout_name))) < 0)
-//     {
-//       fprintf(stderr, "Failed to get name for current layout.\n");
-//       return ret;
-//     }
-
-//     printf("current_layout_name: %s\n", current_layout_name);
-
-//     if (!strcmp(current_layout_name, preferred_layout_name)) {
-//       if ((ret =
-//         av_channel_layout_copy(&enc_ctx->ch_layout, current_layout)) < 0)
-//       {
-//         fprintf(stderr, "Failed to copy preferred channel layout.\n");
-//         return ret;
-//       }
-
-//       printf("Channel layout set to preferred layout.\n");
-//       return 0;
-//     }
-
-//     current_layout++;
-//   }
-
-//   printf("Preferred layout not supported. Checking for supported layout "
-//     "with equivalent number of channels.\n");
-
-//   preferred_nb_channels = preferred_layout->nb_channels;
-//   current_layout = layouts;
-
-//   while (current_layout->nb_channels) {
-//     if ((ret = av_channel_layout_describe(current_layout, current_layout_name,
-//       sizeof(current_layout_name))) < 0)
-//     {
-//       fprintf(stderr, "Failed to get name of current layout.\n");
-//       return ret;
-//     }
-
-//     printf("current_layout_name: %s\n", current_layout_name);
-
-//     if (current_layout->nb_channels == preferred_nb_channels) {
-//       if ((ret =
-//         av_channel_layout_copy(&enc_ctx->ch_layout, current_layout)) < 0)
-//       {
-//         fprintf(stderr, "Failed to copy layout with preferred_nb_channels.\n");
-//         return ret;
-//       }
-
-//       printf("Channel layout set to %s.\n", current_layout_name);
-//       return 0;
-//     }
-
-//     current_layout++;
-//   }
-
-//   printf("No layout with equivalent number of channels supported. Attempting "
-//   "to set channel layout to stereo.\n");
-
-// set_stereo:
-//   if ((ret = av_channel_layout_copy(&enc_ctx->ch_layout,
-//     &(AVChannelLayout) AV_CHANNEL_LAYOUT_STEREO)) < 0)
-//   {
-//     fprintf(stderr, "Failed to copy stereo channel layout.\n");
-//     return ret;
-//   }
-
-//   printf("Channel layout set to stereo.\n");
-//   return 0;
-// }
-
-int select_sample_fmt(AVCodecContext *enc_ctx,
-  enum AVSampleFormat preferred_fmt)
+int select_sample_fmt(AVCodecContext *enc_ctx)
 {
   const enum AVSampleFormat *formats = NULL;
-  const char *preferred_fmt_name, *current_fmt_name;
-  int i = 0, ret = 0;
+  int ret = 0;
 
   if ((ret = avcodec_get_supported_config(enc_ctx, NULL,
     AV_CODEC_CONFIG_SAMPLE_FORMAT, 0, (const void **) &formats, NULL)) < 0)
@@ -313,51 +196,11 @@ int select_sample_fmt(AVCodecContext *enc_ctx,
     return ret;
   }
 
-  if (!(preferred_fmt_name = av_get_sample_fmt_name(preferred_fmt))) {
-    fprintf(stderr, "Failed to get name of preferred_fmt.\n");
-    return AVERROR_UNKNOWN;
-  }
-
-  printf("preferred format: %s\n", preferred_fmt_name);
-
   if (!formats) {
-    printf("No supported sample formats list found. "
-      "Setting sample format to preferred sample format.\n");
-
-    enc_ctx->sample_fmt = preferred_fmt;
+    printf("No supported sample formats list found.\n");
     return 0;
   }
 
-  printf("Checking if preferred sample format is supported by encoder.\n");
-
-  while (formats[i] && formats[i] != AV_SAMPLE_FMT_NONE)
-  {
-    if (!(current_fmt_name = av_get_sample_fmt_name(formats[i]))) {
-      fprintf(stderr, "Failed to get name of current_fmt_name.\n");
-      return AVERROR_UNKNOWN;
-    }
-
-    printf("current_fmt_name: %s\n", current_fmt_name);
-
-    if (!strcmp(current_fmt_name, preferred_fmt_name))
-    {
-      enc_ctx->sample_fmt = formats[i];
-      printf("Sample format set to preferred sample format.\n");
-      return 0;
-    }
-
-    i++;
-  }
-
-  printf("Preferred sample format not supported. "
-    "Setting sample format to first supported sample format.\n");
-
-  if (!(current_fmt_name = av_get_sample_fmt_name(formats[0]))) {
-    fprintf(stderr, "Failed to get name of first supported sample format.\n");
-    return AVERROR_UNKNOWN;
-  }
-
-  printf("first supported sample format: %s\n", current_fmt_name);
   enc_ctx->sample_fmt = formats[0];
 
   return 0;
@@ -393,15 +236,7 @@ static int open_audio_encoder(AVCodecContext **enc_ctx, AVStream *in_stream)
   }
   free(stereo);
 
-  // if ((ret = select_channel_layout(*enc_ctx,
-  //   &in_stream->codecpar->ch_layout)) < 0)
-  // {
-  //   fprintf(stderr, "Failed to select channel layout.\n");
-  //   return ret;
-  // }
-
-  if ((ret = select_sample_fmt(*enc_ctx,
-    in_stream->codecpar->format)) < 0)
+  if ((ret = select_sample_fmt(*enc_ctx)) < 0)
   {
     fprintf(stderr, "Failed to select sample format.\n");
     return ret;

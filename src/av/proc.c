@@ -109,10 +109,13 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   proc_ctx->burn_in_idx = -1;
   proc_ctx->burn_in_ctx = NULL;
 
-  proc_ctx->gain_boost_arr = NULL;
   proc_ctx->renditions_arr = NULL;
-  proc_ctx->hdr = 0;
   proc_ctx->rend_ctx_arr = NULL;
+  proc_ctx->tonemap = 0;
+  proc_ctx->hdr = 0;
+
+  proc_ctx->gain_boost_arr = NULL;
+  proc_ctx->vol_ctx_arr = NULL;
 
   if ((ret = proc_ctx->nb_in_streams =
     get_input_file_nb_streams(process_job_id, db)) < 0)
@@ -184,13 +187,6 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
     goto end;
   }
 
-  if (!(proc_ctx->gain_boost_arr =
-    calloc(proc_ctx->nb_selected_streams, sizeof(int))))
-  {
-    fprintf(stderr, "Failed to allocate gain boost array.\n");
-    goto end;
-  }
-
   if (!(proc_ctx->renditions_arr =
     calloc(proc_ctx->nb_selected_streams, sizeof(int))))
   {
@@ -202,6 +198,20 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
     calloc(proc_ctx->nb_selected_streams, sizeof(RenditionFilterContext *))))
   {
     fprintf(stderr, "Failed to allocate renditions context array.\n");
+    goto end;
+  }
+
+  if (!(proc_ctx->gain_boost_arr =
+    calloc(proc_ctx->nb_selected_streams, sizeof(int))))
+  {
+    fprintf(stderr, "Failed to allocate gain boost array.\n");
+    goto end;
+  }
+
+  if (!(proc_ctx->vol_ctx_arr =
+    calloc(proc_ctx->nb_selected_streams, sizeof(VolumeFilterContext *))))
+  {
+    fprintf(stderr, "Failed to allocate volume filter context array.\n");
     goto end;
   }
 
@@ -252,6 +262,12 @@ void processing_context_free(ProcessingContext **proc_ctx)
 
 
   free((*proc_ctx)->gain_boost_arr);
+  if ((*proc_ctx)->vol_ctx_arr) {
+    for (i = 0; i < (*proc_ctx)->nb_selected_streams; i++) {
+      volume_filter_context_free(&(*proc_ctx)->vol_ctx_arr[i]);
+    }
+    free((*proc_ctx)->vol_ctx_arr);
+  }
 
   free((*proc_ctx)->renditions_arr);
 
@@ -315,14 +331,9 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
   proc_ctx->ctx_map[in_stream_idx] = *ctx_idx;
   proc_ctx->idx_map[in_stream_idx] = *out_stream_idx;
 
-  printf("\nInput stream %d is mapped to output stream %d.\n",
-    in_stream_idx, *out_stream_idx);
-
   title = (char *) sqlite3_column_text(select_video_info_stmt, 1);
 
   if (title) {
-    printf("Output stream %d has title \"%s\".\n", *out_stream_idx, title);
-
     for (end = title; *end; end++);
     len_title = end - title;
 
@@ -349,8 +360,6 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
   title2 = (char *) sqlite3_column_text(select_video_info_stmt, 5);
 
   if (title2) {
-    printf("Output stream %d has title \"%s\".\n", *out_stream_idx, title);
-
     for (end = title2; *end; end++);
     len_title2 = end - title2;
 
@@ -412,12 +421,10 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
     in_stream_idx = sqlite3_column_int(select_audio_stream_info_stmt, 0);
     proc_ctx->ctx_map[in_stream_idx] = *ctx_idx;
     proc_ctx->idx_map[in_stream_idx] = *out_stream_idx;
-    printf("\nInput stream %d is mapped to output stream %d.\n",
-      in_stream_idx, *out_stream_idx);
 
     title = (char *) sqlite3_column_text(select_audio_stream_info_stmt, 1);
+
     if (title) {
-      printf("Output stream %d has title \"%s\".\n", *out_stream_idx, title);
       for (end = title; *end; end++);
       len_title = end - title;
 
@@ -492,8 +499,8 @@ int get_subtitle_process_info(ProcessingContext *proc_ctx,
     proc_ctx->ctx_map[in_stream_idx] = *ctx_idx;
 
     title = (char *) sqlite3_column_text(select_subtitle_stream_idx_stmt, 1);
+
     if (title) {
-      printf("\nOutput stream %d has title \"%s\".\n", *out_stream_idx, title);
       for (end = title; *end; end++);
       len_title = end - title;
 
@@ -516,8 +523,6 @@ int get_subtitle_process_info(ProcessingContext *proc_ctx,
     else {
       proc_ctx->passthrough_arr[*ctx_idx] = 1;
       proc_ctx->idx_map[in_stream_idx] = *out_stream_idx;
-      printf("\nInput stream %d is mapped to output stream %d.\n",
-        in_stream_idx, *out_stream_idx);
       *out_stream_idx += 1;
     }
 
@@ -607,6 +612,16 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
         fprintf(stderr, "Failed to allocate fsc context for \
           input stream: %d\nprocess job: %s\n", in_stream_idx, process_job_id);
         return -1;
+      }
+
+      if (proc_ctx->gain_boost_arr[ctx_idx] > 0) {
+        if (!(proc_ctx->vol_ctx_arr[ctx_idx] =
+          volume_filter_context_init(proc_ctx, out_ctx, ctx_idx, out_stream_idx)))
+        {
+          fprintf(stderr, "Failed to allocate volume filter context for \
+            input stream: %d\nprocess job: %s\n", in_stream_idx, process_job_id);
+          return -1;
+        }
       }
     }
    }
