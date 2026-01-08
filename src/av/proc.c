@@ -395,14 +395,15 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
       process_job_audio_streams.title, \
       process_job_audio_streams.passthrough, \
       process_job_audio_streams.gain_boost, \
-      process_job_audio_streams.create_renditions \
+      process_job_audio_streams.create_renditions, \
+      process_job_audio_streams.title2 \
     FROM process_job_audio_streams \
     JOIN streams ON process_job_audio_streams.stream_id = streams.id \
     WHERE process_job_audio_streams.process_job_id = ?;";
 
   sqlite3_stmt *select_audio_stream_info_stmt = NULL;
-  char *title, *end;
-  int in_stream_idx, len_title, ret = 0;
+  char *title, *title2, *end;
+  int in_stream_idx, len_title, len_title2, ret = 0;
 
   if ((ret = sqlite3_prepare_v2(db, select_audio_stream_info_query, -1,
     &select_audio_stream_info_stmt, 0)) != SQLITE_OK)
@@ -448,6 +449,24 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
 
     proc_ctx->renditions_arr[*ctx_idx] =
       sqlite3_column_int(select_audio_stream_info_stmt, 4);
+
+    title2 = (char *) sqlite3_column_text(select_audio_stream_info_stmt, 5);
+
+    if (title2) {
+      for (end = title2; *end; end++);
+      len_title2 = end - title2;
+
+      if (!(proc_ctx->stream_rend_titles_arr[*ctx_idx] =
+        calloc(len_title2 + 1, sizeof(char))))
+      {
+        fprintf(stderr, "Failed to allocate memory for title2 for stream: %d\n",
+          in_stream_idx);
+        ret = AVERROR(ENOMEM);
+        goto end;
+      }
+
+      strncat(proc_ctx->stream_rend_titles_arr[*ctx_idx], title2, len_title2);
+    }
 
     *out_stream_idx += 1;
     if (proc_ctx->renditions_arr[*ctx_idx]) { *out_stream_idx += 1; }

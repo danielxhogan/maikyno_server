@@ -317,6 +317,7 @@ pub struct  ProcessJobAudioStream {
   pub title: Option<String>,
   pub passthrough: bool,
   pub create_renditions: bool,
+  pub title2: Option<String>,
   pub gain_boost: i32,
   pub stream_id: String,
   pub process_job_id: String

@@ -23,6 +23,7 @@ pub struct ProcessAudioStreamInfo {
   pub title: Option<String>,
   pub passthrough: bool,
   pub create_renditions: bool,
+  pub title2: Option<String>,
   pub gain_boost: i32
 }
 
