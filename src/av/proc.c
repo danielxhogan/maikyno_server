@@ -107,6 +107,10 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   proc_ctx->deint_ctx = NULL;
 
   proc_ctx->burn_in_idx = -1;
+  proc_ctx->first_sub = 0;
+  proc_ctx->last_sub_pts = 0;
+  proc_ctx->tminus1_v_pts = 0;
+  proc_ctx->tminus2_v_pts = 0;
   proc_ctx->burn_in_ctx = NULL;
 
   proc_ctx->renditions_arr = NULL;
@@ -668,6 +672,10 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
         for process job: %s\n", process_job_id);
       return -1;
     }
+
+    // printf("here1\n");
+    // push_dummy_subtitle(proc_ctx, 1920, 1080, 0);
+    // printf("here2\n");
   }
 
   if (proc_ctx->renditions_arr[ctx_idx]) {

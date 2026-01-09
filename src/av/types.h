@@ -71,6 +71,10 @@ typedef struct ProcessingContext {
   DeinterlaceFilterContext *deint_ctx;
 
   int burn_in_idx;
+  int first_sub;
+  int64_t last_sub_pts;
+  int64_t tminus1_v_pts;
+  int64_t tminus2_v_pts;
   BurnInFilterContext *burn_in_ctx;
 
   int *renditions_arr;

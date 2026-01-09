@@ -5,9 +5,6 @@ SubToFrameContext *sub_to_frame_context_alloc(ProcessingContext *proc_ctx,
 {
   int ret = 0;
 
-  enum AVPixelFormat in_pix_fmt = AV_PIX_FMT_PAL8;
-  enum AVPixelFormat out_pix_fmt = AV_PIX_FMT_RGBA;
-
   int v_ctx_idx = proc_ctx->ctx_map[proc_ctx->v_stream_idx];
   int s_ctx_idx = proc_ctx->ctx_map[proc_ctx->burn_in_idx];
 
@@ -23,8 +20,10 @@ SubToFrameContext *sub_to_frame_context_alloc(ProcessingContext *proc_ctx,
   }
 
   stf_ctx->sws_ctx = NULL;
-  stf_ctx->in_pix_fmt = in_pix_fmt;
-  stf_ctx->out_pix_fmt = out_pix_fmt;
+  stf_ctx->in_pix_fmt = AV_PIX_FMT_PAL8;
+  stf_ctx->out_pix_fmt = SUBTITLE_OUTPUT_PIX_FMT;
+  stf_ctx->width_ratio = 1;
+  stf_ctx->height_ratio = 1;
   stf_ctx->scale_algo = SWS_BICUBIC;
   stf_ctx->subtitle_frame = NULL;
 
@@ -36,7 +35,7 @@ SubToFrameContext *sub_to_frame_context_alloc(ProcessingContext *proc_ctx,
 
   stf_ctx->subtitle_frame->width = v_dec_ctx->width;
   stf_ctx->subtitle_frame->height = v_dec_ctx->height;
-  stf_ctx->subtitle_frame->format = out_pix_fmt;
+  stf_ctx->subtitle_frame->format = SUBTITLE_OUTPUT_PIX_FMT;
   stf_ctx->subtitle_frame->color_primaries = v_dec_ctx->color_primaries;
   stf_ctx->subtitle_frame->color_trc = v_dec_ctx->color_trc;
   stf_ctx->subtitle_frame->colorspace = v_dec_ctx->colorspace;
@@ -44,8 +43,25 @@ SubToFrameContext *sub_to_frame_context_alloc(ProcessingContext *proc_ctx,
   stf_ctx->subtitle_frame->color_range = v_dec_ctx->color_range;
 
   if ((ret = av_frame_get_buffer(stf_ctx->subtitle_frame, 0)) < 0) {
-    fprintf(stderr, "Failed to allocate buffers for frame.\n");
+    fprintf(stderr, "Failed to allocate buffers for frame.\n\
+      Libav Error: %s.\n", av_err2str(ret));
     goto end;
+  }
+
+  if (s_dec_ctx->width <= 0) {
+    if (v_dec_ctx->width >= 1920) {
+      s_dec_ctx->width = 1920;
+    } else {
+      s_dec_ctx->width = v_dec_ctx->width;
+    }
+  }
+
+  if (s_dec_ctx->height <= 0) {
+    if (v_dec_ctx->height >= 1080) {
+      s_dec_ctx->height = 1080;
+    } else {
+      s_dec_ctx->height = v_dec_ctx->height;
+    }
   }
 
   stf_ctx->width_ratio = v_dec_ctx->width / s_dec_ctx->width;
@@ -72,7 +88,7 @@ int sub_to_frame_sws_context_alloc(SubToFrameContext *stf_ctx,
     out_width, out_height, stf_ctx->out_pix_fmt,
     stf_ctx->scale_algo, NULL, NULL, NULL)))
   {
-    fprintf(stderr, "Failed to get SwsContext.\n");
+    fprintf(stderr, "Failed to get SwsContext for SubToFrameContext.\n");
     return AVERROR_UNKNOWN;
   }
 
@@ -80,21 +96,22 @@ int sub_to_frame_sws_context_alloc(SubToFrameContext *stf_ctx,
 }
 
 int sub_to_frame_convert(SubToFrameContext *stf_ctx,
-  InputContext *in_ctx)
+  InputContext *in_ctx, int width, int height)
 {
   int ret = 0;
   AVSubtitle *sub = in_ctx->dec_sub;
+  AVFrame *subtitle_frame = stf_ctx->subtitle_frame;
   uint8_t *dst_data[AV_NUM_DATA_POINTERS] = { NULL };
 
-  memset(stf_ctx->subtitle_frame->data[0], 0,
-    stf_ctx->subtitle_frame->height *
-    stf_ctx->subtitle_frame->linesize[0]);
+  memset(subtitle_frame->data[0], 0,
+    subtitle_frame->height *
+    subtitle_frame->linesize[0]);
 
-  for (int i = 0; i < (int) sub->num_rects; i++)
+  for (unsigned int i = 0; i < sub->num_rects; i++)
   {
-    dst_data[0] = stf_ctx->subtitle_frame->data[0] +
+    dst_data[0] = subtitle_frame->data[0] +
       (sub->rects[i]->y *
-        stf_ctx->subtitle_frame->linesize[0] *
+        subtitle_frame->linesize[0] *
         stf_ctx->height_ratio) +
       (sub->rects[i]->x * 4 * stf_ctx->width_ratio);
 
@@ -106,23 +123,62 @@ int sub_to_frame_convert(SubToFrameContext *stf_ctx,
       return ret;
     }
 
-    if ((ret = av_frame_make_writable(stf_ctx->subtitle_frame)) < 0) {
-      fprintf(stderr, "Failed to make frame writable.\n");
+    if ((ret = av_frame_make_writable(subtitle_frame)) < 0) {
+      fprintf(stderr, "Failed to make frame writable.\n\
+        Libav Error: %s.\n", av_err2str(ret));
       return ret;
     }
 
-    ret = sws_scale(stf_ctx->sws_ctx,
+    sws_scale(stf_ctx->sws_ctx,
       (const uint8_t * const *) sub->rects[i]->data,
       sub->rects[i]->linesize,
       0, sub->rects[i]->h,
       dst_data,
-      stf_ctx->subtitle_frame->linesize
-    );
+      subtitle_frame->linesize);
   }
 
-  stf_ctx->subtitle_frame->pts = sub->pts;
-  stf_ctx->subtitle_frame->pkt_dts = in_ctx->init_pkt->dts;
+  subtitle_frame->pts = sub->pts;
+  subtitle_frame->pkt_dts = in_ctx->init_pkt->dts;
 
+  return 0;
+}
+
+int push_dummy_subtitle(ProcessingContext *proc_ctx,
+  OutputContext *out_ctx, int out_stream_idx, int64_t pts)
+{
+  int ret = 0;
+  AVFrame *dummy;
+
+  if (!(dummy = av_frame_alloc())) {
+    fprintf(stderr, "Failed to allocate dummy frame.\n");
+    return -ENOMEM;
+  }
+
+  dummy->format = SUBTITLE_OUTPUT_PIX_FMT;
+  dummy->width = out_ctx->enc_ctx[out_stream_idx]->width;
+  dummy->height = out_ctx->enc_ctx[out_stream_idx]->height;
+  dummy->pts = pts;
+
+  if ((ret = av_frame_get_buffer(dummy, 0)) < 0) {
+    fprintf(stderr, "Failed to get frame buffers for dummy frame.\n\
+      Libav Error: %s.\n", av_err2str(ret));
+    goto end;
+  }
+
+  memset(dummy->data[0], 0, dummy->linesize[0] * dummy->height);
+
+  if ((ret =
+    av_buffersrc_add_frame_flags(proc_ctx->burn_in_ctx->s_buffersrc_ctx,
+    dummy, AV_BUFFERSRC_FLAG_PUSH)) < 0)
+  {
+    fprintf(stderr, "Failed to add dummy frame to buffersrc.\n\
+      Libav Error: %s.\n", av_err2str(ret));
+    goto end;
+  }
+
+end:
+  av_frame_free(&dummy);
+  if (ret < 0) { return ret; }
   return 0;
 }
 
@@ -140,7 +196,8 @@ BurnInFilterContext *burn_in_filter_context_init(ProcessingContext *proc_ctx,
   InputContext *in_ctx)
 {
   int ret = 0;
-  char v_args[512], s_args[512], *flt_str = "[in1][in2]overlay[out]";
+  char v_args[512], s_args[512],
+    *flt_str = "[in1][in2]overlay=repeatlast=1:eof_action=pass[out]";
   const char *pix_fmt;
 
   const AVFilter *buffersrc = avfilter_get_by_name("buffer");
@@ -198,16 +255,17 @@ BurnInFilterContext *burn_in_filter_context_init(ProcessingContext *proc_ctx,
     v_dec_ctx->sample_aspect_ratio.num,
     v_dec_ctx->sample_aspect_ratio.den);
 
-  if ((ret = avfilter_graph_create_filter(&burn_in_ctx->v_buffersrc_ctx, buffersrc,
-    "in1", v_args, NULL, burn_in_ctx->filter_graph)) < 0)
+  if ((ret = avfilter_graph_create_filter(&burn_in_ctx->v_buffersrc_ctx,
+    buffersrc, "in1", v_args, NULL, burn_in_ctx->filter_graph)) < 0)
   {
-    fprintf(stderr, "Failed to create buffer source.\n");
+    fprintf(stderr, "Failed to create buffer source.\n\
+      Libav Error: %s.\n", av_err2str(ret));
     goto end;
   }
 
   snprintf(s_args, sizeof(s_args),
     "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=%d/%d",
-    v_dec_ctx->width, v_dec_ctx->height, v_dec_ctx->pix_fmt,
+    v_dec_ctx->width, v_dec_ctx->height, AV_PIX_FMT_RGBA,
     v_stream->time_base.num, v_stream->time_base.den,
     v_dec_ctx->sample_aspect_ratio.num,
     v_dec_ctx->sample_aspect_ratio.den);
@@ -215,7 +273,8 @@ BurnInFilterContext *burn_in_filter_context_init(ProcessingContext *proc_ctx,
   if ((ret = avfilter_graph_create_filter(&burn_in_ctx->s_buffersrc_ctx, buffersrc,
     "in2", s_args, NULL, burn_in_ctx->filter_graph)) < 0)
   {
-    fprintf(stderr, "Failed to create buffer source.\n");
+    fprintf(stderr, "Failed to create buffer source.\n\
+      Libav Error: %s.\n", av_err2str(ret));
     goto end;
   }
 
@@ -232,12 +291,14 @@ BurnInFilterContext *burn_in_filter_context_init(ProcessingContext *proc_ctx,
   if ((ret = av_opt_set(burn_in_ctx->buffersink_ctx, "pixel_formats",
     pix_fmt, AV_OPT_SEARCH_CHILDREN)))
   {
-    fprintf(stderr, "Failed to set pixel format on buffersink.\n");
+    fprintf(stderr, "Failed to set pixel format on buffersink.\n\
+      Libav Error: %s.\n", av_err2str(ret));
     goto end;
   }
 
   if ((ret = avfilter_init_dict(burn_in_ctx->buffersink_ctx, NULL))) {
-    fprintf(stderr, "Failed to initialize buffersink.\n");
+    fprintf(stderr, "Failed to initialize buffersink.\n\
+      Libav Error: %s.\n", av_err2str(ret));
     goto end;
   }
 
@@ -258,12 +319,14 @@ BurnInFilterContext *burn_in_filter_context_init(ProcessingContext *proc_ctx,
   if ((ret = avfilter_graph_parse_ptr(burn_in_ctx->filter_graph,
     flt_str, &inputs, &outputs, NULL)) < 0)
   {
-    fprintf(stderr, "Failed to configure filter graph.\n");
+    fprintf(stderr, "Failed to configure filter graph.\n\
+      Libav Error: %s.\n", av_err2str(ret));
     goto end;
   }
 
   if ((ret = avfilter_graph_config(burn_in_ctx->filter_graph, NULL)) < 0) {
-    fprintf(stderr, "Failed to configure filter graph.\n");
+    fprintf(stderr, "Failed to configure filter graph.\n\
+      Libav Error: %s.\n", av_err2str(ret));
     goto end;
   }
 
@@ -282,7 +345,9 @@ BurnInFilterContext *burn_in_filter_context_init(ProcessingContext *proc_ctx,
   burn_in_ctx->filtered_frame->chroma_location = v_dec_ctx->chroma_sample_location;
   burn_in_ctx->filtered_frame->color_range = v_dec_ctx->color_range;
 
-  if (!(burn_in_ctx->stf_ctx = sub_to_frame_context_alloc(proc_ctx, in_ctx))) {
+  if (!(burn_in_ctx->stf_ctx =
+    sub_to_frame_context_alloc(proc_ctx, in_ctx)))
+  {
     fprintf(stderr,
       "Failed to initialize subtitle to frame converter context.\n");
     ret = -ENOMEM;
