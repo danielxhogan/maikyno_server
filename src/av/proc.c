@@ -586,6 +586,7 @@ int get_processing_info(ProcessingContext *proc_ctx,
       process job: %s.\n", process_job_id);
     return ret;
   }
+  printf("proc_ctx->idx_map[6]: %d\n", proc_ctx->idx_map[6]);
 
   proc_ctx->nb_out_streams = out_stream_idx + 1;
 
@@ -611,45 +612,44 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
     if (passthrough) { continue; }
 
     codec_type = in_ctx->fmt_ctx->streams[in_stream_idx]->codecpar->codec_type;
+    if (codec_type != AVMEDIA_TYPE_AUDIO) { continue; }
 
-    if (codec_type == AVMEDIA_TYPE_AUDIO)
+    dec_ctx = in_ctx->dec_ctx[ctx_idx];
+    out_stream_idx = proc_ctx->idx_map[in_stream_idx];
+
+    if (proc_ctx->renditions_arr[ctx_idx]) {
+      out_stream_idx += 1;
+    }
+
+    enc_ctx = out_ctx->enc_ctx_arr[out_stream_idx];
+
+    if (!(proc_ctx->swr_out_ctx_arr[ctx_idx] =
+      swr_output_context_alloc(dec_ctx, enc_ctx)))
     {
-      dec_ctx = in_ctx->dec_ctx[ctx_idx];
-      out_stream_idx = proc_ctx->idx_map[in_stream_idx];
+      fprintf(stderr, "Failed to allocate swr output context for \
+        input stream: %d\nprocess job: %s\n", in_stream_idx, process_job_id);
+      return -1;
+    }
 
-      if (proc_ctx->renditions_arr[ctx_idx]) {
-        out_stream_idx += 1;
-      }
+    if (!(proc_ctx->fsc_ctx_arr[ctx_idx] = fsc_ctx_alloc(enc_ctx))) {
+      fprintf(stderr, "Failed to allocate fsc context for \
+        input stream: %d\nprocess job: %s\n", in_stream_idx, process_job_id);
+      return -1;
+    }
 
-      enc_ctx = out_ctx->enc_ctx[out_stream_idx];
-
-      if (!(proc_ctx->swr_out_ctx_arr[ctx_idx] =
-        swr_output_context_alloc(dec_ctx, enc_ctx)))
+    if (proc_ctx->gain_boost_arr[ctx_idx] > 0) {
+      if (!(proc_ctx->vol_ctx_arr[ctx_idx] =
+        volume_filter_context_init(proc_ctx, out_ctx, ctx_idx, out_stream_idx)))
       {
-        fprintf(stderr, "Failed to allocate swr output context for \
+        fprintf(stderr, "Failed to allocate volume filter context for \
           input stream: %d\nprocess job: %s\n", in_stream_idx, process_job_id);
         return -1;
-      }
-
-      if (!(proc_ctx->fsc_ctx_arr[ctx_idx] = fsc_ctx_alloc(enc_ctx))) {
-        fprintf(stderr, "Failed to allocate fsc context for \
-          input stream: %d\nprocess job: %s\n", in_stream_idx, process_job_id);
-        return -1;
-      }
-
-      if (proc_ctx->gain_boost_arr[ctx_idx] > 0) {
-        if (!(proc_ctx->vol_ctx_arr[ctx_idx] =
-          volume_filter_context_init(proc_ctx, out_ctx, ctx_idx, out_stream_idx)))
-        {
-          fprintf(stderr, "Failed to allocate volume filter context for \
-            input stream: %d\nprocess job: %s\n", in_stream_idx, process_job_id);
-          return -1;
-        }
       }
     }
-   }
+  }
 
-  ctx_idx = proc_ctx->ctx_map[proc_ctx->v_stream_idx];
+  in_stream_idx = proc_ctx->v_stream_idx;
+  ctx_idx = proc_ctx->ctx_map[in_stream_idx];
   out_stream_idx = proc_ctx->idx_map[in_stream_idx];
 
   if (proc_ctx->deint) {
@@ -666,22 +666,20 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
     proc_ctx->burn_in_idx != -1 &&
     !proc_ctx->passthrough_arr[proc_ctx->v_stream_idx]
   ) {
-    if (!(proc_ctx->burn_in_ctx = burn_in_filter_context_init(proc_ctx, in_ctx)))
+    if (!(proc_ctx->burn_in_ctx =
+      burn_in_filter_context_init(proc_ctx, in_ctx)))
     {
       fprintf(stderr, "Failed to allocate burn in filter context \
         for process job: %s\n", process_job_id);
       return -1;
     }
-
-    // printf("here1\n");
-    // push_dummy_subtitle(proc_ctx, 1920, 1080, 0);
-    // printf("here2\n");
   }
 
-  if (proc_ctx->renditions_arr[ctx_idx]) {
+  if (proc_ctx->renditions_arr[ctx_idx])
+  {
     if (!(proc_ctx->rend_ctx_arr[ctx_idx] =
       video_rendition_filter_context_init(proc_ctx, in_ctx->dec_ctx[ctx_idx],
-        out_ctx->enc_ctx[out_stream_idx], out_ctx->enc_ctx[out_stream_idx + 1],
+        out_ctx->enc_ctx_arr[out_stream_idx], out_ctx->enc_ctx_arr[out_stream_idx + 1],
         in_ctx->fmt_ctx->streams[proc_ctx->v_stream_idx])))
     {
       fprintf(stderr, "Failed to allocate video rendition context for \

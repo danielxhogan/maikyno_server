@@ -213,19 +213,17 @@ int extract_hdr_metadata(HdrMetadataContext *hdr_ctx, const char *filename)
       if (hdr_ctx->mdm && hdr_ctx->cll && hdr_ctx->dovi) break;
     }
 
-    if ((ret < 0 && ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
-      fprintf(stderr, "Failed to receive frame from decoder.: %d\n", ret);
+    if (ret < 0 && ret != AVERROR(EAGAIN) && (ret != AVERROR_EOF)) {
+      fprintf(stderr, "Failed to receive frame from decoder.\n\
+        Libav Error: %s.\n", av_err2str(ret));
       goto end;
     }
 
-    if (hdr_ctx->mdm && hdr_ctx->cll && hdr_ctx->dovi) {
-      break;
-    }
-
-      if (pkt) { av_packet_unref(pkt); }
+    if (pkt) { av_packet_unref(pkt); }
+    if (hdr_ctx->mdm && hdr_ctx->cll && hdr_ctx->dovi) { break; }
   }
 
-  if ((ret < 0 && ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
+  if (ret < 0 && ret != AVERROR(EAGAIN) && (ret != AVERROR_EOF)) {
     fprintf(stderr, "Failed to read frame from input file.\n");
     goto end;
   }
@@ -267,9 +265,7 @@ int inject_hdr_metadta(HdrMetadataContext *hdr_ctx, AVCodecContext *enc_ctx,
       return AVERROR_UNKNOWN;
     }
 
-    if (*params_str) {
-      free(*params_str);
-    }
+    if (*params_str) { free(*params_str); }
 
     if (hdr_ctx->dovi) {
       if (!av_packet_side_data_add(&enc_ctx->coded_side_data,

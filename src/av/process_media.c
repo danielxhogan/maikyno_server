@@ -7,15 +7,15 @@ int encode_video_frame(ProcessingContext *proc_ctx, InputContext *in_ctx,
   int in_stream_idx = proc_ctx->v_stream_idx;
 
   if ((ret = avcodec_send_frame(
-    out_ctx->enc_ctx[out_stream_idx], frame)) < 0)
+    out_ctx->enc_ctx_arr[out_stream_idx], frame)) < 0)
   {
-    fprintf(stderr, "Failed to send frame to encoder.\nLibav Error: %s.\n",
-      av_err2str(ret));
+    fprintf(stderr, "Failed to send frame to encoder.\n\
+      Libav Error: %s.\n", av_err2str(ret));
     return ret;
   }
 
   while ((ret = avcodec_receive_packet(
-    out_ctx->enc_ctx[out_stream_idx], out_ctx->enc_pkt)) >= 0)
+    out_ctx->enc_ctx_arr[out_stream_idx], out_ctx->enc_pkt)) >= 0)
   {
     out_ctx->enc_pkt->stream_index = out_stream_idx;
 
@@ -31,15 +31,17 @@ int encode_video_frame(ProcessingContext *proc_ctx, InputContext *in_ctx,
     if ((ret = av_interleaved_write_frame(out_ctx->fmt_ctx,
       out_ctx->enc_pkt)) < 0)
     {
-      fprintf(stderr, "Failed to write packet to file.\n");
+      fprintf(stderr, "Failed to write packet to file.\n\
+        Libav Error: %s.\n", av_err2str(ret));
       return ret;
     }
 
     if (out_ctx->enc_pkt) { av_packet_unref(out_ctx->enc_pkt); }
   }
 
-  if ((ret != AVERROR(EAGAIN)) && ret != AVERROR_EOF) {
-    fprintf(stderr, "Failed to receive packet from encoder.\n");
+  if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
+    fprintf(stderr, "Failed to receive packet from encoder.\n\
+      Libav Error: %s.\n", av_err2str(ret));
     return ret;
   }
 
@@ -55,7 +57,8 @@ int make_rendtion(ProcessingContext *proc_ctx, InputContext *in_ctx,
   if ((ret = av_buffersrc_add_frame_flags(rend_ctx->buffersrc_ctx,
     frame, AV_BUFFERSRC_FLAG_KEEP_REF)) < 0)
   {
-    fprintf(stderr, "Failed to add frame to buffer source.\n");
+    fprintf(stderr, "Failed to add frame to buffer source.\n\
+      Libav Error: %s.\n", av_err2str(ret));
     return ret;
   }
 
@@ -65,15 +68,17 @@ int make_rendtion(ProcessingContext *proc_ctx, InputContext *in_ctx,
     if ((ret = encode_video_frame(proc_ctx, in_ctx, out_ctx,
       rend_ctx->filtered_frame1, 0)) < 0)
     {
-      fprintf(stderr, "Failed to encode video frame.\n");
+      fprintf(stderr, "Failed to encode video frame.\n\
+      Libav Error: %s.\n", av_err2str(ret));
       return ret;
     }
 
     av_frame_unref(rend_ctx->filtered_frame1);
   }
 
-  if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
-    fprintf(stderr, "Failed to get frame from first buffer sink.\n");
+  if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
+    fprintf(stderr, "Failed to get frame from first buffer sink.\n\
+      Libav Error: %s.\n", av_err2str(ret));
     return ret;
   }
 
@@ -90,8 +95,9 @@ int make_rendtion(ProcessingContext *proc_ctx, InputContext *in_ctx,
     av_frame_unref(rend_ctx->filtered_frame2);
   }
 
-  if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
-    fprintf(stderr, "Failed to get frame from first buffer sink.\n");
+  if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
+    fprintf(stderr, "Failed to get frame from first buffer sink.\n\
+      Libav Error: %s.\n", av_err2str(ret));
     return ret;
   }
 
@@ -108,7 +114,8 @@ int burn_in_subtitles(ProcessingContext *proc_ctx, InputContext *in_ctx,
   if ((ret = av_buffersrc_add_frame_flags(buffersrc_ctx,
     frame, AV_BUFFERSRC_FLAG_KEEP_REF)) < 0)
   {
-    fprintf(stderr, "Failed to add frame to buffer source.\n");
+    fprintf(stderr, "Failed to add frame to buffer source.\n\
+      Libav Error: %s.\n", av_err2str(ret));
     return ret;
   }
 
@@ -161,8 +168,9 @@ int burn_in_subtitles(ProcessingContext *proc_ctx, InputContext *in_ctx,
     if (ret < 0) { break; }
   }
 
-  if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
-    fprintf(stderr, "Failed to get frame from buffer sink.\n");
+  if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
+    fprintf(stderr, "Failed to get frame from buffer sink.\n\
+      Libav Error: %s.\n", av_err2str(ret));
     return ret;
   }
 
@@ -177,7 +185,8 @@ int deinterlace_video_frame(ProcessingContext *proc_ctx, InputContext *in_ctx,
   if ((ret = av_buffersrc_add_frame_flags(proc_ctx->deint_ctx->buffersrc_ctx,
     in_ctx->dec_frame, AV_BUFFERSRC_FLAG_KEEP_REF)) < 0)
   {
-    fprintf(stderr, "Failed to add frame to buffer source.\n");
+    fprintf(stderr, "Failed to add frame to buffer source.\n\
+      Libav Error: %s.\n", av_err2str(ret));
     return ret;
   }
 
@@ -186,8 +195,9 @@ int deinterlace_video_frame(ProcessingContext *proc_ctx, InputContext *in_ctx,
   {
     if (proc_ctx->burn_in_ctx && proc_ctx->first_sub)
     {
-      if (in_ctx->dec_frame->pts > proc_ctx->last_sub_pts + 3000) {
+      if (in_ctx->dec_frame->pts > proc_ctx->last_sub_pts + 5000) {
         push_dummy_subtitle(proc_ctx, out_ctx, 0, in_ctx->dec_frame->pts);
+        proc_ctx->last_sub_pts = in_ctx->dec_frame->pts;
       }
 
       if ((ret = burn_in_subtitles(proc_ctx, in_ctx, out_ctx,
@@ -219,8 +229,9 @@ int deinterlace_video_frame(ProcessingContext *proc_ctx, InputContext *in_ctx,
     av_frame_unref(proc_ctx->deint_ctx->filtered_frame);
   }
 
-  if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
-    fprintf(stderr, "Failed to get frame from buffer sink.\n");
+  if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
+    fprintf(stderr, "Failed to get frame from buffer sink.\n\
+      Libav Error: %s.\n", av_err2str(ret));
     return ret;
   }
 
@@ -232,7 +243,7 @@ int encode_audio_frame(OutputContext *out_ctx,
 {
   int ret = 0;
 
-  if ((ret = avcodec_send_frame(out_ctx->enc_ctx[out_stream_idx], frame)) < 0)
+  if ((ret = avcodec_send_frame(out_ctx->enc_ctx_arr[out_stream_idx], frame)) < 0)
   {
     fprintf(stderr, "Failed to send frame to encoder.\nError: %s.\n",
       av_err2str(ret));
@@ -240,12 +251,12 @@ int encode_audio_frame(OutputContext *out_ctx,
   }
 
   while ((ret = avcodec_receive_packet(
-    out_ctx->enc_ctx[out_stream_idx], out_ctx->enc_pkt)) >= 0)
+    out_ctx->enc_ctx_arr[out_stream_idx], out_ctx->enc_pkt)) >= 0)
   {
     out_ctx->enc_pkt->stream_index = out_stream_idx;
 
     av_packet_rescale_ts(out_ctx->enc_pkt,
-      (AVRational) {1, out_ctx->enc_ctx[out_stream_idx]->sample_rate},
+      (AVRational) {1, out_ctx->enc_ctx_arr[out_stream_idx]->sample_rate},
       out_ctx->fmt_ctx->streams[out_stream_idx]->time_base);
 
     if ((ret =
@@ -259,7 +270,7 @@ int encode_audio_frame(OutputContext *out_ctx,
     if (out_ctx->enc_pkt) { av_packet_unref(out_ctx->enc_pkt); }
   }
 
-  if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
+  if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
     fprintf(stderr, "Failed to receive packet from encoder.\nError: %s.\n",
       av_err2str(ret));
     return ret;
@@ -276,7 +287,8 @@ int boost_gain(ProcessingContext *proc_ctx, OutputContext *out_ctx,
   if ((ret = av_buffersrc_add_frame_flags(proc_ctx->vol_ctx_arr[ctx_idx]->buffersrc_ctx,
     frame, AV_BUFFERSRC_FLAG_KEEP_REF)) < 0)
   {
-    fprintf(stderr, "Failed to add frame to buffer source.\n");
+    fprintf(stderr, "Failed to add frame to buffer source.\n\
+      Libav Error: %s.\n", av_err2str(ret));
     return ret;
   }
 
@@ -291,8 +303,9 @@ int boost_gain(ProcessingContext *proc_ctx, OutputContext *out_ctx,
     }
   }
 
-  if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
-    fprintf(stderr, "Failed to get frame from volume filter buffer sink.\n");
+  if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
+    fprintf(stderr, "Failed to get frame from volume filter buffer sink.\n\
+      Libav Error: %s.\n", av_err2str(ret));
     return ret;
   }
 
@@ -341,13 +354,13 @@ flush:
   stream_start_time = in_ctx->fmt_ctx->streams[in_stream_idx]->start_time;
   stream_time_base = in_ctx->fmt_ctx->streams[in_stream_idx]->time_base;
 
-  sample_rate = out_ctx->enc_ctx[out_stream_idx]->sample_rate;
+  sample_rate = out_ctx->enc_ctx_arr[out_stream_idx]->sample_rate;
   pts_time_base = (AVRational) {1, sample_rate};
 
   start_time = av_rescale_q(stream_start_time, stream_time_base, pts_time_base);
 
   while (fsc_ctx->nb_samples_in_buffer >=
-    out_ctx->enc_ctx[out_stream_idx]->frame_size || !in_ctx->dec_frame)
+    out_ctx->enc_ctx_arr[out_stream_idx]->frame_size || !in_ctx->dec_frame)
   {
     timestamp = swr_out_ctx->nb_converted_samples + start_time;
 
@@ -365,7 +378,7 @@ flush:
     }
 
     swr_out_ctx->nb_converted_samples +=
-      out_ctx->enc_ctx[out_stream_idx]->frame_size;
+      out_ctx->enc_ctx_arr[out_stream_idx]->frame_size;
 
     if (proc_ctx->gain_boost_arr[ctx_idx] > 0)
     {
@@ -397,7 +410,7 @@ int decode_sub_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
 
   int got_sub_ptr, ret = 0;
   AVCodecContext *s_dec_ctx = in_ctx->dec_ctx[ctx_idx];
-  AVCodecContext *enc_ctx = out_ctx->enc_ctx[0];
+  AVCodecContext *enc_ctx = out_ctx->enc_ctx_arr[0];
   int width = enc_ctx->width;
   int height = enc_ctx->height;
 
@@ -409,7 +422,8 @@ int decode_sub_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
   if ((ret = avcodec_decode_subtitle2(s_dec_ctx, in_ctx->dec_sub,
     &got_sub_ptr, in_ctx->init_pkt)) < 0)
   {
-    fprintf(stderr, "Failed to decode subtitle.\n");
+    fprintf(stderr, "Failed to decode subtitle.\n\
+      Libav Error: %s.\n", av_err2str(ret));
     return ret;
   }
 
@@ -420,7 +434,6 @@ int decode_sub_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
   }
 
   proc_ctx->last_sub_pts = in_ctx->dec_sub->pts;
-  printf("proc_ctx->last_sub_pts: %ld\n", proc_ctx->last_sub_pts);
 
   if ((ret = sub_to_frame_convert(proc_ctx->burn_in_ctx->stf_ctx, in_ctx, width, height)))
   {
@@ -468,12 +481,7 @@ int decode_av_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
         }
       }
       else if (proc_ctx->burn_in_ctx && proc_ctx->first_sub) {
-        if (in_ctx->dec_frame->pts > proc_ctx->last_sub_pts + 3000) {
-
-          printf("in_ctx->dec_frame->pts: %ld\n", in_ctx->dec_frame->pts);
-          printf("proc_ctx->last_sub_pts: %ld\n", proc_ctx->last_sub_pts);
-          printf("proc_ctx->last_sub_pts + 3000: %ld\n", proc_ctx->last_sub_pts + 3000);
-
+        if (in_ctx->dec_frame->pts > proc_ctx->last_sub_pts + 5000) {
           push_dummy_subtitle(proc_ctx, out_ctx, out_stream_idx, in_ctx->dec_frame->pts);
           proc_ctx->last_sub_pts = in_ctx->dec_frame->pts;
         }
@@ -631,7 +639,7 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
     if(in_ctx->init_pkt) { av_packet_unref(in_ctx->init_pkt); }
   }
 
-  if ((ret != AVERROR(EAGAIN)) && (ret != AVERROR_EOF)) {
+  if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
     fprintf(stderr, "Failed to read frame.\nError: %s.\n", av_err2str(ret));
     return ret;
   }
@@ -775,11 +783,6 @@ int process_video(char *process_job_id, const char *batch_id)
       proc_ctx->burn_in_ctx->v_buffersrc_ctx, NULL) < 0) {
         fprintf(stderr, "Failed to flush burn in filter.\n");
     }
-
-    if (burn_in_subtitles(proc_ctx, in_ctx, out_ctx,
-      proc_ctx->burn_in_ctx->s_buffersrc_ctx, NULL) < 0) {
-        fprintf(stderr, "Failed to flush burn in filter.\n");
-    }
   }
 
   for (
@@ -816,7 +819,8 @@ int process_video(char *process_job_id, const char *batch_id)
   }
 
   if (av_write_trailer(out_ctx->fmt_ctx) < 0) {
-    fprintf(stderr, "Failed to write trailer to file.\n");
+    fprintf(stderr, "Failed to write trailer to file.\n\
+      Libav Error: %s.\n", av_err2str(ret));
   }
 
   if (ret != ABORTED) {

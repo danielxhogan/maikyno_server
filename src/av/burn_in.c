@@ -49,20 +49,30 @@ SubToFrameContext *sub_to_frame_context_alloc(ProcessingContext *proc_ctx,
   }
 
   if (s_dec_ctx->width <= 0) {
+    printf("No subtitle width found.\n");
     if (v_dec_ctx->width >= 1920) {
+      printf("Video width above 1920. Setting subtitle width to 1920.\n");
       s_dec_ctx->width = 1920;
     } else {
+      printf("Setting subtitle width to %d.\n", v_dec_ctx->width);
       s_dec_ctx->width = v_dec_ctx->width;
     }
   }
 
+  printf("s_dec_ctx->width: %d.\n", s_dec_ctx->width);
+
   if (s_dec_ctx->height <= 0) {
+    printf("No subtitle height found.\n");
     if (v_dec_ctx->height >= 1080) {
+      printf("Video height above 1080. Setting subtitle height to 1080.\n");
       s_dec_ctx->height = 1080;
     } else {
+      printf("Setting subtitle height to %d.\n", v_dec_ctx->height);
       s_dec_ctx->height = v_dec_ctx->height;
     }
   }
+
+  printf("s_dec_ctx->height: %d.\n", s_dec_ctx->height);
 
   stf_ctx->width_ratio = v_dec_ctx->width / s_dec_ctx->width;
   stf_ctx->height_ratio = v_dec_ctx->height / s_dec_ctx->height;
@@ -155,8 +165,8 @@ int push_dummy_subtitle(ProcessingContext *proc_ctx,
   }
 
   dummy->format = SUBTITLE_OUTPUT_PIX_FMT;
-  dummy->width = out_ctx->enc_ctx[out_stream_idx]->width;
-  dummy->height = out_ctx->enc_ctx[out_stream_idx]->height;
+  dummy->width = out_ctx->enc_ctx_arr[out_stream_idx]->width;
+  dummy->height = out_ctx->enc_ctx_arr[out_stream_idx]->height;
   dummy->pts = pts;
 
   if ((ret = av_frame_get_buffer(dummy, 0)) < 0) {

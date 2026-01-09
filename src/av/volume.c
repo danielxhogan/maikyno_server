@@ -11,7 +11,7 @@ VolumeFilterContext *volume_filter_context_init(ProcessingContext *proc_ctx,
 
   const AVFilter *buffersrc = avfilter_get_by_name("abuffer");
   const AVFilter *buffersink = avfilter_get_by_name("abuffersink");
-  AVCodecContext *enc_ctx = out_ctx->enc_ctx[out_stream_idx];
+  AVCodecContext *enc_ctx = out_ctx->enc_ctx_arr[out_stream_idx];
 
   VolumeFilterContext *vol_ctx = NULL;
   AVFilterInOut *outputs = NULL;

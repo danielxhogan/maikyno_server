@@ -14,7 +14,6 @@ int buffersink_ctx_init(AVFilterContext **buffersink_ctx,
     return ret;
   }
 
-
   if ((ret = av_opt_set(*buffersink_ctx, "pixel_formats",
     pix_fmt, AV_OPT_SEARCH_CHILDREN)))
   {
@@ -36,6 +35,7 @@ RenditionFilterContext *video_rendition_filter_context_init(
 {
   int ret = 0;
   char args[512], flt_str[512];
+
   const char *pix_fmt_str1 = av_get_pix_fmt_name(enc_ctx1->pix_fmt);
   const char *pix_fmt_str2 = av_get_pix_fmt_name(enc_ctx2->pix_fmt);
 
@@ -85,6 +85,7 @@ RenditionFilterContext *video_rendition_filter_context_init(
     ret = AVERROR(ENOMEM);
     goto end;
   }
+
   snprintf(args, sizeof(args),
     "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=%d/%d",
     dec_ctx->width, dec_ctx->height, dec_ctx->pix_fmt,

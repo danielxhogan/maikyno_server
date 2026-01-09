@@ -61,12 +61,12 @@ static int get_len_params_str(char *hdr_params_str, char *additional_params_str)
 }
 
 static int open_video_encoder(AVCodecContext **enc_ctx, ProcessingContext *proc_ctx,
-  AVStream *in_stream, char *in_filename, int rendition2)
+  AVStream *in_stream, int ctx_idx, char *in_filename, int rendition2)
 {
-  int len_params_str, ret = 0;
+  int len_params_str, cores, pools, ret = 0;
   const AVCodec *enc;
   HdrMetadataContext *hdr_ctx = NULL;
-  char *params_str = NULL, *hdr_params_str = NULL, *additional_params_str;
+  char *params_str = NULL, *hdr_params_str = NULL, additional_params_str[128];
 
   if (!(enc = avcodec_find_encoder_by_name("libx265"))) {
     fprintf(stderr, "Failed to find encoder.\n");
@@ -131,8 +131,52 @@ static int open_video_encoder(AVCodecContext **enc_ctx, ProcessingContext *proc_
 
   (*enc_ctx)->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
-  additional_params_str =
-    "pools=4:keyint=120:min-keyint=120:no-open-gop=true:no-scenecut=true";
+  cores = get_core_count();
+  if (cores <= 0) { cores = 2; }
+  printf("cores: %d\n", cores);
+
+  if (
+    in_stream->codecpar->width > 1920 ||
+    in_stream->codecpar->height > 1080
+  ) {
+    printf("using 4K settings for pools.\n");
+    if (proc_ctx->renditions_arr[ctx_idx]) {
+      if (rendition2) {
+        // 1/2
+        pools = (cores + 1) / 2;
+        printf("rendition 2: pools: %d\n", pools);
+      } else {
+        // 1/3
+        pools = (cores + 2) / 3;
+        printf("rendition 1: pools: %d\n", pools);
+      }
+    } else {
+      // 1/2
+      pools = (cores + 1) / 2;
+      printf("no renditions, pools: %d\n", pools);
+    }
+  } else {
+    printf("using sub 4K settings for pools.\n");
+    if (proc_ctx->renditions_arr[ctx_idx]) {
+      if (rendition2) {
+        // 2/3
+        pools = ((cores * 2) + 2) / 3;
+        printf("rendition 2: pools: %d\n", pools);
+      } else {
+        // 1/2
+        pools = (cores + 1) / 2;
+        printf("rendition 1: pools: %d\n", pools);
+      }
+    } else {
+      // 2/3
+      pools = ((cores * 2) + 2) / 3;
+      printf("no renditions, pools: %d\n", pools);
+    }
+  }
+
+  snprintf(additional_params_str, sizeof(additional_params_str),
+    "pools=%d:keyint=120:min-keyint=120:no-open-gop=true:no-scenecut=true", pools);
+
   len_params_str = get_len_params_str(hdr_params_str, additional_params_str);
 
   if (!(params_str = calloc(len_params_str + 1, sizeof(char))))
@@ -144,6 +188,8 @@ static int open_video_encoder(AVCodecContext **enc_ctx, ProcessingContext *proc_
 
   if (hdr_params_str) { strcat(params_str, hdr_params_str); }
   strcat(params_str, additional_params_str);
+
+  printf("params_str: %s\n", params_str);
 
   if ((ret = av_opt_set((*enc_ctx)->priv_data,
     "x265-params", params_str, 0)) < 0)
@@ -261,7 +307,8 @@ static int open_encoder(ProcessingContext *proc_ctx, OutputContext *out_ctx,
 
   if (stream_type == AVMEDIA_TYPE_VIDEO) {
     if ((ret =
-      open_video_encoder(&out_ctx->enc_ctx[out_stream_idx], proc_ctx, in_stream, in_filename, 0)) < 0)
+      open_video_encoder(&out_ctx->enc_ctx_arr[out_stream_idx],
+        proc_ctx, in_stream, ctx_idx, in_filename, 0)) < 0)
     {
       fprintf(stderr, "Failed to open video encoder for output stream.\n");
       return ret;
@@ -270,8 +317,8 @@ static int open_encoder(ProcessingContext *proc_ctx, OutputContext *out_ctx,
     if (proc_ctx->renditions_arr[ctx_idx]) {
       out_stream_idx += 1;
 
-      if ((ret = open_video_encoder(&out_ctx->enc_ctx[out_stream_idx], proc_ctx,
-        in_stream, in_filename, 1)) < 0)
+      if ((ret = open_video_encoder(&out_ctx->enc_ctx_arr[out_stream_idx], proc_ctx,
+        in_stream, ctx_idx, in_filename, 1)) < 0)
       {
         fprintf(stderr, "Failed to open video encoder for output stream.\n");
         return ret;
@@ -284,7 +331,7 @@ static int open_encoder(ProcessingContext *proc_ctx, OutputContext *out_ctx,
       out_stream_idx += 1;
     }
 
-    if ((ret = open_audio_encoder(&out_ctx->enc_ctx[out_stream_idx],
+    if ((ret = open_audio_encoder(&out_ctx->enc_ctx_arr[out_stream_idx],
       in_stream)) < 0)
     {
       fprintf(stderr, "Failed to open audio encoder for output stream.\n");
@@ -510,7 +557,7 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
       }
     }
 
-    if ((ret = init_stream(out_ctx->fmt_ctx, out_ctx->enc_ctx[out_stream_idx],
+    if ((ret = init_stream(out_ctx->fmt_ctx, out_ctx->enc_ctx_arr[out_stream_idx],
       in_ctx->fmt_ctx->streams[in_stream_idx],
       proc_ctx->stream_titles_arr[ctx_idx])) < 0)
     {
@@ -521,7 +568,7 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
     }
 
     if (proc_ctx->renditions_arr[ctx_idx]) {
-      if ((ret = init_stream(out_ctx->fmt_ctx, out_ctx->enc_ctx[out_stream_idx + 1],
+      if ((ret = init_stream(out_ctx->fmt_ctx, out_ctx->enc_ctx_arr[out_stream_idx + 1],
         in_ctx->fmt_ctx->streams[in_stream_idx],
         proc_ctx->stream_rend_titles_arr[ctx_idx])) < 0)
       {
@@ -549,7 +596,7 @@ OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
   }
 
   out_ctx->fmt_ctx = NULL;
-  out_ctx->enc_ctx = NULL;
+  out_ctx->enc_ctx_arr = NULL;
   out_ctx->enc_pkt = NULL;
   out_ctx->nb_out_streams = proc_ctx->nb_out_streams;
 
@@ -602,7 +649,7 @@ OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
     goto end;
   }
 
-  if (!(out_ctx->enc_ctx =
+  if (!(out_ctx->enc_ctx_arr =
     calloc(out_ctx->nb_out_streams, sizeof(AVCodecContext *))))
   {
     fprintf(stderr, "Failed to allocate array for encoder contexts:\n\
@@ -663,11 +710,11 @@ void close_output(OutputContext **out_ctx)
     avio_closep(&(*out_ctx)->fmt_ctx->pb);
   avformat_free_context((*out_ctx)->fmt_ctx);
 
-  if ((*out_ctx)->enc_ctx) {
+  if ((*out_ctx)->enc_ctx_arr) {
     for (i = 0; i < (*out_ctx)->nb_out_streams; i++) {
-      avcodec_free_context(&(*out_ctx)->enc_ctx[i]);
+      avcodec_free_context(&(*out_ctx)->enc_ctx_arr[i]);
     }
-    free((*out_ctx)->enc_ctx);
+    free((*out_ctx)->enc_ctx_arr);
   }
 
   if ((*out_ctx)->enc_pkt) { av_packet_unref((*out_ctx)->enc_pkt); }
