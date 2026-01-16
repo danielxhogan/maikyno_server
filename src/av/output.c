@@ -258,7 +258,7 @@ static int open_audio_encoder(AVCodecContext **enc_ctx, AVStream *in_stream)
   const AVCodec *enc;
   AVChannelLayout *stereo = NULL;
 
-  if (!(enc = avcodec_find_encoder_by_name("libfdk_aac"))) {
+  if (!(enc = avcodec_find_encoder_by_name("libopus"))) {
     fprintf(stderr, "Failed to find encoder.\n");
     ret = AVERROR_UNKNOWN;
     return ret;
