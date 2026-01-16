@@ -586,7 +586,6 @@ int get_processing_info(ProcessingContext *proc_ctx,
       process job: %s.\n", process_job_id);
     return ret;
   }
-  printf("proc_ctx->idx_map[6]: %d\n", proc_ctx->idx_map[6]);
 
   proc_ctx->nb_out_streams = out_stream_idx + 1;
 

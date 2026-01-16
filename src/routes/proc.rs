@@ -126,9 +126,6 @@ pub async fn rename_extras(rename_extras_info: web::Json<RenameExtrasInfo>,
     let new_name = format!("{}/{:02}.{}",
       extra_parent.display(), video_count, extra_ext.display());
 
-    println!("extra_path: {}", extra_path.display());
-    println!("new_name: {}", new_name);
-
     match rename(extra_path, new_name) {
       Ok(_) => {},
       Err(err) => { eprintln!("Rename error: {:?}", err); continue; }
