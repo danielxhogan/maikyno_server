@@ -132,46 +132,12 @@ static int open_video_encoder(AVCodecContext **enc_ctx, ProcessingContext *proc_
   (*enc_ctx)->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
   cores = get_core_count();
-  if (cores <= 0) { cores = 2; }
-  printf("cores: %d\n", cores);
+  if (cores <= 0) { cores = 4; }
 
-  if (
-    in_stream->codecpar->width > 1920 ||
-    in_stream->codecpar->height > 1080
-  ) {
-    printf("using 4K settings for pools.\n");
-    if (proc_ctx->renditions_arr[ctx_idx]) {
-      if (rendition2) {
-        // 1/2
-        pools = (cores + 1) / 2;
-        printf("rendition 2: pools: %d\n", pools);
-      } else {
-        // 1/3
-        pools = (cores + 2) / 3;
-        printf("rendition 1: pools: %d\n", pools);
-      }
-    } else {
-      // 1/2
-      pools = (cores + 1) / 2;
-      printf("no renditions, pools: %d\n", pools);
-    }
+  if (proc_ctx->renditions_arr[ctx_idx]) {
+    pools = (cores + 1) / 2;
   } else {
-    printf("using sub 4K settings for pools.\n");
-    if (proc_ctx->renditions_arr[ctx_idx]) {
-      if (rendition2) {
-        // 2/3
-        pools = ((cores * 2) + 2) / 3;
-        printf("rendition 2: pools: %d\n", pools);
-      } else {
-        // 1/2
-        pools = (cores + 1) / 2;
-        printf("rendition 1: pools: %d\n", pools);
-      }
-    } else {
-      // 2/3
-      pools = ((cores * 2) + 2) / 3;
-      printf("no renditions, pools: %d\n", pools);
-    }
+    pools = ((cores * 2) + 2) / 3;
   }
 
   snprintf(additional_params_str, sizeof(additional_params_str),
