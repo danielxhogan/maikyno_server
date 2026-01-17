@@ -249,7 +249,7 @@ pub async fn process_media(process_media_info: web::Json<ProcessMediaInfo>,
         Ok(process_media_ret) =>
         {
           if process_media_ret < 0 {
-            println!("Failed to process media for batch id: {:?}",
+            println!("Failed to process media for batch id {:?}.",
             batch.id);
           }
         },

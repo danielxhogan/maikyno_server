@@ -76,7 +76,7 @@ int check_abort_status(const char *batch_id)
   status = sqlite3_column_int(check_abort_status_stmt, 0);
 
   if (status) {
-    printf("batch: %s is aborted.\n", batch_id);
+    printf("batch \"%s\" is aborted.\n", batch_id);
     ret = ABORTED;
   }
 

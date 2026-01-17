@@ -616,7 +616,7 @@ OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
     goto end;
   }
 
-  printf("\nOpening output file \"%s\".\n", out_filename);
+  printf("Opening output file \"%s\".\n", out_filename);
 
   if ((ret = avformat_alloc_output_context2(
     &out_ctx->fmt_ctx, NULL, NULL, out_filename)))

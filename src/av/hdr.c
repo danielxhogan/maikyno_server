@@ -77,7 +77,7 @@ int extract_hdr_metadata(HdrMetadataContext *hdr_ctx, const char *filename)
   #define FRAME_DECODE_LIMIT 100
 
   if ((ret = avformat_open_input(&fmt_ctx, filename, NULL, NULL)) < 0) {
-    fprintf(stderr, "Failed to open input video file: '%s'.\n", filename);
+    fprintf(stderr, "Failed to open input file \"%s\".\n", filename);
     goto end;
   }
 

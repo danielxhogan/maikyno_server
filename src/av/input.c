@@ -122,7 +122,7 @@ InputContext *open_input(ProcessingContext *proc_ctx,
     goto end;
   }
 
-  printf("\nOpening input file \"%s\".\n", input_file);
+  printf("Opening input file \"%s\".\n", input_file);
 
   if ((ret = av_dict_set(&opts, "probesize", "50000000", 0)) < 0) {
     fprintf(stderr, "Failed to set probesize option.\n");
@@ -137,7 +137,7 @@ InputContext *open_input(ProcessingContext *proc_ctx,
   if ((ret =
     avformat_open_input(&in_ctx->fmt_ctx, input_file, NULL, &opts)) < 0)
   {
-    fprintf(stderr, "Failed to open input video file: '%s'.\n", input_file);
+    fprintf(stderr, "Failed to open input file \"%s\".\n", input_file);
     goto end;
   }
 
@@ -192,7 +192,7 @@ end:
   free(input_file);
 
   if (ret < 0) {
-    fprintf(stderr, "\nLibav Error: %s\n", av_err2str(ret));
+    fprintf(stderr, "Libav Error: %s.\n", av_err2str(ret));
     close_input(&in_ctx);
     return NULL;
   }
