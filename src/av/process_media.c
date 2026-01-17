@@ -404,7 +404,7 @@ flush:
 }
 
 int decode_sub_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
-  OutputContext *out_ctx, int ctx_idx, int out_stream_idx)
+  OutputContext *out_ctx, int ctx_idx)
 {
   if (proc_ctx->passthrough_arr[0]) { return 0; }
 
@@ -549,7 +549,7 @@ int decode_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
     }
   } else if (codec_type == AVMEDIA_TYPE_SUBTITLE && in_ctx->init_pkt)
   {
-    if ((ret = decode_sub_packet(proc_ctx, in_ctx, out_ctx, ctx_idx, out_stream_idx)) < 0) {
+    if ((ret = decode_sub_packet(proc_ctx, in_ctx, out_ctx, ctx_idx)) < 0) {
       fprintf(stderr, "Failed to decode subtitle packet \
         for input stream: %d.\n", in_stream_idx);
       return ret;
