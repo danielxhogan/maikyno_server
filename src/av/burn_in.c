@@ -106,7 +106,7 @@ int sub_to_frame_sws_context_alloc(SubToFrameContext *stf_ctx,
 }
 
 int sub_to_frame_convert(SubToFrameContext *stf_ctx,
-  InputContext *in_ctx, int width, int height)
+  InputContext *in_ctx)
 {
   int ret = 0;
   AVSubtitle *sub = in_ctx->dec_sub;

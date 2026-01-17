@@ -410,9 +410,6 @@ int decode_sub_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
 
   int got_sub_ptr, ret = 0;
   AVCodecContext *s_dec_ctx = in_ctx->dec_ctx[ctx_idx];
-  AVCodecContext *enc_ctx = out_ctx->enc_ctx_arr[0];
-  int width = enc_ctx->width;
-  int height = enc_ctx->height;
 
   if (proc_ctx->first_sub == 0) {
     proc_ctx->first_sub = 1;
@@ -435,7 +432,7 @@ int decode_sub_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
 
   proc_ctx->last_sub_pts = in_ctx->dec_sub->pts;
 
-  if ((ret = sub_to_frame_convert(proc_ctx->burn_in_ctx->stf_ctx, in_ctx, width, height)))
+  if ((ret = sub_to_frame_convert(proc_ctx->burn_in_ctx->stf_ctx, in_ctx)))
   {
     fprintf(stderr, "Failed to convert subtitle to frame.\n");
     return ret;
