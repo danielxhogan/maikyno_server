@@ -120,6 +120,7 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   proc_ctx->rend_ctx_arr = NULL;
 
   proc_ctx->gain_boost_arr = NULL;
+  proc_ctx->gain_boost2_arr = NULL;
   proc_ctx->vol_ctx_arr = NULL;
 
   if ((ret = proc_ctx->nb_in_streams =
@@ -204,6 +205,13 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
     goto end;
   }
 
+  if (!(proc_ctx->gain_boost2_arr =
+    calloc(proc_ctx->nb_selected_streams, sizeof(int))))
+  {
+    fprintf(stderr, "Failed to allocate gain boost array.\n");
+    goto end;
+  }
+
   return proc_ctx;
 
 end:
@@ -250,6 +258,8 @@ void processing_context_free(ProcessingContext **proc_ctx)
   burn_in_filter_context_free(&(*proc_ctx)->burn_in_ctx);
 
   free((*proc_ctx)->gain_boost_arr);
+  free((*proc_ctx)->gain_boost2_arr);
+
   if ((*proc_ctx)->vol_ctx_arr) {
     for (i = 0; i < (*proc_ctx)->nb_out_streams; i++) {
       volume_filter_context_free(&(*proc_ctx)->vol_ctx_arr[i]);
@@ -392,6 +402,7 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
       process_job_audio_streams.gain_boost, \
       process_job_audio_streams.create_renditions, \
       process_job_audio_streams.title2, \
+      process_job_audio_streams.gain_boost2, \
       streams.codec \
     FROM process_job_audio_streams \
     JOIN streams ON process_job_audio_streams.stream_id = streams.id \
@@ -464,7 +475,10 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
       strncat(proc_ctx->stream_rend_titles_arr[*ctx_idx], title2, len_title2);
     }
 
-    codec = (char *) sqlite3_column_text(select_audio_stream_info_stmt, 6);
+    proc_ctx->gain_boost2_arr[*ctx_idx] =
+      sqlite3_column_int(select_audio_stream_info_stmt, 6);
+
+    codec = (char *) sqlite3_column_text(select_audio_stream_info_stmt, 7);
 
     for (end = codec; *end; end++);
     len_codec = end - codec;
@@ -479,7 +493,6 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
     }
 
     strncat(proc_ctx->codecs[*ctx_idx], codec, len_codec);
-    printf("proc_ctx->codecs[*ctx_idx]: %s.\n", proc_ctx->codecs[*ctx_idx]);
 
     *out_stream_idx += 1;
     if (proc_ctx->renditions_arr[*ctx_idx]) { *out_stream_idx += 1; }
@@ -677,7 +690,7 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
 
       if (proc_ctx->gain_boost_arr[ctx_idx] > 0) {
         if (!(proc_ctx->vol_ctx_arr[out_stream_idx] =
-          volume_filter_context_init(proc_ctx, out_ctx, ctx_idx, out_stream_idx)))
+          volume_filter_context_init(proc_ctx, out_ctx, ctx_idx, out_stream_idx, i)))
         {
           fprintf(stderr, "Failed to allocate volume filter context for \
             input stream '%d'\n", in_stream_idx);

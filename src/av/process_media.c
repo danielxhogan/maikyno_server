@@ -589,7 +589,7 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
 
     frame_count += 1;
 
-    if (frame_count % 5000 == 0) {
+    if (frame_count % 3000 == 0) {
       if (check_abort_status(batch_id) == ABORTED) {
         return ABORTED;
       }

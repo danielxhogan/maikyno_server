@@ -84,6 +84,7 @@ typedef struct ProcessingContext {
   RenditionFilterContext **rend_ctx_arr;
 
   int *gain_boost_arr;
+  int *gain_boost2_arr;
   VolumeFilterContext **vol_ctx_arr;
 } ProcessingContext;
 

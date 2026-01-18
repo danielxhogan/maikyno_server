@@ -1,11 +1,17 @@
 #include "volume.h"
 
 VolumeFilterContext *volume_filter_context_init(ProcessingContext *proc_ctx,
-  OutputContext *out_ctx, int ctx_idx, int out_stream_idx)
+  OutputContext *out_ctx, int ctx_idx, int out_stream_idx, int rendition2)
 {
-  int gain_boost = proc_ctx->gain_boost_arr[ctx_idx], ret = 0;
+  int gain_boost, ret = 0;
   char args[512], flt_str[512], ch_layout[512];
   const char *sample_fmt;
+
+  if (!rendition2) {
+    gain_boost = proc_ctx->gain_boost_arr[ctx_idx];
+  } else {
+    gain_boost = proc_ctx->gain_boost2_arr[ctx_idx];
+  }
 
   snprintf(flt_str, sizeof(flt_str), "volume=%d", gain_boost);
 

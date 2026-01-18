@@ -520,10 +520,6 @@ static int open_encoder(InputContext *in_ctx, ProcessingContext *proc_ctx,
     if (proc_ctx->renditions_arr[ctx_idx]) {
       if (strcmp(proc_ctx->codecs[ctx_idx], "ac3"))
       {
-        printf("ctx_idx: %d.\n", ctx_idx);
-        printf("proc_ctx->codecs[ctx_idx]: %s.\n", proc_ctx->codecs[ctx_idx]);
-        printf("out_stream_idx: %d\n", out_stream_idx);
-
         if ((ret = open_ac3_encoder(&out_ctx->enc_ctx_arr[out_stream_idx],
            in_ctx->dec_ctx[ctx_idx], in_stream)) < 0)
         {

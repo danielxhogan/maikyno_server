@@ -76,9 +76,10 @@ diesel::table! {
         id -> Text,
         title -> Nullable<Text>,
         passthrough -> Bool,
+        gain_boost -> Integer,
         create_renditions -> Bool,
         title2 -> Nullable<Text>,
-        gain_boost -> Integer,
+        gain_boost2 -> Integer,
         stream_id -> Text,
         process_job_id -> Text,
     }
