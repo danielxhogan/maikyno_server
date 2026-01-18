@@ -112,6 +112,7 @@ InputContext *open_input(ProcessingContext *proc_ctx,
   in_ctx->init_pkt = NULL;
   in_ctx->init_pkt_cpy = NULL;
   in_ctx->dec_frame = NULL;
+  in_ctx->dec_frame_cpy = NULL;
   in_ctx->dec_sub = NULL;
   in_ctx->nb_selected_streams = proc_ctx->nb_selected_streams;
 
@@ -182,6 +183,12 @@ InputContext *open_input(ProcessingContext *proc_ctx,
     goto end;
   }
 
+  if (!(in_ctx->dec_frame_cpy = av_frame_alloc())) {
+    fprintf(stderr, "Failed to allocate AVFrame.\n");
+    ret = AVERROR(ENOMEM);
+    goto end;
+  }
+
   if (!(in_ctx->dec_sub = av_mallocz(sizeof(AVSubtitle)))) {
     fprintf(stderr, "Failed to allocate AVSubtitle.\n");
     ret = AVERROR(ENOMEM);
@@ -220,6 +227,8 @@ void close_input(InputContext **in_ctx)
   av_packet_free(&(*in_ctx)->init_pkt_cpy);
   av_frame_unref((*in_ctx)->dec_frame);
   av_frame_free(&(*in_ctx)->dec_frame);
+  av_frame_unref((*in_ctx)->dec_frame_cpy);
+  av_frame_free(&(*in_ctx)->dec_frame_cpy);
   if ((*in_ctx)->dec_sub) { avsubtitle_free((*in_ctx)->dec_sub); }
   free(*in_ctx);
   *in_ctx = NULL;

@@ -80,6 +80,7 @@ typedef struct ProcessingContext {
   int *renditions_arr;
   int tonemap;
   int hdr;
+  char **codecs;
   RenditionFilterContext **rend_ctx_arr;
 
   int *gain_boost_arr;
@@ -92,6 +93,7 @@ typedef struct InputContext {
   AVPacket *init_pkt;
   AVPacket *init_pkt_cpy;
   AVFrame *dec_frame;
+  AVFrame *dec_frame_cpy;
   AVSubtitle *dec_sub;
   int nb_selected_streams;
 } InputContext;

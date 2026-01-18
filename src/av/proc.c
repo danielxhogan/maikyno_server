@@ -114,9 +114,10 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   proc_ctx->burn_in_ctx = NULL;
 
   proc_ctx->renditions_arr = NULL;
-  proc_ctx->rend_ctx_arr = NULL;
   proc_ctx->tonemap = 0;
   proc_ctx->hdr = 0;
+  proc_ctx->codecs = NULL;
+  proc_ctx->rend_ctx_arr = NULL;
 
   proc_ctx->gain_boost_arr = NULL;
   proc_ctx->vol_ctx_arr = NULL;
@@ -175,26 +176,17 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
     goto end;
   }
 
-  if (!(proc_ctx->swr_out_ctx_arr =
-    calloc(proc_ctx->nb_selected_streams, sizeof(SwrOutputContext *))))
-  {
-    fprintf(stderr, "Failed to allocate array for swr output contexts \
-      for process job: %s\n", process_job_id);
-    goto end;
-  }
-
-  if (!(proc_ctx->fsc_ctx_arr =
-    calloc(proc_ctx->nb_selected_streams, sizeof(FrameSizeConversionContext *))))
-  {
-    fprintf(stderr, "Failed to allocate array for frame size conversion contexts \
-      for process job: %s\n", process_job_id);
-    goto end;
-  }
-
   if (!(proc_ctx->renditions_arr =
     calloc(proc_ctx->nb_selected_streams, sizeof(int))))
   {
     fprintf(stderr, "Failed to allocate renditions array.\n");
+    goto end;
+  }
+
+  if (!(proc_ctx->codecs =
+    calloc(proc_ctx->nb_selected_streams, sizeof(char *))))
+  {
+    fprintf(stderr, "Failed to allocate codecs array.\n");
     goto end;
   }
 
@@ -209,13 +201,6 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
     calloc(proc_ctx->nb_selected_streams, sizeof(int))))
   {
     fprintf(stderr, "Failed to allocate gain boost array.\n");
-    goto end;
-  }
-
-  if (!(proc_ctx->vol_ctx_arr =
-    calloc(proc_ctx->nb_selected_streams, sizeof(VolumeFilterContext *))))
-  {
-    fprintf(stderr, "Failed to allocate volume filter context array.\n");
     goto end;
   }
 
@@ -248,14 +233,14 @@ void processing_context_free(ProcessingContext **proc_ctx)
   free((*proc_ctx)->passthrough_arr);
 
   if ((*proc_ctx)->swr_out_ctx_arr) {
-    for (i = 0; i < (*proc_ctx)->nb_selected_streams; i++) {
+    for (i = 0; i < (*proc_ctx)->nb_out_streams; i++) {
       swr_output_context_free(&(*proc_ctx)->swr_out_ctx_arr[i]);
     }
     free((*proc_ctx)->swr_out_ctx_arr);
   }
 
   if ((*proc_ctx)->fsc_ctx_arr) {
-    for (i = 0; i < (*proc_ctx)->nb_selected_streams; i++) {
+    for (i = 0; i < (*proc_ctx)->nb_out_streams; i++) {
       fsc_ctx_free(&(*proc_ctx)->fsc_ctx_arr[i]);
     }
     free((*proc_ctx)->fsc_ctx_arr);
@@ -264,16 +249,22 @@ void processing_context_free(ProcessingContext **proc_ctx)
   deint_filter_context_free(&(*proc_ctx)->deint_ctx);
   burn_in_filter_context_free(&(*proc_ctx)->burn_in_ctx);
 
-
   free((*proc_ctx)->gain_boost_arr);
   if ((*proc_ctx)->vol_ctx_arr) {
-    for (i = 0; i < (*proc_ctx)->nb_selected_streams; i++) {
+    for (i = 0; i < (*proc_ctx)->nb_out_streams; i++) {
       volume_filter_context_free(&(*proc_ctx)->vol_ctx_arr[i]);
     }
     free((*proc_ctx)->vol_ctx_arr);
   }
 
   free((*proc_ctx)->renditions_arr);
+
+  if ((*proc_ctx)->codecs) {
+    for (i = 0; i < (*proc_ctx)->nb_selected_streams; i++) {
+      free((*proc_ctx)->codecs[i]);
+    }
+    free((*proc_ctx)->codecs);
+  }
 
   if ((*proc_ctx)->rend_ctx_arr) {
     for (i = 0; i < (*proc_ctx)->nb_selected_streams; i++) {
@@ -400,14 +391,15 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
       process_job_audio_streams.passthrough, \
       process_job_audio_streams.gain_boost, \
       process_job_audio_streams.create_renditions, \
-      process_job_audio_streams.title2 \
+      process_job_audio_streams.title2, \
+      streams.codec \
     FROM process_job_audio_streams \
     JOIN streams ON process_job_audio_streams.stream_id = streams.id \
     WHERE process_job_audio_streams.process_job_id = ?;";
 
   sqlite3_stmt *select_audio_stream_info_stmt = NULL;
-  char *title, *title2, *end;
-  int in_stream_idx, len_title, len_title2, ret = 0;
+  char *title, *title2, *codec, *end;
+  int in_stream_idx, len_title, len_title2, len_codec, ret = 0;
 
   if ((ret = sqlite3_prepare_v2(db, select_audio_stream_info_query, -1,
     &select_audio_stream_info_stmt, 0)) != SQLITE_OK)
@@ -463,7 +455,7 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
       if (!(proc_ctx->stream_rend_titles_arr[*ctx_idx] =
         calloc(len_title2 + 1, sizeof(char))))
       {
-        fprintf(stderr, "Failed to allocate memory for title2 for stream: %d\n",
+        fprintf(stderr, "Failed to allocate memory for title2 for stream '%d'\n",
           in_stream_idx);
         ret = AVERROR(ENOMEM);
         goto end;
@@ -471,6 +463,23 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
 
       strncat(proc_ctx->stream_rend_titles_arr[*ctx_idx], title2, len_title2);
     }
+
+    codec = (char *) sqlite3_column_text(select_audio_stream_info_stmt, 6);
+
+    for (end = codec; *end; end++);
+    len_codec = end - codec;
+
+    if (!(proc_ctx->codecs[*ctx_idx] =
+      calloc(len_codec + 1, sizeof(char))))
+    {
+      fprintf(stderr, "Failed to allocate memory for codec for stream '%d'\n",
+        in_stream_idx);
+      ret = AVERROR(ENOMEM);
+      goto end;
+    }
+
+    strncat(proc_ctx->codecs[*ctx_idx], codec, len_codec);
+    printf("proc_ctx->codecs[*ctx_idx]: %s.\n", proc_ctx->codecs[*ctx_idx]);
 
     *out_stream_idx += 1;
     if (proc_ctx->renditions_arr[*ctx_idx]) { *out_stream_idx += 1; }
@@ -494,8 +503,8 @@ int get_subtitle_process_info(ProcessingContext *proc_ctx,
 {
   char *select_subtitle_stream_idx_query =
     "SELECT streams.stream_idx, \
-    process_job_subtitle_streams.title, \
-    process_job_subtitle_streams.burn_in \
+      process_job_subtitle_streams.title, \
+      process_job_subtitle_streams.burn_in \
     FROM process_job_subtitle_streams \
     JOIN streams ON process_job_subtitle_streams.stream_id = streams.id \
     WHERE process_job_subtitle_streams.process_job_id = ?;";
@@ -595,9 +604,31 @@ int get_processing_info(ProcessingContext *proc_ctx,
 int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
   OutputContext *out_ctx, char *process_job_id)
 {
-  int in_stream_idx, ctx_idx, out_stream_idx, passthrough;
+  int in_stream_idx, ctx_idx, out_stream_idx, passthrough, i, j;
   enum AVMediaType codec_type;
   AVCodecContext *dec_ctx, *enc_ctx;
+
+  if (!(proc_ctx->swr_out_ctx_arr =
+    calloc(proc_ctx->nb_out_streams, sizeof(SwrOutputContext *))))
+  {
+    fprintf(stderr, "Failed to allocate array for swr output contexts.\n");
+    return -1;
+  }
+
+  if (!(proc_ctx->fsc_ctx_arr =
+    calloc(proc_ctx->nb_out_streams, sizeof(FrameSizeConversionContext *))))
+  {
+    fprintf(stderr, "Failed to allocate array \
+      for frame size conversion contexts.\n");
+    return -1;
+  }
+
+  if (!(proc_ctx->vol_ctx_arr =
+    calloc(proc_ctx->nb_out_streams, sizeof(VolumeFilterContext *))))
+  {
+    fprintf(stderr, "Failed to allocate volume filter context array.\n");
+    return -1;
+  }
 
   for (
     in_stream_idx = 0;
@@ -617,33 +648,44 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
     out_stream_idx = proc_ctx->idx_map[in_stream_idx];
 
     if (proc_ctx->renditions_arr[ctx_idx]) {
-      out_stream_idx += 1;
+      if (strcmp(proc_ctx->codecs[ctx_idx], "ac3")) {
+        j = 2;
+      } else {
+        j = 1;
+        out_stream_idx += 1;
+      }
+    } else {
+      j = 1;
     }
 
-    enc_ctx = out_ctx->enc_ctx_arr[out_stream_idx];
+    for (i = 0; i < j; i++) {
+      enc_ctx = out_ctx->enc_ctx_arr[out_stream_idx];
 
-    if (!(proc_ctx->swr_out_ctx_arr[ctx_idx] =
-      swr_output_context_alloc(dec_ctx, enc_ctx)))
-    {
-      fprintf(stderr, "Failed to allocate swr output context for \
-        input stream: %d\nprocess job: %s\n", in_stream_idx, process_job_id);
-      return -1;
-    }
-
-    if (!(proc_ctx->fsc_ctx_arr[ctx_idx] = fsc_ctx_alloc(enc_ctx))) {
-      fprintf(stderr, "Failed to allocate fsc context for \
-        input stream: %d\nprocess job: %s\n", in_stream_idx, process_job_id);
-      return -1;
-    }
-
-    if (proc_ctx->gain_boost_arr[ctx_idx] > 0) {
-      if (!(proc_ctx->vol_ctx_arr[ctx_idx] =
-        volume_filter_context_init(proc_ctx, out_ctx, ctx_idx, out_stream_idx)))
+      if (!(proc_ctx->swr_out_ctx_arr[out_stream_idx] =
+        swr_output_context_alloc(dec_ctx, enc_ctx)))
       {
-        fprintf(stderr, "Failed to allocate volume filter context for \
-          input stream: %d\nprocess job: %s\n", in_stream_idx, process_job_id);
+        fprintf(stderr, "Failed to allocate swr output context for \
+          input stream '%d'.\n", in_stream_idx);
         return -1;
       }
+
+      if (!(proc_ctx->fsc_ctx_arr[out_stream_idx] = fsc_ctx_alloc(enc_ctx))) {
+        fprintf(stderr, "Failed to allocate fsc context for \
+          input stream '%d'.\n", in_stream_idx);
+        return -1;
+      }
+
+      if (proc_ctx->gain_boost_arr[ctx_idx] > 0) {
+        if (!(proc_ctx->vol_ctx_arr[out_stream_idx] =
+          volume_filter_context_init(proc_ctx, out_ctx, ctx_idx, out_stream_idx)))
+        {
+          fprintf(stderr, "Failed to allocate volume filter context for \
+            input stream '%d'\n", in_stream_idx);
+          return -1;
+        }
+      }
+
+      out_stream_idx += 1;
     }
   }
 
