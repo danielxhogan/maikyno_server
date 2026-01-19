@@ -68,8 +68,7 @@ int make_rendtion(ProcessingContext *proc_ctx, InputContext *in_ctx,
     if ((ret = encode_video_frame(proc_ctx, in_ctx, out_ctx,
       rend_ctx->filtered_frame1, 0)) < 0)
     {
-      fprintf(stderr, "Failed to encode first rendition frame.\n\
-      Libav Error: %s.\n", av_err2str(ret));
+      fprintf(stderr, "Failed to encode first rendition frame.\n");
       return ret;
     }
 
@@ -560,7 +559,7 @@ int decode_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
       in_stream_idx, ctx_idx, out_stream_idx)) < 0)
     {
       fprintf(stderr, "Failed to decode audio or video packet \
-        for input stream: %d.\n", in_stream_idx);
+        for input stream '%d'.\n", in_stream_idx);
       return ret;
     }
   } else if (codec_type == AVMEDIA_TYPE_SUBTITLE && in_ctx->init_pkt)
@@ -584,29 +583,33 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
     int in_stream_idx = in_ctx->init_pkt->stream_index;
     int ctx_idx = proc_ctx->ctx_map[in_stream_idx];
     int out_stream_idx = proc_ctx->idx_map[in_stream_idx];
+    enum AVMediaType codec_type =
+      in_ctx->fmt_ctx->streams[in_stream_idx]->codecpar->codec_type;
+
+    if (codec_type == AVMEDIA_TYPE_VIDEO) {
+      frame_count += 1;
+
+      if (frame_count % 300 == 0) {
+        if (check_abort_status(batch_id) == ABORTED) {
+          return ABORTED;
+        }
+      }
+
+      if (frame_count % 2000 == 0 || check_again) {
+        if (in_ctx->init_pkt->pts > 0) {
+          check_again = 0;
+          if (calculate_pct_complete(in_ctx, process_job_id) < 0) {
+            fprintf(stderr, "Failed to calculate percent complete.\n");
+          }
+        } else {
+          check_again = 1;
+        }
+      }
+    }
 
     if (ctx_idx == INACTIVE_STREAM) {
       if(in_ctx->init_pkt) { av_packet_unref(in_ctx->init_pkt); }
       continue;
-    }
-
-    frame_count += 1;
-
-    if (frame_count % 3000 == 0) {
-      if (check_abort_status(batch_id) == ABORTED) {
-        return ABORTED;
-      }
-    }
-
-    if (frame_count % 10000 == 0 || check_again) {
-      if (in_ctx->init_pkt->pts > 0) {
-        check_again = 0;
-        if (calculate_pct_complete(in_ctx, process_job_id) < 0) {
-          fprintf(stderr, "Failed to calculate percent complete.\n");
-        }
-      } else {
-        check_again = 1;
-      }
     }
 
     if (proc_ctx->passthrough_arr[ctx_idx]) {
@@ -779,7 +782,7 @@ int process_video(char *process_job_id, const char *batch_id)
       in_stream_idx, ctx_idx, out_stream_idx, in_ctx->dec_frame) < 0)
     {
       fprintf(stderr, "Failed to encode audio frame while flushing \
-        frame size converter for input stream: '%d'.\n", in_stream_idx);
+        frame size converter for input stream '%d'.\n", in_stream_idx);
     }
   }
 
