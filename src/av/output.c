@@ -518,8 +518,10 @@ static int open_encoder(InputContext *in_ctx, ProcessingContext *proc_ctx,
   else if (stream_type == AVMEDIA_TYPE_AUDIO)
   {
     if (proc_ctx->renditions_arr[ctx_idx]) {
-      if (strcmp(proc_ctx->codecs[ctx_idx], "ac3"))
-      {
+      if (
+        strcmp(proc_ctx->codecs[ctx_idx], "ac3") ||
+        proc_ctx->gain_boost_arr[ctx_idx] > 0
+      ) {
         if ((ret = open_ac3_encoder(&out_ctx->enc_ctx_arr[out_stream_idx],
            in_ctx->dec_ctx[ctx_idx], in_stream)) < 0)
         {

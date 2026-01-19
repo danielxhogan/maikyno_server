@@ -661,9 +661,14 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
     out_stream_idx = proc_ctx->idx_map[in_stream_idx];
 
     if (proc_ctx->renditions_arr[ctx_idx]) {
-      if (strcmp(proc_ctx->codecs[ctx_idx], "ac3")) {
+      if (
+        strcmp(proc_ctx->codecs[ctx_idx], "ac3") ||
+        proc_ctx->gain_boost_arr[ctx_idx] > 0
+      ) {
         j = 2;
-      } else {
+      }
+      else
+      {
         j = 1;
         out_stream_idx += 1;
       }
