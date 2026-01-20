@@ -4,9 +4,8 @@ int generate_suggested_title(char **suggested_title,
   char *video_name, char *media_dir_name,
   char *show_id, int extra, sqlite3 *db)
 {
-  int ret, len_video_name,
-    len_show_name, len_media_dir_name, len_extra_str, len_episode_str,
-    len_suggested_title;
+  int len_video_name, len_show_name, len_media_dir_name, len_extra_str,
+    len_episode_str, len_suggested_title, ret = 0;
 
   char *video_name_root = NULL, *dot_pos, *show_name,
     *extra_str = " Extra ", *episode_str = " Episode ",
@@ -20,7 +19,7 @@ int generate_suggested_title(char **suggested_title,
 
   if (!(video_name_root = calloc(len_video_name + 1, sizeof(char))))
   {
-    fprintf(stderr, "Failed to allocate video_name_root\n");
+    fprintf(stderr, "Failed to allocate video_name_root.\n");
     ret = AVERROR(ENOMEM);
     goto end;
   }
@@ -40,8 +39,9 @@ int generate_suggested_title(char **suggested_title,
     if ((ret = sqlite3_prepare_v2(db, select_show_name_query, -1,
       &select_show_name_stmt, 0)) != SQLITE_OK)
     {
-      fprintf(stderr, "Failed to prepare select show name statement.\
-        \nError: %s\n", sqlite3_errmsg(db));
+      fprintf(stderr, "Failed to prepare select show name statement.\n");
+      fprintf(stderr, "show_id: \"%s\".\n", show_id);
+      fprintf(stderr, "Sqlite Error: %s.\n", sqlite3_errmsg(db));
       ret = -ret;
       goto end;
     }
@@ -49,15 +49,16 @@ int generate_suggested_title(char **suggested_title,
     sqlite3_bind_text(select_show_name_stmt, 1, show_id, -1, SQLITE_STATIC);
 
     if ((ret = sqlite3_step(select_show_name_stmt)) != SQLITE_ROW) {
-      fprintf(stderr, "Failed to get show name for show: %s\n", show_id);
+      fprintf(stderr, "Failed to select show name for show: \"%s\".\n", show_id);
+      fprintf(stderr, "Sqlite Error: %s.\n", sqlite3_errmsg(db));
       ret = -ret;
       goto end;
     }
 
     if (!(show_name = (char *) sqlite3_column_text(select_show_name_stmt, 0)))
     {
-      fprintf(stderr, "Failed to get show name column text for show: %s\n",
-        show_id);
+      fprintf(stderr, "Failed to get show name show: \"%s\".\n", show_id);
+      fprintf(stderr, "Sqlite Error: %s.\n", sqlite3_errmsg(db));
       ret = -1;
       goto end;
     }
@@ -75,7 +76,8 @@ int generate_suggested_title(char **suggested_title,
 
       if (!(*suggested_title = calloc(len_suggested_title + 1, sizeof(char))))
       {
-        fprintf(stderr, "Failed to allocate suggested_title for season extra\n");
+        fprintf(stderr, "Failed to allocate suggested_title for season extra.\n");
+        fprintf(stderr, "show_id: \"%s\".\n", show_id);
         ret = AVERROR(ENOMEM);
         goto end;
       }
@@ -98,7 +100,8 @@ int generate_suggested_title(char **suggested_title,
 
       if (!(*suggested_title = calloc(len_suggested_title + 1, sizeof(char))))
       {
-        fprintf(stderr, "Failed to allocate suggested_title for episode\n");
+        fprintf(stderr, "Failed to allocate suggested_title for episode.\n");
+        fprintf(stderr, "show_id: \"%s\".\n", show_id);
         ret = AVERROR(ENOMEM);
         goto end;
       }
@@ -118,7 +121,7 @@ int generate_suggested_title(char **suggested_title,
 
       if (!(*suggested_title = calloc(len_suggested_title + 1, sizeof(char))))
       {
-        fprintf(stderr, "Failed to allocate suggested_title for movie extra\n");
+        fprintf(stderr, "Failed to allocate suggested_title for movie extra.\n");
         ret = AVERROR(ENOMEM);
         goto end;
       }
@@ -131,7 +134,7 @@ int generate_suggested_title(char **suggested_title,
 
       if (!(*suggested_title = calloc(len_video_name + 1, sizeof(char))))
       {
-        fprintf(stderr, "Failed to allocate suggested_title for movie extra\n");
+        fprintf(stderr, "Failed to allocate suggested_title for movie extra.\n");
         ret = AVERROR(ENOMEM);
         goto end;
       }
@@ -150,30 +153,20 @@ int scan_video(char *video_id, char *video_name,
   char *video_path, char *media_dir_name,
   char *show_id, int extra, sqlite3 *db)
 {
-  int ret;
-
   AVFormatContext *fmt_ctx = NULL;
   AVStream *stream;
   AVDictionaryEntry *title_dict_entry;
 
   uuid_t uuid;
-  char uuid_str[LEN_UUID_STRING];
-  int stream_id;
-  char *title;
-  int stream_type;
+  char uuid_str[LEN_UUID_STRING], *title, *suggested_title = NULL;
   const char *codec_name, *profile_name;
-  int height;
-  int width;
-  int interlaced;
-
-  char *suggested_title = NULL;
+  int stream_id, height, width, interlaced, stream_type, ret = 0;
 
   char *update_video_query =
     "UPDATE videos \
     SET title = ?, suggested_title = ?, bitrate = ? \
     WHERE id = ?;";
   sqlite3_stmt *update_video_stmt = NULL;
-
 
   char *insert_video_stream_query =
     "INSERT INTO streams \
@@ -182,7 +175,6 @@ int scan_video(char *video_id, char *video_name,
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);";
   sqlite3_stmt *insert_video_stream_stmt = NULL;
 
-
   char *delete_video_streams_query =
     "DELETE FROM streams WHERE video_id = ?;";
   sqlite3_stmt *delete_video_streams_stmt = NULL;
@@ -190,8 +182,8 @@ int scan_video(char *video_id, char *video_name,
   if ((ret = sqlite3_prepare_v2(db, delete_video_streams_query, -1,
     &delete_video_streams_stmt, 0)) != SQLITE_OK)
   {
-    fprintf(stderr, "Failed to prepare delete movie version stream statement. \
-      \nError: %s\n", sqlite3_errmsg(db));
+    fprintf(stderr, "Failed to prepare delete movie version stream statement.");
+    fprintf(stderr, "Sqlite Error: %s.\n", sqlite3_errmsg(db));
     ret = -ret;
     goto end;
   }
@@ -200,31 +192,29 @@ int scan_video(char *video_id, char *video_name,
     (const char *) video_id, -1, SQLITE_STATIC);
 
   if ((ret = sqlite3_step(delete_video_streams_stmt)) != SQLITE_DONE) {
-    fprintf(stderr,
-      "Failed to delete video streams for video: \
-      %s\nError: %s\n", video_path, sqlite3_errmsg(db));
+    fprintf(stderr, "Failed to delete video streams.\n");
+    fprintf(stderr, "Sqlite Error: %s.\n", sqlite3_errmsg(db));
     ret = -ret;
     goto end;
   }
 
-  if ((ret =
-    avformat_open_input(&fmt_ctx, video_path, NULL, NULL)) < 0)
-  {
-    fprintf(stderr, "Failed to open input video file: '%s'.\n",
-      video_path);
+  if ((ret = avformat_open_input(&fmt_ctx, video_path, NULL, NULL)) < 0) {
+    fprintf(stderr, "Failed to open input video.\n");
+    fprintf(stderr, "Libav Error: %s.\n", av_err2str(ret));
     goto end;
   }
 
   if ((ret = avformat_find_stream_info(fmt_ctx, NULL)) < 0) {
     fprintf(stderr, "Failed to retrieve input stream info.");
+    fprintf(stderr, "Libav Error: %s.\n", av_err2str(ret));
     goto end;
   }
 
   if ((ret = sqlite3_prepare_v2(db, update_video_query, -1,
     &update_video_stmt, 0)) != SQLITE_OK)
   {
-    fprintf(stderr, "Failed to prepare update video statement. \
-      \nError: %s\n", sqlite3_errmsg(db));
+    fprintf(stderr, "Failed to prepare update video statement.\n");
+    fprintf(stderr, "Sqlite Error: %s.\n", sqlite3_errmsg(db));
     ret = -ret;
     goto end;
   }
@@ -235,8 +225,7 @@ int scan_video(char *video_id, char *video_name,
   if ((ret = generate_suggested_title(&suggested_title, video_name,
     media_dir_name, show_id, extra, db)) < 0)
   {
-    fprintf(stderr, "Failed to get suggested title for video: %s, media_dir: %s\n",
-      video_path, media_dir_name);
+    fprintf(stderr, "Failed to get suggested title.\n");
     goto end;
   }
 
@@ -257,13 +246,11 @@ int scan_video(char *video_id, char *video_name,
     -1, SQLITE_STATIC);
 
   if ((ret = sqlite3_step(update_video_stmt)) != SQLITE_DONE) {
-    fprintf(stderr, "Failed to update video for video: \
-      %s\nError: %s\n", video_path, sqlite3_errmsg(db));
+    fprintf(stderr, "Failed to update video.\n");
+    fprintf(stderr, "Sqlite Error: %s.\n", sqlite3_errmsg(db));
     ret = -ret;
     goto end;
   }
-
-  // av_dump_format(fmt_ctx, 0, video_path, 0);
 
   for (unsigned int i = 0; i < fmt_ctx->nb_streams; i++)
   {
@@ -304,8 +291,8 @@ int scan_video(char *video_id, char *video_name,
   if ((ret = sqlite3_prepare_v2(db, insert_video_stream_query, -1,
     &insert_video_stream_stmt, 0)) != SQLITE_OK)
   {
-    fprintf(stderr, "Failed to prepare insert movie version stream statement. \
-      \nError: %s\n", sqlite3_errmsg(db));
+    fprintf(stderr, "Failed to prepare insert video stream statement.\n");
+    fprintf(stderr, "Sqlite Error: %s.\n", sqlite3_errmsg(db));
       ret = -ret;
     goto end;
   }
@@ -337,9 +324,8 @@ int scan_video(char *video_id, char *video_name,
       (char *) video_id, -1, SQLITE_STATIC);
 
     if ((ret = sqlite3_step(insert_video_stream_stmt)) != SQLITE_DONE) {
-      fprintf(stderr,
-        "Failed to insert video stream for video: \
-        %s\nError: %s\n", video_path, sqlite3_errmsg(db));
+      fprintf(stderr, "Failed to insert video stream.\n");
+      fprintf(stderr, "Sqlite Error: %s.\n", sqlite3_errmsg(db));
         ret = -ret;
       goto end;
     }
@@ -370,17 +356,17 @@ int scan_media_streams(const char *media_dir_id)
 
   if ((ret = sqlite3_open(DATABASE_URL, &db)) != SQLITE_OK)
   {
-    fprintf(stderr, "Failed to open database: %s\nError: %s\n",
-      DATABASE_URL, sqlite3_errmsg(db));
-      ret = -ret;
+    fprintf(stderr, "Failed to open database: \"%s\".\n", DATABASE_URL);
+    fprintf(stderr, "Sqlite Error: %s.\n", sqlite3_errmsg(db));
+    ret = -ret;
     goto end;
   }
 
   if ((ret = sqlite3_prepare_v2(db, select_media_dir_query, -1,
     &select_media_dir_stmt, 0)) != SQLITE_OK)
   {
-    fprintf(stderr, "Failed to prepare select media_dir statement.\nError: %s\n",
-      sqlite3_errmsg(db));
+    fprintf(stderr, "Failed to prepare select media dir statement.\n");
+    fprintf(stderr, "Sqlite Error: %s.\n", sqlite3_errmsg(db));
     ret = -ret;
     goto end;
   }
@@ -388,36 +374,35 @@ int scan_media_streams(const char *media_dir_id)
   sqlite3_bind_text(select_media_dir_stmt, 1, media_dir_id, -1, SQLITE_STATIC);
 
   if ((ret = sqlite3_step(select_media_dir_stmt)) != SQLITE_ROW) {
-    fprintf(stderr, "Failed to get media_dir for media_dir_id: %s\n", media_dir_id);
+    fprintf(stderr, "Failed to select media dir.\n");
+    fprintf(stderr, "Sqlite Error: %s.\n", sqlite3_errmsg(db));
     ret = -ret;
     goto end;
   }
 
   if (!(media_dir_name = (char *) sqlite3_column_text(select_media_dir_stmt, 0)))
   {
-    fprintf(stderr, "Failed to get media_dir_name for media_dir_id: %s\n",
-      media_dir_id);
+    fprintf(stderr, "Failed to get media dir name.\n");
+    fprintf(stderr, "Sqlite Error: %s.\n", sqlite3_errmsg(db));
     ret = -1;
     goto end;
   }
 
   if (!(media_dir_path = (char *) sqlite3_column_text(select_media_dir_stmt, 1)))
   {
-    fprintf(stderr, "Failed to get media_dir path for media_dir_id: %s\n",
-      media_dir_id);
+    fprintf(stderr, "Failed to get media_dir path.\n");
+    fprintf(stderr, "Sqlite Error: %s.\n", sqlite3_errmsg(db));
     ret = -1;
     goto end;
   }
 
-  if (!(show_id = (char *) sqlite3_column_text(select_media_dir_stmt, 2))) {
-    // printf(stderr, "media_dir: %s is not a show.\n", media_dir_path);
-  }
+  show_id = (char *) sqlite3_column_text(select_media_dir_stmt, 2);
 
   if ((ret = sqlite3_prepare_v2(db, select_videos_query, -1,
     &select_videos_stmt, 0)) != SQLITE_OK)
   {
-    fprintf(stderr, "Failed to prepare select media_dir versions statement. \
-      \nError: %s\n", sqlite3_errmsg(db));
+    fprintf(stderr, "Failed to prepare select videos statement.\n");
+    fprintf(stderr, "Sqlite Error: %s.\n", sqlite3_errmsg(db));
     ret = -ret;
     goto end;
   }
@@ -429,29 +414,32 @@ int scan_media_streams(const char *media_dir_id)
     if (!(video_id =
       (char *) sqlite3_column_text(select_videos_stmt, 0)))
     {
-      fprintf(stderr,
-        "Failed to get video id for media_dir: %s\n", media_dir_path);
+      fprintf(stderr, "Failed to get video id.\n");
+      fprintf(stderr, "Sqlite Error: %s.\n", sqlite3_errmsg(db));
       ret = -1;
-      goto end;
+      continue;
     }
 
     if (!(video_name =
       (char *) sqlite3_column_text(select_videos_stmt, 1)))
     {
-      fprintf(stderr,
-        "Failed to get video_name for media_dir: %s\n", media_dir_path);
+      fprintf(stderr, "Failed to get video_name.\nvideo_id: \"%s\".\n",
+        video_id);
+      fprintf(stderr, "Sqlite Error: %s.\n", sqlite3_errmsg(db));
       ret = -1;
-      goto end;
+      continue;
     }
 
 
     if (!(video_path =
       (char *) sqlite3_column_text(select_videos_stmt, 2)))
     {
-      fprintf(stderr,
-        "Failed to get video path for media_dir: %s\n", media_dir_path);
+      fprintf(stderr, "Failed to get video_name.\nvideo_id: \"%s\".\n",
+        video_id);
+      fprintf(stderr, "video_name: \"%s\".\n", video_name);
+      fprintf(stderr, "Sqlite Error: %s.\n", sqlite3_errmsg(db));
       ret = -1;
-      goto end;
+      continue;
     }
 
     extra = sqlite3_column_int(select_videos_stmt, 3);
@@ -459,8 +447,10 @@ int scan_media_streams(const char *media_dir_id)
     if ((ret = scan_video(video_id, video_name, video_path,
       media_dir_name, show_id, extra, db)) < 0)
     {
-      fprintf(stderr, "Failed to scan video: %s\n", video_path);
-      goto end;
+      fprintf(stderr, "Failed to scan video.\nvideo_id: \"%s\".\n", video_id);
+      fprintf(stderr, "video_name: \"%s\".\nvideo_path: \"%s\".\n",
+        video_name, video_path);
+      continue;
     }
   }
 
@@ -469,5 +459,11 @@ end:
   sqlite3_finalize(select_videos_stmt);
   sqlite3_close(db);
 
-  return ret;
+  if (ret < 0) {
+    fprintf(stderr, "Failed to scan media streams for media dir: \"%s\".\n",
+      media_dir_id);
+    return ret;
+  }
+
+  return 0;
 }
