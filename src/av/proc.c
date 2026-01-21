@@ -693,12 +693,29 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
         return -1;
       }
 
-      if (proc_ctx->gain_boost_arr[ctx_idx] > 0) {
+      if (
+        (j == 2 && i == 0 && proc_ctx->gain_boost_arr[ctx_idx] > 0) ||
+        (j == 1 && !proc_ctx->renditions_arr[ctx_idx])
+      ) {
         if (!(proc_ctx->vol_ctx_arr[out_stream_idx] =
-          volume_filter_context_init(proc_ctx, out_ctx, ctx_idx, out_stream_idx, i)))
+          volume_filter_context_init(proc_ctx, out_ctx, ctx_idx,
+            out_stream_idx, 0)))
         {
-          fprintf(stderr, "Failed to allocate volume filter context for \
-            input stream '%d'\n", in_stream_idx);
+          fprintf(stderr, "Failed to allocate volume filter context.\n");
+          fprintf(stderr, "input stream: '%d'.\n", in_stream_idx);
+          return -1;
+        }
+      }
+      if (
+        (j == 2 && i == 1 && proc_ctx->gain_boost2_arr[ctx_idx] > 0) ||
+        (j == 1 && proc_ctx->renditions_arr[ctx_idx])
+      ) {
+        if (!(proc_ctx->vol_ctx_arr[out_stream_idx] =
+          volume_filter_context_init(proc_ctx, out_ctx, ctx_idx,
+            out_stream_idx, 1)))
+        {
+          fprintf(stderr, "Failed to allocate volume filter context.\n");
+          fprintf(stderr, "input stream: '%d'.\n", in_stream_idx);
           return -1;
         }
       }

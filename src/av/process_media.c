@@ -373,7 +373,7 @@ flush:
     swr_out_ctx->nb_converted_samples +=
       out_ctx->enc_ctx_arr[out_stream_idx]->frame_size;
 
-    if (proc_ctx->gain_boost_arr[ctx_idx] > 0)
+    if (proc_ctx->vol_ctx_arr[out_stream_idx])
     {
       if ((ret = boost_gain(proc_ctx, out_ctx,
         out_stream_idx, fsc_ctx->frame)))
