@@ -881,12 +881,14 @@ OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
       avio_open(&out_ctx->fmt_ctx->pb, out_filename, AVIO_FLAG_WRITE)) < 0)
     {
       fprintf(stderr, "Failed to open output file.\n");
+      fprintf(stderr, "Libav Error: %s.\n", av_err2str(ret));
       goto end;
     }
   }
 
   if ((ret = avformat_write_header(out_ctx->fmt_ctx, NULL)) < 0) {
     fprintf(stderr, "Failed to write header for output file.\n");
+    fprintf(stderr, "Libav Error: %s.\n", av_err2str(ret));
     goto end;
   }
 
