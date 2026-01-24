@@ -64,7 +64,7 @@ typedef struct StreamConfig {
   int rend1_gain_boost;
   int rend2_gain_boost;
 
-  int burn_in;
+  int burn_in_idx;
 } StreamConfig;
 
 typedef struct StreamContext {
@@ -109,7 +109,6 @@ typedef struct ProcessingContext {
   int *ctx_map;
   int *idx_map;
 
-  char **stream_titles_arr;
   char **stream_rend_titles_arr;
   int *passthrough_arr;
 

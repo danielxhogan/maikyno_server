@@ -741,6 +741,8 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
   InputContext *in_ctx, OutputContext *out_ctx, char *process_job_id)
 {
   int in_stream_idx, ctx_idx, out_stream_idx, ret = 0;
+  StreamConfig *stream_cfg;
+
   for (
     in_stream_idx = 0;
     in_stream_idx < (int) in_ctx->fmt_ctx->nb_streams;
@@ -750,6 +752,8 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
     if (in_stream_idx == proc_ctx->burn_in_idx) { continue; }
 
     ctx_idx = proc_ctx->ctx_map[in_stream_idx];
+    stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
+
     out_stream_idx = proc_ctx->idx_map[in_stream_idx];
 
     if (!proc_ctx->passthrough_arr[ctx_idx]) {
@@ -765,7 +769,7 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
 
     if ((ret = init_stream(out_ctx->fmt_ctx, out_ctx->enc_ctx_arr[out_stream_idx],
       in_ctx->fmt_ctx->streams[in_stream_idx],
-      proc_ctx->stream_titles_arr[ctx_idx])) < 0)
+      stream_cfg->rend1_title)) < 0)
     {
       fprintf(stderr, "Failed to initialize stream for output stream: %d.\n\
         process_job: %s.\nLibav Error: %s.\n",
