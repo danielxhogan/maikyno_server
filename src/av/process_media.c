@@ -514,7 +514,7 @@ int decode_av_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
         stream_cfg->renditions &&
         (
           strcmp(proc_ctx->codecs[ctx_idx], "ac3") ||
-          proc_ctx->gain_boost_arr[ctx_idx] > 0
+          stream_cfg->rend1_gain_boost > 0
         )
       ) {
         in_ctx->dec_frame_cpy = av_frame_clone(in_ctx->dec_frame);
@@ -641,7 +641,7 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
       in_ctx->dec_ctx[ctx_idx]->codec_type == AVMEDIA_TYPE_AUDIO &&
       stream_cfg->renditions &&
       !strcmp(proc_ctx->codecs[ctx_idx], "ac3") &&
-      proc_ctx->gain_boost_arr[ctx_idx] <= 0
+      stream_cfg->rend1_gain_boost <= 0
     ) {
       in_ctx->init_pkt_cpy = av_packet_clone(in_ctx->init_pkt);
       in_ctx->init_pkt_cpy->stream_index = out_stream_idx;

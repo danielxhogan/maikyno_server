@@ -144,7 +144,6 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   proc_ctx->codecs = NULL;
   proc_ctx->rend_ctx_arr = NULL;
 
-  proc_ctx->gain_boost_arr = NULL;
   proc_ctx->gain_boost2_arr = NULL;
   proc_ctx->vol_ctx_arr = NULL;
 
@@ -196,13 +195,6 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
     calloc(proc_ctx->nb_selected_streams, sizeof(RenditionFilterContext *))))
   {
     fprintf(stderr, "Failed to allocate renditions context array.\n");
-    goto end;
-  }
-
-  if (!(proc_ctx->gain_boost_arr =
-    calloc(proc_ctx->nb_selected_streams, sizeof(int))))
-  {
-    fprintf(stderr, "Failed to allocate gain boost array.\n");
     goto end;
   }
 
@@ -270,7 +262,6 @@ void processing_context_free(ProcessingContext **proc_ctx)
   deint_filter_context_free(&(*proc_ctx)->deint_ctx);
   burn_in_filter_context_free(&(*proc_ctx)->burn_in_ctx);
 
-  free((*proc_ctx)->gain_boost_arr);
   free((*proc_ctx)->gain_boost2_arr);
 
   if ((*proc_ctx)->vol_ctx_arr) {
@@ -376,11 +367,8 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
   }
 
   stream_cfg->passthrough = sqlite3_column_int(select_video_info_stmt, 2);
-
   proc_ctx->deint = sqlite3_column_int(select_video_info_stmt, 3);
-
   stream_cfg->renditions = sqlite3_column_int(select_video_info_stmt, 4);
-
   title2 = (char *) sqlite3_column_text(select_video_info_stmt, 5);
 
   if (title2) {
@@ -472,7 +460,7 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
 
     stream_cfg->passthrough = sqlite3_column_int(select_audio_stream_info_stmt, 2);
 
-    proc_ctx->gain_boost_arr[*ctx_idx] =
+    stream_cfg->rend1_gain_boost =
       sqlite3_column_int(select_audio_stream_info_stmt, 3);
 
     stream_cfg->renditions = sqlite3_column_int(select_audio_stream_info_stmt, 4);
@@ -683,7 +671,6 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
     stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
 
     passthrough = stream_cfg->passthrough;
-
     if (passthrough) { continue; }
 
     codec_type = in_ctx->fmt_ctx->streams[in_stream_idx]->codecpar->codec_type;
@@ -695,7 +682,7 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
     if (stream_cfg->renditions) {
       if (
         strcmp(proc_ctx->codecs[ctx_idx], "ac3") ||
-        proc_ctx->gain_boost_arr[ctx_idx] > 0
+        stream_cfg->rend1_gain_boost > 0
       ) {
         j = 2;
       }
@@ -726,8 +713,8 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
       }
 
       if (
-        (j == 2 && i == 0 && proc_ctx->gain_boost_arr[ctx_idx] > 0) ||
-        (j == 1 && !stream_cfg->renditions)
+        ((j == 2 && i == 0) || (j == 1 && !stream_cfg->renditions)) &&
+        stream_cfg->rend1_gain_boost > 0
       ) {
         if (!(proc_ctx->vol_ctx_arr[out_stream_idx] =
           volume_filter_context_init(proc_ctx, out_ctx, ctx_idx,
@@ -739,8 +726,8 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
         }
       }
       if (
-        (j == 2 && i == 1 && proc_ctx->gain_boost2_arr[ctx_idx] > 0) ||
-        (j == 1 && stream_cfg->renditions)
+        ((j == 2 && i == 1) || (j == 1 && stream_cfg->renditions)) &&
+        proc_ctx->gain_boost2_arr[ctx_idx] > 0
       ) {
         if (!(proc_ctx->vol_ctx_arr[out_stream_idx] =
           volume_filter_context_init(proc_ctx, out_ctx, ctx_idx,

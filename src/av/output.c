@@ -524,7 +524,7 @@ static int open_encoder(InputContext *in_ctx, ProcessingContext *proc_ctx,
     if (stream_cfg->renditions) {
       if (
         strcmp(proc_ctx->codecs[ctx_idx], "ac3") ||
-        proc_ctx->gain_boost_arr[ctx_idx] > 0
+        stream_cfg->rend1_gain_boost > 0
       ) {
         if ((ret = open_ac3_encoder(&out_ctx->enc_ctx_arr[out_stream_idx],
            in_ctx->dec_ctx[ctx_idx], in_stream)) < 0)

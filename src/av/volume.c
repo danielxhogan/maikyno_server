@@ -9,9 +9,10 @@ VolumeFilterContext *volume_filter_context_init(ProcessingContext *proc_ctx,
   int gain_boost, ret = 0;
   char args[512], flt_str[512], ch_layout[512];
   const char *sample_fmt;
+  StreamConfig *stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
 
   if (!rendition2) {
-    gain_boost = proc_ctx->gain_boost_arr[ctx_idx];
+    gain_boost = stream_cfg->rend1_gain_boost;
   } else {
     gain_boost = proc_ctx->gain_boost2_arr[ctx_idx];
   }
