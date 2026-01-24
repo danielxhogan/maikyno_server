@@ -130,7 +130,6 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   proc_ctx->idx_map = NULL;
 
   proc_ctx->stream_rend_titles_arr = NULL;
-  proc_ctx->passthrough_arr = NULL;
 
   proc_ctx->swr_out_ctx_arr = NULL;
   proc_ctx->fsc_ctx_arr = NULL;
@@ -196,13 +195,6 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
     calloc(proc_ctx->nb_selected_streams, sizeof(char *))))
   {
     fprintf(stderr, "Failed to allocate titles array.\n");
-    goto end;
-  }
-
-  if (!(proc_ctx->passthrough_arr =
-    calloc(proc_ctx->nb_selected_streams, sizeof(int))))
-  {
-    fprintf(stderr, "Failed to allocate passthrough array.\n");
     goto end;
   }
 
@@ -287,8 +279,6 @@ void processing_context_free(ProcessingContext **proc_ctx)
     }
     free((*proc_ctx)->stream_rend_titles_arr);
   }
-
-  free((*proc_ctx)->passthrough_arr);
 
   if ((*proc_ctx)->swr_out_ctx_arr) {
     for (i = 0; i < (*proc_ctx)->nb_out_streams; i++) {
@@ -414,8 +404,7 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
     strncat(stream_cfg->rend1_title, title, len_title);
   }
 
-  proc_ctx->passthrough_arr[*ctx_idx] =
-    sqlite3_column_int(select_video_info_stmt, 2);
+  stream_cfg->passthrough = sqlite3_column_int(select_video_info_stmt, 2);
 
   proc_ctx->deint = sqlite3_column_int(select_video_info_stmt, 3);
 
@@ -511,8 +500,7 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
       strncat(stream_cfg->rend1_title, title, len_title);
     }
 
-    proc_ctx->passthrough_arr[*ctx_idx] =
-      sqlite3_column_int(select_audio_stream_info_stmt, 2);
+    stream_cfg->passthrough = sqlite3_column_int(select_audio_stream_info_stmt, 2);
 
     proc_ctx->gain_boost_arr[*ctx_idx] =
       sqlite3_column_int(select_audio_stream_info_stmt, 3);
@@ -628,11 +616,16 @@ int get_subtitle_process_info(ProcessingContext *proc_ctx,
     }
 
     burn_in = sqlite3_column_int(select_subtitle_stream_idx_stmt, 2);
-    if (burn_in) {
+    if (
+      burn_in &&
+      proc_ctx->burn_in_idx < 0 &&
+      !proc_ctx->stream_cfg_arr[0]->passthrough
+    ) {
       proc_ctx->burn_in_idx = in_stream_idx;
     }
     else {
-      proc_ctx->passthrough_arr[*ctx_idx] = 1;
+      stream_cfg->passthrough = 1;
+
       proc_ctx->idx_map[in_stream_idx] = *out_stream_idx;
       *out_stream_idx += 1;
     }
@@ -684,6 +677,7 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
   OutputContext *out_ctx, char *process_job_id)
 {
   int in_stream_idx, ctx_idx, out_stream_idx, passthrough, i, j;
+  StreamConfig *stream_cfg;
   enum AVMediaType codec_type;
   AVCodecContext *dec_ctx, *enc_ctx;
 
@@ -717,7 +711,10 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
     ctx_idx = proc_ctx->ctx_map[in_stream_idx];
     if (ctx_idx == INACTIVE_STREAM) { continue; }
 
-    passthrough = proc_ctx->passthrough_arr[ctx_idx];
+    stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
+
+    passthrough = stream_cfg->passthrough;
+
     if (passthrough) { continue; }
 
     codec_type = in_ctx->fmt_ctx->streams[in_stream_idx]->codecpar->codec_type;
@@ -792,6 +789,9 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
 
   in_stream_idx = proc_ctx->v_stream_idx;
   ctx_idx = proc_ctx->ctx_map[in_stream_idx];
+
+  stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
+
   out_stream_idx = proc_ctx->idx_map[in_stream_idx];
 
   if (proc_ctx->deint) {
@@ -806,7 +806,7 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
 
   if (
     proc_ctx->burn_in_idx != -1 &&
-    !proc_ctx->passthrough_arr[proc_ctx->v_stream_idx]
+    !proc_ctx->stream_cfg_arr[0]->passthrough
   ) {
     if (!(proc_ctx->burn_in_ctx =
       burn_in_filter_context_init(proc_ctx, in_ctx)))

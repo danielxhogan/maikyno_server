@@ -756,7 +756,7 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
 
     out_stream_idx = proc_ctx->idx_map[in_stream_idx];
 
-    if (!proc_ctx->passthrough_arr[ctx_idx]) {
+    if (!stream_cfg->passthrough) {
       if ((ret = open_encoder(in_ctx, proc_ctx, out_ctx, ctx_idx, out_stream_idx,
         in_ctx->fmt_ctx->streams[in_stream_idx], in_ctx->fmt_ctx->url)) < 0)
       {

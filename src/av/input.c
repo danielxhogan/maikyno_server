@@ -99,6 +99,7 @@ InputContext *open_input(ProcessingContext *proc_ctx,
   int ctx_idx, ret = 0;
   char *input_file = NULL;
   unsigned int in_stream_idx;
+  StreamConfig *stream_cfg;
   AVDictionary *opts = NULL;
 
   InputContext *in_ctx = malloc(sizeof(InputContext));
@@ -161,8 +162,10 @@ InputContext *open_input(ProcessingContext *proc_ctx,
     in_stream_idx++
   ) {
     ctx_idx = proc_ctx->ctx_map[in_stream_idx];
+    stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
     if (ctx_idx == INACTIVE_STREAM) { continue; }
-    if (proc_ctx->passthrough_arr[ctx_idx]) { continue; }
+
+    if (stream_cfg->passthrough) { continue; }
 
     if ((ret = open_decoder(in_ctx, in_stream_idx, ctx_idx)) < 0) {
       fprintf(stderr, "Failed to open decoder for stream %d for process job: %s\n",

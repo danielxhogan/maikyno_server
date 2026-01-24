@@ -58,32 +58,19 @@ typedef struct StreamConfig {
   int passthrough;
   int renditions;
 
-  int tonemap;
-  int deinterlace;
-
   int rend1_gain_boost;
   int rend2_gain_boost;
-
-  int burn_in_idx;
 } StreamConfig;
 
 typedef struct StreamContext {
   enum AVMediaType *codec_type;
   AVStream *in_stream;
   int *in_stream_idx;
+
   int rend1_out_stream_idx;
   int rend2_out_stream_idx;
 
   AVCodecContext *dec_ctx;
-  AVPacket *init_pkt;
-  AVPacket *init_pkt_cpy;
-  AVFrame *dec_frame;
-  AVFrame *dec_frame_cpy;
-  AVSubtitle *dec_sub;
-
-  DeinterlaceFilterContext *deint_ctx;
-  int hdr;
-  RenditionFilterContext *rend_ctx;
 
   SwrOutputContext *rend1_swr_out_ctx;
   SwrOutputContext *rend2_swr_out_ctx;
@@ -92,53 +79,59 @@ typedef struct StreamContext {
   VolumeFilterContext *rend1_vol_ctx;
   VolumeFilterContext *rend2_vol_ctx;
 
-  BurnInFilterContext *burn_in_ctx;
-
   AVCodecContext rend1_enc_ctx;
   AVCodecContext rend2_enc_ctx;
 
 } StreamContext;
 
 typedef struct ProcessingContext {
-  unsigned int nb_in_streams;
-  unsigned int nb_selected_streams;
   unsigned int nb_out_streams;
-
-  unsigned int v_stream_idx;
-
-  int *ctx_map;
   int *idx_map;
 
   char **stream_rend_titles_arr;
-  int *passthrough_arr;
 
   SwrOutputContext **swr_out_ctx_arr;
   FrameSizeConversionContext **fsc_ctx_arr;
+
+  int64_t last_sub_pts;
+  int64_t tminus1_v_pts;
+  int64_t tminus2_v_pts;
+
+  int *renditions_arr;
+  char **codecs;
+
+  int *gain_boost_arr;
+  int *gain_boost2_arr;
+  VolumeFilterContext **vol_ctx_arr;
+
+
+  // *************************************
+  unsigned int nb_in_streams;
+  unsigned int nb_selected_streams;
+  unsigned int v_stream_idx;
+  int *ctx_map;
+
+  AVFormatContext *in_fmt_ctx;
+  AVFormatContext *out_fmt_ctx;
+
+  StreamConfig **stream_cfg_arr;
+  StreamContext **stream_ctx_arr;
+
+  int tonemap;
+  int hdr;
+  RenditionFilterContext **rend_ctx_arr;
 
   int deint;
   DeinterlaceFilterContext *deint_ctx;
 
   int burn_in_idx;
   int first_sub;
-  int64_t last_sub_pts;
-  int64_t tminus1_v_pts;
-  int64_t tminus2_v_pts;
   BurnInFilterContext *burn_in_ctx;
 
-  int *renditions_arr;
-  int tonemap;
-  int hdr;
-  char **codecs;
-  RenditionFilterContext **rend_ctx_arr;
-
-  int *gain_boost_arr;
-  int *gain_boost2_arr;
-  VolumeFilterContext **vol_ctx_arr;
-
-  AVFormatContext *in_fmt_ctx;
-  AVFormatContext *out_fmt_ctx;
-  StreamConfig **stream_cfg_arr;
-  StreamContext **stream_ctx_arr;
+  AVPacket *init_pkt;
+  AVPacket *init_pkt_cpy;
+  AVFrame *dec_frame;
+  AVFrame *dec_frame_cpy;
 } ProcessingContext;
 
 typedef struct OutputContext {
