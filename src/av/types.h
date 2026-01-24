@@ -67,7 +67,7 @@ typedef struct StreamConfig {
   int burn_in;
 } StreamConfig;
 
-typedef struct StreamProcessingContext {
+typedef struct StreamContext {
   enum AVMediaType *codec_type;
   AVStream *in_stream;
   int *in_stream_idx;
@@ -97,7 +97,7 @@ typedef struct StreamProcessingContext {
   AVCodecContext rend1_enc_ctx;
   AVCodecContext rend2_enc_ctx;
 
-} StreamProcessingContext;
+} StreamContext;
 
 typedef struct ProcessingContext {
   unsigned int nb_in_streams;
@@ -139,7 +139,7 @@ typedef struct ProcessingContext {
   AVFormatContext *in_fmt_ctx;
   AVFormatContext *out_fmt_ctx;
   StreamConfig **stream_cfg_arr;
-  StreamProcessingContext **stream_proc_ctx_arr;
+  StreamContext **stream_ctx_arr;
 } ProcessingContext;
 
 typedef struct OutputContext {

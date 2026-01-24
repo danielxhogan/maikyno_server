@@ -127,6 +127,10 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   proc_ctx->gain_boost2_arr = NULL;
   proc_ctx->vol_ctx_arr = NULL;
 
+
+  proc_ctx->stream_cfg_arr = NULL;
+  proc_ctx->stream_ctx_arr = NULL;
+
   if ((ret = proc_ctx->nb_in_streams =
     get_input_file_nb_streams(process_job_id, db)) < 0)
   {
@@ -214,6 +218,34 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   {
     fprintf(stderr, "Failed to allocate gain boost array.\n");
     goto end;
+  }
+
+  if (!(proc_ctx->stream_cfg_arr =
+    calloc(proc_ctx->nb_selected_streams, sizeof(StreamConfig *))))
+  {
+    fprintf(stderr, "Failed to allocate stream config array.\n");
+    goto end;
+  }
+
+  for (i = 0; i < proc_ctx->nb_selected_streams; i++) {
+    if (!(proc_ctx->stream_cfg_arr[i] = malloc(sizeof(StreamConfig)))) {
+      fprintf(stderr, "Failed to allocate stream config index '%d'.\n", i);
+      goto end;
+    }
+  }
+
+  if (!(proc_ctx->stream_ctx_arr =
+    calloc(proc_ctx->nb_selected_streams, sizeof(StreamContext *))))
+  {
+    fprintf(stderr, "Failed to allocate stream context array.\n");
+    goto end;
+  }
+
+  for (i = 0; i < proc_ctx->nb_selected_streams; i++) {
+    if (!(proc_ctx->stream_ctx_arr[i] = malloc(sizeof(StreamContext)))) {
+      fprintf(stderr, "Failed to allocate stream context index '%d'.\n", i);
+      goto end;
+    }
   }
 
   return proc_ctx;
