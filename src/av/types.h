@@ -88,8 +88,6 @@ typedef struct ProcessingContext {
   unsigned int nb_out_streams;
   int *idx_map;
 
-  char **stream_rend_titles_arr;
-
   SwrOutputContext **swr_out_ctx_arr;
   FrameSizeConversionContext **fsc_ctx_arr;
 

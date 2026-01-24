@@ -782,7 +782,7 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
     if (stream_cfg->renditions) {
       if ((ret = init_stream(out_ctx->fmt_ctx, out_ctx->enc_ctx_arr[out_stream_idx + 1],
         in_ctx->fmt_ctx->streams[in_stream_idx],
-        proc_ctx->stream_rend_titles_arr[ctx_idx])) < 0)
+        stream_cfg->rend2_title)) < 0)
       {
         fprintf(stderr, "Failed to initialize stream for output stream: %d.\n\
           process_job: %s.\nLibav Error: %s.\n",

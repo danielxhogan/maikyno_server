@@ -126,8 +126,6 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   proc_ctx->ctx_map = NULL;
   proc_ctx->idx_map = NULL;
 
-  proc_ctx->stream_rend_titles_arr = NULL;
-
   proc_ctx->swr_out_ctx_arr = NULL;
   proc_ctx->fsc_ctx_arr = NULL;
 
@@ -184,13 +182,6 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   {
     fprintf(stderr, "Failed to get stream count for process job: %s\n",
       process_job_id);
-    goto end;
-  }
-
-  if (!(proc_ctx->stream_rend_titles_arr =
-    calloc(proc_ctx->nb_selected_streams, sizeof(char *))))
-  {
-    fprintf(stderr, "Failed to allocate titles array.\n");
     goto end;
   }
 
@@ -261,13 +252,6 @@ void processing_context_free(ProcessingContext **proc_ctx)
 {
   if (!*proc_ctx) { return; }
   unsigned int i;
-
-  if ((*proc_ctx)->stream_rend_titles_arr) {
-    for (i = 0; i < (*proc_ctx)->nb_selected_streams; i++) {
-      free((*proc_ctx)->stream_rend_titles_arr[i]);
-    }
-    free((*proc_ctx)->stream_rend_titles_arr);
-  }
 
   if ((*proc_ctx)->swr_out_ctx_arr) {
     for (i = 0; i < (*proc_ctx)->nb_out_streams; i++) {
@@ -403,7 +387,7 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
     for (end = title2; *end; end++);
     len_title2 = end - title2;
 
-    if (!(proc_ctx->stream_rend_titles_arr[*ctx_idx] =
+    if (!(stream_cfg->rend2_title =
       calloc(len_title2 + 1, sizeof(char))))
     {
       fprintf(stderr, "Failed to allocate memory for title2 for stream: %d\n",
@@ -412,7 +396,7 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
       goto end;
     }
 
-    strncat(proc_ctx->stream_rend_titles_arr[*ctx_idx], title2, len_title2);
+    strncat(stream_cfg->rend2_title, title2, len_title2);
   }
 
   proc_ctx->tonemap = sqlite3_column_int(select_video_info_stmt, 6);
@@ -499,7 +483,7 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
       for (end = title2; *end; end++);
       len_title2 = end - title2;
 
-      if (!(proc_ctx->stream_rend_titles_arr[*ctx_idx] =
+      if (!(stream_cfg->rend2_title =
         calloc(len_title2 + 1, sizeof(char))))
       {
         fprintf(stderr, "Failed to allocate memory for title2 for stream '%d'\n",
@@ -508,7 +492,7 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
         goto end;
       }
 
-      strncat(proc_ctx->stream_rend_titles_arr[*ctx_idx], title2, len_title2);
+      strncat(stream_cfg->rend2_title, title2, len_title2);
     }
 
     proc_ctx->gain_boost2_arr[*ctx_idx] =
