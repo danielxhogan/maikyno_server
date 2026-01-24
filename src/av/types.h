@@ -97,7 +97,6 @@ typedef struct ProcessingContext {
   int64_t tminus1_v_pts;
   int64_t tminus2_v_pts;
 
-  int *renditions_arr;
   char **codecs;
 
   int *gain_boost_arr;

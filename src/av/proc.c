@@ -91,11 +91,8 @@ StreamConfig *stream_config_alloc()
   stream_cfg->rend2_title = NULL;
   stream_cfg->passthrough = 0;
   stream_cfg->renditions = 0;
-  stream_cfg->tonemap = 0;
-  stream_cfg->deinterlace = 0;
   stream_cfg->rend1_gain_boost = 0;
   stream_cfg->rend2_gain_boost = 0;
-  stream_cfg->burn_in_idx = -1;
 
   return stream_cfg;
 }
@@ -144,7 +141,6 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   proc_ctx->tminus2_v_pts = 0;
   proc_ctx->burn_in_ctx = NULL;
 
-  proc_ctx->renditions_arr = NULL;
   proc_ctx->tonemap = 0;
   proc_ctx->hdr = 0;
   proc_ctx->codecs = NULL;
@@ -195,13 +191,6 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
     calloc(proc_ctx->nb_selected_streams, sizeof(char *))))
   {
     fprintf(stderr, "Failed to allocate titles array.\n");
-    goto end;
-  }
-
-  if (!(proc_ctx->renditions_arr =
-    calloc(proc_ctx->nb_selected_streams, sizeof(int))))
-  {
-    fprintf(stderr, "Failed to allocate renditions array.\n");
     goto end;
   }
 
@@ -307,8 +296,6 @@ void processing_context_free(ProcessingContext **proc_ctx)
     free((*proc_ctx)->vol_ctx_arr);
   }
 
-  free((*proc_ctx)->renditions_arr);
-
   if ((*proc_ctx)->codecs) {
     for (i = 0; i < (*proc_ctx)->nb_selected_streams; i++) {
       free((*proc_ctx)->codecs[i]);
@@ -408,8 +395,7 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
 
   proc_ctx->deint = sqlite3_column_int(select_video_info_stmt, 3);
 
-  proc_ctx->renditions_arr[*ctx_idx] =
-    sqlite3_column_int(select_video_info_stmt, 4);
+  stream_cfg->renditions = sqlite3_column_int(select_video_info_stmt, 4);
 
   title2 = (char *) sqlite3_column_text(select_video_info_stmt, 5);
 
@@ -431,7 +417,7 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
 
   proc_ctx->tonemap = sqlite3_column_int(select_video_info_stmt, 6);
 
-  if (proc_ctx->renditions_arr[*ctx_idx]) { *out_stream_idx += 1; }
+  if (stream_cfg->renditions) { *out_stream_idx += 1; }
   *out_stream_idx += 1;
   *ctx_idx = 1;
 
@@ -505,8 +491,7 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
     proc_ctx->gain_boost_arr[*ctx_idx] =
       sqlite3_column_int(select_audio_stream_info_stmt, 3);
 
-    proc_ctx->renditions_arr[*ctx_idx] =
-      sqlite3_column_int(select_audio_stream_info_stmt, 4);
+    stream_cfg->renditions = sqlite3_column_int(select_audio_stream_info_stmt, 4);
 
     title2 = (char *) sqlite3_column_text(select_audio_stream_info_stmt, 5);
 
@@ -546,7 +531,7 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
     strncat(proc_ctx->codecs[*ctx_idx], codec, len_codec);
 
     *out_stream_idx += 1;
-    if (proc_ctx->renditions_arr[*ctx_idx]) { *out_stream_idx += 1; }
+    if (stream_cfg->renditions) { *out_stream_idx += 1; }
     *ctx_idx += 1;
   }
 
@@ -723,7 +708,7 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
     dec_ctx = in_ctx->dec_ctx[ctx_idx];
     out_stream_idx = proc_ctx->idx_map[in_stream_idx];
 
-    if (proc_ctx->renditions_arr[ctx_idx]) {
+    if (stream_cfg->renditions) {
       if (
         strcmp(proc_ctx->codecs[ctx_idx], "ac3") ||
         proc_ctx->gain_boost_arr[ctx_idx] > 0
@@ -758,7 +743,7 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
 
       if (
         (j == 2 && i == 0 && proc_ctx->gain_boost_arr[ctx_idx] > 0) ||
-        (j == 1 && !proc_ctx->renditions_arr[ctx_idx])
+        (j == 1 && !stream_cfg->renditions)
       ) {
         if (!(proc_ctx->vol_ctx_arr[out_stream_idx] =
           volume_filter_context_init(proc_ctx, out_ctx, ctx_idx,
@@ -771,7 +756,7 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
       }
       if (
         (j == 2 && i == 1 && proc_ctx->gain_boost2_arr[ctx_idx] > 0) ||
-        (j == 1 && proc_ctx->renditions_arr[ctx_idx])
+        (j == 1 && stream_cfg->renditions)
       ) {
         if (!(proc_ctx->vol_ctx_arr[out_stream_idx] =
           volume_filter_context_init(proc_ctx, out_ctx, ctx_idx,
@@ -817,7 +802,7 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
     }
   }
 
-  if (proc_ctx->renditions_arr[ctx_idx])
+  if (stream_cfg->renditions)
   {
     if (!(proc_ctx->rend_ctx_arr[ctx_idx] =
       video_rendition_filter_context_init(proc_ctx, in_ctx->dec_ctx[ctx_idx],

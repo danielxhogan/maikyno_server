@@ -450,6 +450,7 @@ int decode_av_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
   OutputContext *out_ctx, int in_stream_idx, int ctx_idx, int out_stream_idx)
 {
   int ret = 0;
+  StreamConfig *stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
   enum AVMediaType codec_type = in_ctx->dec_ctx[ctx_idx]->codec_type;
 
 
@@ -510,7 +511,7 @@ int decode_av_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
     else if (codec_type == AVMEDIA_TYPE_AUDIO)
     {
       if (
-        proc_ctx->renditions_arr[ctx_idx] &&
+        stream_cfg->renditions &&
         (
           strcmp(proc_ctx->codecs[ctx_idx], "ac3") ||
           proc_ctx->gain_boost_arr[ctx_idx] > 0
@@ -638,7 +639,7 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
 
     if (
       in_ctx->dec_ctx[ctx_idx]->codec_type == AVMEDIA_TYPE_AUDIO &&
-      proc_ctx->renditions_arr[ctx_idx] &&
+      stream_cfg->renditions &&
       !strcmp(proc_ctx->codecs[ctx_idx], "ac3") &&
       proc_ctx->gain_boost_arr[ctx_idx] <= 0
     ) {
@@ -757,7 +758,7 @@ int process_video(char *process_job_id, const char *batch_id)
     if (stream_cfg->passthrough) { continue; }
 
     if (
-      proc_ctx->renditions_arr[ctx_idx] &&
+      stream_cfg->renditions &&
       in_ctx->dec_ctx[ctx_idx]->codec_type == AVMEDIA_TYPE_AUDIO
     ) {
       out_stream_idx += 1;
@@ -781,12 +782,12 @@ int process_video(char *process_job_id, const char *batch_id)
     in_stream_idx++
   ) {
     ctx_idx = proc_ctx->ctx_map[in_stream_idx];
-    stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
     out_stream_idx = proc_ctx->idx_map[in_stream_idx];
-    if (proc_ctx->renditions_arr[ctx_idx]) { out_stream_idx += 1; }
-
     if (ctx_idx == INACTIVE_STREAM) { continue; }
+
+    stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
     if (stream_cfg->passthrough) { continue; }
+    if (stream_cfg->renditions) { out_stream_idx += 1; }
     if (in_ctx->dec_ctx[ctx_idx]->codec_type != AVMEDIA_TYPE_AUDIO) { continue; }
 
     if (convert_audio_frame(proc_ctx, in_ctx, out_ctx,
@@ -832,7 +833,7 @@ int process_video(char *process_job_id, const char *batch_id)
           in_stream_idx);
       }
     } else if (codec_type == AVMEDIA_TYPE_AUDIO) {
-      if (proc_ctx->renditions_arr[ctx_idx]) { out_stream_idx += 1; }
+      if (stream_cfg->renditions) { out_stream_idx += 1; }
 
       if (encode_audio_frame(out_ctx,
         out_stream_idx, NULL) < 0)

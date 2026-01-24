@@ -67,6 +67,7 @@ static int open_video_encoder(AVCodecContext **enc_ctx, ProcessingContext *proc_
 {
   int len_params_str, cores, pools, ret = 0;
   const AVCodec *enc;
+  StreamConfig *stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
   HdrMetadataContext *hdr_ctx = NULL;
   char *params_str = NULL, *hdr_params_str = NULL, additional_params_str[128];
 
@@ -136,7 +137,7 @@ static int open_video_encoder(AVCodecContext **enc_ctx, ProcessingContext *proc_
   cores = get_core_count();
   if (cores <= 0) { cores = 4; }
 
-  if (proc_ctx->renditions_arr[ctx_idx]) {
+  if (stream_cfg->renditions) {
     pools = (cores + 1) / 2;
   } else {
     pools = ((cores * 2) + 2) / 3;
@@ -494,6 +495,7 @@ static int open_encoder(InputContext *in_ctx, ProcessingContext *proc_ctx,
   char *in_filename)
 {
   int ret;
+  StreamConfig *stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
   enum AVMediaType stream_type = in_stream->codecpar->codec_type;
 
   if (stream_type == AVMEDIA_TYPE_VIDEO) {
@@ -505,7 +507,7 @@ static int open_encoder(InputContext *in_ctx, ProcessingContext *proc_ctx,
       return ret;
     }
 
-    if (proc_ctx->renditions_arr[ctx_idx]) {
+    if (stream_cfg->renditions) {
       out_stream_idx += 1;
 
       if ((ret = open_video_encoder(&out_ctx->enc_ctx_arr[out_stream_idx], proc_ctx,
@@ -519,7 +521,7 @@ static int open_encoder(InputContext *in_ctx, ProcessingContext *proc_ctx,
 
   else if (stream_type == AVMEDIA_TYPE_AUDIO)
   {
-    if (proc_ctx->renditions_arr[ctx_idx]) {
+    if (stream_cfg->renditions) {
       if (
         strcmp(proc_ctx->codecs[ctx_idx], "ac3") ||
         proc_ctx->gain_boost_arr[ctx_idx] > 0
@@ -777,7 +779,7 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
       return ret;
     }
 
-    if (proc_ctx->renditions_arr[ctx_idx]) {
+    if (stream_cfg->renditions) {
       if ((ret = init_stream(out_ctx->fmt_ctx, out_ctx->enc_ctx_arr[out_stream_idx + 1],
         in_ctx->fmt_ctx->streams[in_stream_idx],
         proc_ctx->stream_rend_titles_arr[ctx_idx])) < 0)
