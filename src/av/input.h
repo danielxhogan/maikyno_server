@@ -2,10 +2,6 @@
 
 #include "types.h"
 
-#include <libavformat/avformat.h>
-#include <libavcodec/avcodec.h>
-#include <libavutil/avutil.h>
-
 #include <sqlite3.h>
 
 #define INACTIVE_STREAM -1

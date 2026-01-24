@@ -1,8 +1,6 @@
 #pragma once
 
 #include "types.h"
-#include "hdr.h"
-#include "utils.h"
 
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>

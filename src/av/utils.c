@@ -1,5 +1,7 @@
 #include "utils.h"
 
+#include <sqlite3.h>
+
 #include <stdio.h>
 
 #ifdef _WIN32
@@ -86,26 +88,6 @@ end:
   return ret;
 }
 
-int calculate_pct_complete(InputContext *in_ctx, char *process_job_id)
-{
-  int ret;
-  int64_t duration, pct_complete;
-
-  duration = av_rescale_q(in_ctx->fmt_ctx->duration, AV_TIME_BASE_Q,
-    in_ctx->fmt_ctx->streams[in_ctx->init_pkt->stream_index]->time_base);
-
-  pct_complete = in_ctx->init_pkt->pts * 100 / duration;
-  printf("pct_complete: %ld%%\n", pct_complete);
-
-  if ((ret = update_pct_complete(pct_complete, process_job_id)) < 0) {
-    fprintf(stderr, "Failed to update pct_complete for process_job: %s\n",
-      process_job_id);
-    return ret;
-  }
-
-  return 0;
-}
-
 int update_pct_complete(int64_t pct, char *process_job_id)
 {
   int ret;
@@ -148,6 +130,26 @@ end:
   sqlite3_close(db);
 
   if (ret != SQLITE_DONE) { return -ret; }
+  return 0;
+}
+
+int calculate_pct_complete(InputContext *in_ctx, char *process_job_id)
+{
+  int ret;
+  int64_t duration, pct_complete;
+
+  duration = av_rescale_q(in_ctx->fmt_ctx->duration, AV_TIME_BASE_Q,
+    in_ctx->fmt_ctx->streams[in_ctx->init_pkt->stream_index]->time_base);
+
+  pct_complete = in_ctx->init_pkt->pts * 100 / duration;
+  printf("pct_complete: %ld%%\n", pct_complete);
+
+  if ((ret = update_pct_complete(pct_complete, process_job_id)) < 0) {
+    fprintf(stderr, "Failed to update pct_complete for process_job: %s\n",
+      process_job_id);
+    return ret;
+  }
+
   return 0;
 }
 

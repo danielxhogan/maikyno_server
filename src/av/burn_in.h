@@ -3,7 +3,9 @@
 #include "types.h"
 
 #include <libswscale/swscale.h>
+#include <libavfilter/buffersrc.h>
 #include <libavutil/pixdesc.h>
+#include <libavutil/opt.h>
 
 #define SUBTITLE_OUTPUT_PIX_FMT AV_PIX_FMT_RGBA
 

@@ -1,5 +1,8 @@
 #include "rendition.h"
 
+#include <libavutil/pixdesc.h>
+#include <libavutil/opt.h>
+
 int buffersink_ctx_init(AVFilterContext **buffersink_ctx,
   AVFilterGraph *filter_graph, const char *pix_fmt)
 {

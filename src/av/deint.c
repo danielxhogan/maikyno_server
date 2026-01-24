@@ -1,5 +1,11 @@
 #include "deint.h"
 
+#include <libavformat/avformat.h>
+#include <libavcodec/avcodec.h>
+#include <libavfilter/avfilter.h>
+#include <libavutil/pixdesc.h>
+#include <libavutil/opt.h>
+
 DeinterlaceFilterContext *deint_filter_context_init(InputContext *in_ctx,
   int in_stream_idx, int ctx_idx)
 {

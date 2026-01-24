@@ -5,15 +5,16 @@
 
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
-#include <libavfilter/buffersink.h>
-#include <libavfilter/buffersrc.h>
+#include <libavfilter/avfilter.h>
 
-typedef struct DeinterlaceFilterContext {
-  AVFilterContext *buffersink_ctx;
+typedef struct RenditionFilterContext {
   AVFilterContext *buffersrc_ctx;
+  AVFilterContext *buffersink_ctx1;
+  AVFilterContext *buffersink_ctx2;
   AVFilterGraph *filter_graph;
-  AVFrame *filtered_frame;
-} DeinterlaceFilterContext;
+  AVFrame *filtered_frame1;
+  AVFrame *filtered_frame2;
+} RenditionFilterContext;
 
 typedef struct SubToFrameContext {
   struct SwsContext *sws_ctx;
@@ -34,14 +35,12 @@ typedef struct BurnInFilterContext {
   SubToFrameContext *stf_ctx;
 } BurnInFilterContext;
 
-typedef struct RenditionFilterContext {
+typedef struct DeinterlaceFilterContext {
+  AVFilterContext *buffersink_ctx;
   AVFilterContext *buffersrc_ctx;
-  AVFilterContext *buffersink_ctx1;
-  AVFilterContext *buffersink_ctx2;
   AVFilterGraph *filter_graph;
-  AVFrame *filtered_frame1;
-  AVFrame *filtered_frame2;
-} RenditionFilterContext;
+  AVFrame *filtered_frame;
+} DeinterlaceFilterContext;
 
 typedef struct VolumeFilterContext {
   AVFilterContext *buffersink_ctx;
@@ -143,6 +142,13 @@ typedef struct ProcessingContext {
   StreamProcessingContext **stream_proc_ctx_arr;
 } ProcessingContext;
 
+typedef struct OutputContext {
+  AVFormatContext *fmt_ctx;
+  AVCodecContext **enc_ctx_arr;
+  AVPacket *enc_pkt;
+  int nb_out_streams;
+} OutputContext;
+
 typedef struct InputContext {
   AVFormatContext *fmt_ctx;
   AVCodecContext **dec_ctx;
@@ -153,10 +159,3 @@ typedef struct InputContext {
   AVSubtitle *dec_sub;
   int nb_selected_streams;
 } InputContext;
-
-typedef struct OutputContext {
-  AVFormatContext *fmt_ctx;
-  AVCodecContext **enc_ctx_arr;
-  AVPacket *enc_pkt;
-  int nb_out_streams;
-} OutputContext;

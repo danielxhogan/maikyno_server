@@ -1,5 +1,11 @@
 #include "process_media.h"
 
+#include "proc.h"
+#include "input.h"
+#include "output.h"
+#include "burn_in.h"
+#include "utils.h"
+
 int encode_video_frame(ProcessingContext *proc_ctx, InputContext *in_ctx,
   OutputContext *out_ctx, AVFrame *frame, int out_stream_idx)
 {
@@ -313,7 +319,7 @@ int boost_gain(ProcessingContext *proc_ctx, OutputContext *out_ctx,
 }
 
 static int convert_audio_frame(ProcessingContext *proc_ctx, InputContext *in_ctx,
-  OutputContext *out_ctx, int in_stream_idx, int ctx_idx, int out_stream_idx,
+  OutputContext *out_ctx, int in_stream_idx, int out_stream_idx,
   AVFrame *frame)
 {
   int nb_converted_samples, sample_rate, start_time, timestamp, ret = 0;
@@ -515,7 +521,7 @@ int decode_av_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
         in_ctx->dec_frame_cpy = av_frame_clone(in_ctx->dec_frame);
 
         if ((ret = convert_audio_frame(proc_ctx, in_ctx, out_ctx,
-          in_stream_idx, ctx_idx, out_stream_idx, in_ctx->dec_frame_cpy)) < 0)
+          in_stream_idx, out_stream_idx, in_ctx->dec_frame_cpy)) < 0)
         {
           fprintf(stderr, "Failed to encode audio frame from input stream '%d'.\n",
             in_stream_idx);
@@ -527,7 +533,7 @@ int decode_av_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
       }
 
       if ((ret = convert_audio_frame(proc_ctx, in_ctx, out_ctx,
-        in_stream_idx, ctx_idx, out_stream_idx, in_ctx->dec_frame)) < 0)
+        in_stream_idx, out_stream_idx, in_ctx->dec_frame)) < 0)
       {
         fprintf(stderr, "Failed to encode audio frame from input stream '%d'.\n",
           in_stream_idx);
@@ -779,7 +785,7 @@ int process_video(char *process_job_id, const char *batch_id)
     if (in_ctx->dec_ctx[ctx_idx]->codec_type != AVMEDIA_TYPE_AUDIO) { continue; }
 
     if (convert_audio_frame(proc_ctx, in_ctx, out_ctx,
-      in_stream_idx, ctx_idx, out_stream_idx, in_ctx->dec_frame) < 0)
+      in_stream_idx, out_stream_idx, in_ctx->dec_frame) < 0)
     {
       fprintf(stderr, "Failed to encode audio frame while flushing \
         frame size converter for input stream '%d'.\n", in_stream_idx);

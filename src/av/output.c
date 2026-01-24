@@ -1,5 +1,7 @@
 #include "output.h"
 #include "input.h"
+#include "hdr.h"
+#include "utils.h"
 
 static int copy_chapters(AVFormatContext *out_fmt_ctx,
   AVFormatContext *in_fmt_ctx)

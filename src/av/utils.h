@@ -1,8 +1,6 @@
 #pragma once
 
 #include "types.h"
-
-#include <sqlite3.h>
 #include <uuid/uuid.h>
 
 enum ProcessJobStatus {
