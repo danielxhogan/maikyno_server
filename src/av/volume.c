@@ -14,7 +14,7 @@ VolumeFilterContext *volume_filter_context_init(ProcessingContext *proc_ctx,
   if (!rendition2) {
     gain_boost = stream_cfg->rend1_gain_boost;
   } else {
-    gain_boost = proc_ctx->gain_boost2_arr[ctx_idx];
+    gain_boost = stream_cfg->rend2_gain_boost;
   }
 
   snprintf(flt_str, sizeof(flt_str), "volume=%d", gain_boost);

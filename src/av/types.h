@@ -97,7 +97,6 @@ typedef struct ProcessingContext {
 
   char **codecs;
 
-  int *gain_boost2_arr;
   VolumeFilterContext **vol_ctx_arr;
 
 
