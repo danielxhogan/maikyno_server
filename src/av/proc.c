@@ -303,6 +303,7 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
   char *process_job_id, int *ctx_idx, int *out_stream_idx, sqlite3 *db)
 {
   StreamConfig *stream_cfg;
+  StreamContext *stream_ctx;
 
   char *select_video_info_query =
     "SELECT streams.stream_idx, \
@@ -342,11 +343,14 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
   *ctx_idx = 0;
   *out_stream_idx = 0;
   stream_cfg = proc_ctx->stream_cfg_arr[*ctx_idx];
+  stream_ctx = proc_ctx->stream_ctx_arr[*ctx_idx];
+
 
   in_stream_idx = sqlite3_column_int(select_video_info_stmt, 0);
   proc_ctx->v_stream_idx = in_stream_idx;
   proc_ctx->ctx_map[in_stream_idx] = *ctx_idx;
   proc_ctx->idx_map[in_stream_idx] = *out_stream_idx;
+  stream_ctx->in_stream_idx = in_stream_idx;
 
   title = (char *) sqlite3_column_text(select_video_info_stmt, 1);
 
@@ -439,8 +443,10 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
     in_stream_idx = sqlite3_column_int(select_audio_stream_info_stmt, 0);
     proc_ctx->ctx_map[in_stream_idx] = *ctx_idx;
     proc_ctx->idx_map[in_stream_idx] = *out_stream_idx;
+
     stream_cfg = proc_ctx->stream_cfg_arr[*ctx_idx];
     stream_ctx = proc_ctx->stream_ctx_arr[*ctx_idx];
+    stream_ctx->in_stream_idx = in_stream_idx;
 
     title = (char *) sqlite3_column_text(select_audio_stream_info_stmt, 1);
 
@@ -525,6 +531,7 @@ int get_subtitle_process_info(ProcessingContext *proc_ctx,
   char *process_job_id, int *ctx_idx, int *out_stream_idx, sqlite3 *db)
 {
   StreamConfig *stream_cfg;
+  StreamContext *stream_ctx;
 
   char *select_subtitle_stream_idx_query =
     "SELECT streams.stream_idx, \
@@ -554,7 +561,10 @@ int get_subtitle_process_info(ProcessingContext *proc_ctx,
   {
     in_stream_idx = sqlite3_column_int(select_subtitle_stream_idx_stmt, 0);
     proc_ctx->ctx_map[in_stream_idx] = *ctx_idx;
+
     stream_cfg = proc_ctx->stream_cfg_arr[*ctx_idx];
+    stream_ctx = proc_ctx->stream_ctx_arr[*ctx_idx];
+    stream_ctx->in_stream_idx = in_stream_idx;
 
     title = (char *) sqlite3_column_text(select_subtitle_stream_idx_stmt, 1);
 

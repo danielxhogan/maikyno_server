@@ -96,10 +96,10 @@ static int open_decoder(InputContext *in_ctx, int in_stream_idx, int ctx_idx)
 InputContext *open_input(ProcessingContext *proc_ctx,
   char *process_job_id, sqlite3 *db)
 {
-  int ctx_idx, ret = 0;
+  int ret = 0;
   char *input_file = NULL;
-  unsigned int in_stream_idx;
   StreamConfig *stream_cfg;
+  StreamContext *stream_ctx;
   AVDictionary *opts = NULL;
 
   InputContext *in_ctx = malloc(sizeof(InputContext));
@@ -156,20 +156,15 @@ InputContext *open_input(ProcessingContext *proc_ctx,
     goto end;
   }
 
-  for (
-    in_stream_idx = 0;
-    in_stream_idx < in_ctx->fmt_ctx->nb_streams;
-    in_stream_idx++
-  ) {
-    ctx_idx = proc_ctx->ctx_map[in_stream_idx];
-    stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
-    if (ctx_idx == INACTIVE_STREAM) { continue; }
-
+  for (unsigned int i = 0; i < proc_ctx->nb_selected_streams; i++) {
+    stream_cfg = proc_ctx->stream_cfg_arr[i];
     if (stream_cfg->passthrough) { continue; }
+    stream_ctx = proc_ctx->stream_ctx_arr[i];
 
-    if ((ret = open_decoder(in_ctx, in_stream_idx, ctx_idx)) < 0) {
-      fprintf(stderr, "Failed to open decoder for stream %d for process job: %s\n",
-        in_stream_idx, process_job_id);
+    if ((ret = open_decoder(in_ctx, stream_ctx->in_stream_idx, i)) < 0) {
+      fprintf(stderr, "Failed to open decoder.\n");
+      fprintf(stderr, "stream '%d'.\nprocess job: \"%s\".\n",
+        stream_ctx->in_stream_idx, process_job_id);
       goto end;
     }
   }
