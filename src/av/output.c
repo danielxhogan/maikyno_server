@@ -745,34 +745,29 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
 {
   int in_stream_idx, ctx_idx, out_stream_idx, ret = 0;
   StreamConfig *stream_cfg;
+  StreamContext *stream_ctx;
 
-  for (
-    in_stream_idx = 0;
-    in_stream_idx < (int) in_ctx->fmt_ctx->nb_streams;
-    in_stream_idx++
-  ) {
-    if (proc_ctx->ctx_map[in_stream_idx] == INACTIVE_STREAM) { continue; }
-    if (in_stream_idx == proc_ctx->burn_in_idx) { continue; }
+  for (unsigned int i = 0; i < proc_ctx->nb_selected_streams; i++) {
+    stream_cfg = proc_ctx->stream_cfg_arr[i];
+    stream_ctx = proc_ctx->stream_ctx_arr[i];
+    if (stream_ctx->in_stream_idx == proc_ctx->burn_in_idx) { continue; }
 
-    ctx_idx = proc_ctx->ctx_map[in_stream_idx];
-    stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
-
+    in_stream_idx = stream_ctx->in_stream_idx;
     out_stream_idx = proc_ctx->idx_map[in_stream_idx];
 
     if (!stream_cfg->passthrough) {
-      if ((ret = open_encoder(in_ctx, proc_ctx, out_ctx, ctx_idx, out_stream_idx,
-        in_ctx->fmt_ctx->streams[in_stream_idx], in_ctx->fmt_ctx->url)) < 0)
+      if ((ret = open_encoder(in_ctx, proc_ctx, out_ctx, i, out_stream_idx,
+        stream_ctx->in_stream, in_ctx->fmt_ctx->url)) < 0)
       {
         fprintf(stderr, "Failed to open encoder for output stream: %d.\n\
-          process job: %s.\nLibav Error: %s.\n",
-          in_stream_idx, process_job_id, av_err2str(ret));
+          process job: %s.\n",
+          in_stream_idx, process_job_id);
         return ret;
       }
     }
 
     if ((ret = init_stream(out_ctx->fmt_ctx, out_ctx->enc_ctx_arr[out_stream_idx],
-      in_ctx->fmt_ctx->streams[in_stream_idx],
-      stream_cfg->rend1_title)) < 0)
+      stream_ctx->in_stream, stream_cfg->rend1_title)) < 0)
     {
       fprintf(stderr, "Failed to initialize stream for output stream: %d.\n\
         process_job: %s.\nLibav Error: %s.\n",
@@ -782,8 +777,7 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
 
     if (stream_cfg->renditions) {
       if ((ret = init_stream(out_ctx->fmt_ctx, out_ctx->enc_ctx_arr[out_stream_idx + 1],
-        in_ctx->fmt_ctx->streams[in_stream_idx],
-        stream_cfg->rend2_title)) < 0)
+        stream_ctx->in_stream, stream_cfg->rend2_title)) < 0)
       {
         fprintf(stderr, "Failed to initialize stream for output stream: %d.\n\
           process_job: %s.\nLibav Error: %s.\n",

@@ -96,7 +96,7 @@ static int open_decoder(InputContext *in_ctx, int in_stream_idx, int ctx_idx)
 InputContext *open_input(ProcessingContext *proc_ctx,
   char *process_job_id, sqlite3 *db)
 {
-  int ret = 0;
+  int in_stream_idx, ret = 0;
   char *input_file = NULL;
   StreamConfig *stream_cfg;
   StreamContext *stream_ctx;
@@ -158,13 +158,19 @@ InputContext *open_input(ProcessingContext *proc_ctx,
 
   for (unsigned int i = 0; i < proc_ctx->nb_selected_streams; i++) {
     stream_cfg = proc_ctx->stream_cfg_arr[i];
-    if (stream_cfg->passthrough) { continue; }
     stream_ctx = proc_ctx->stream_ctx_arr[i];
 
-    if ((ret = open_decoder(in_ctx, stream_ctx->in_stream_idx, i)) < 0) {
+    in_stream_idx = stream_ctx->in_stream_idx;
+    stream_ctx->in_stream = in_ctx->fmt_ctx->streams[in_stream_idx];
+    stream_ctx->codec_type = stream_ctx->in_stream->codecpar->codec_type;
+
+    if (stream_cfg->passthrough) { continue; }
+
+
+    if ((ret = open_decoder(in_ctx, in_stream_idx, i)) < 0) {
       fprintf(stderr, "Failed to open decoder.\n");
       fprintf(stderr, "stream '%d'.\nprocess job: \"%s\".\n",
-        stream_ctx->in_stream_idx, process_job_id);
+        in_stream_idx, process_job_id);
       goto end;
     }
   }
