@@ -451,6 +451,7 @@ int decode_av_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
 {
   int ret = 0;
   StreamConfig *stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
+  StreamContext *stream_ctx = proc_ctx->stream_ctx_arr[ctx_idx];
   enum AVMediaType codec_type = in_ctx->dec_ctx[ctx_idx]->codec_type;
 
 
@@ -513,7 +514,7 @@ int decode_av_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
       if (
         stream_cfg->renditions &&
         (
-          strcmp(proc_ctx->codecs[ctx_idx], "ac3") ||
+          strcmp(stream_ctx->codec, "ac3") ||
           stream_cfg->rend1_gain_boost > 0
         )
       ) {
@@ -583,6 +584,7 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
   OutputContext *out_ctx, const char *batch_id, char *process_job_id)
 {
   StreamConfig *stream_cfg;
+  StreamContext *stream_ctx;
   int frame_count, check_again = 0, ret = 0;
 
   while ((ret = av_read_frame(in_ctx->fmt_ctx, in_ctx->init_pkt)) >= 0)
@@ -590,6 +592,7 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
     int in_stream_idx = in_ctx->init_pkt->stream_index;
     int ctx_idx = proc_ctx->ctx_map[in_stream_idx];
     stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
+    stream_ctx = proc_ctx->stream_ctx_arr[ctx_idx];
     int out_stream_idx = proc_ctx->idx_map[in_stream_idx];
     enum AVMediaType codec_type =
       in_ctx->fmt_ctx->streams[in_stream_idx]->codecpar->codec_type;
@@ -620,7 +623,6 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
       continue;
     }
 
-    // if (proc_ctx->passthrough_arr[ctx_idx]) {
     if (stream_cfg->passthrough) {
       in_ctx->init_pkt->stream_index = out_stream_idx;
 
@@ -640,7 +642,7 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
     if (
       in_ctx->dec_ctx[ctx_idx]->codec_type == AVMEDIA_TYPE_AUDIO &&
       stream_cfg->renditions &&
-      !strcmp(proc_ctx->codecs[ctx_idx], "ac3") &&
+      !strcmp(stream_ctx->codec, "ac3") &&
       stream_cfg->rend1_gain_boost <= 0
     ) {
       in_ctx->init_pkt_cpy = av_packet_clone(in_ctx->init_pkt);

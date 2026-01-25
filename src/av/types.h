@@ -50,8 +50,6 @@ typedef struct VolumeFilterContext {
 } VolumeFilterContext;
 
 typedef struct StreamConfig {
-  char *codec;
-
   char *rend1_title;
   char *rend2_title;
 
@@ -63,13 +61,11 @@ typedef struct StreamConfig {
 } StreamConfig;
 
 typedef struct StreamContext {
-  enum AVMediaType *codec_type;
+  char *codec;
+  enum AVMediaType codec_type;
+
   AVStream *in_stream;
-  int *in_stream_idx;
-
-  int rend1_out_stream_idx;
-  int rend2_out_stream_idx;
-
+  int in_stream_idx;
   AVCodecContext *dec_ctx;
 
   SwrOutputContext *rend1_swr_out_ctx;
@@ -79,9 +75,10 @@ typedef struct StreamContext {
   VolumeFilterContext *rend1_vol_ctx;
   VolumeFilterContext *rend2_vol_ctx;
 
-  AVCodecContext rend1_enc_ctx;
-  AVCodecContext rend2_enc_ctx;
-
+  int rend1_out_stream_idx;
+  int rend2_out_stream_idx;
+  AVCodecContext *rend1_enc_ctx;
+  AVCodecContext *rend2_enc_ctx;
 } StreamContext;
 
 typedef struct ProcessingContext {
@@ -95,10 +92,7 @@ typedef struct ProcessingContext {
   int64_t tminus1_v_pts;
   int64_t tminus2_v_pts;
 
-  char **codecs;
-
   VolumeFilterContext **vol_ctx_arr;
-
 
   // *************************************
   unsigned int nb_in_streams;

@@ -86,7 +86,6 @@ StreamConfig *stream_config_alloc()
   StreamConfig *stream_cfg;
   if (!(stream_cfg = malloc(sizeof(StreamConfig)))) { return NULL; }
 
-  stream_cfg->codec = NULL;
   stream_cfg->rend1_title = NULL;
   stream_cfg->rend2_title = NULL;
   stream_cfg->passthrough = 0;
@@ -107,6 +106,43 @@ void stream_config_free(StreamConfig **stream_cfg)
   *stream_cfg = NULL;
 }
 
+StreamContext *stream_context_alloc()
+{
+  StreamContext *stream_ctx;
+  if(!(stream_ctx = malloc(sizeof(StreamContext)))) { return NULL; }
+
+  stream_ctx->codec = NULL;
+  stream_ctx->codec_type = AVMEDIA_TYPE_UNKNOWN;
+
+  stream_ctx->in_stream = NULL;
+  stream_ctx->in_stream_idx = -1;
+  stream_ctx->dec_ctx = NULL;
+
+  stream_ctx->rend1_swr_out_ctx = NULL;
+  stream_ctx->rend2_swr_out_ctx = NULL;
+  stream_ctx->rend1_fsc_ctx = NULL;
+  stream_ctx->rend2_fsc_ctx = NULL;
+  stream_ctx->rend1_vol_ctx = NULL;
+  stream_ctx->rend2_vol_ctx = NULL;
+
+  stream_ctx->rend1_out_stream_idx = -1;
+  stream_ctx->rend2_out_stream_idx = -1;
+  stream_ctx->rend1_enc_ctx = NULL;
+  stream_ctx->rend2_enc_ctx = NULL;
+
+  return stream_ctx;
+}
+
+void stream_context_free(StreamContext **stream_ctx)
+{
+  if (!*stream_ctx) { return; }
+
+  free((*stream_ctx)->codec);
+
+  free(*stream_ctx);
+  *stream_ctx = NULL;
+}
+
 ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
 {
   int ret = 0;
@@ -117,38 +153,38 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
     return NULL;
   }
 
-  proc_ctx->nb_in_streams = 0;
-  proc_ctx->nb_selected_streams = 0;
   proc_ctx->nb_out_streams = 0;
 
-  proc_ctx->v_stream_idx = -1;
-
-  proc_ctx->ctx_map = NULL;
   proc_ctx->idx_map = NULL;
 
   proc_ctx->swr_out_ctx_arr = NULL;
   proc_ctx->fsc_ctx_arr = NULL;
+
+  proc_ctx->last_sub_pts = 0;
+  proc_ctx->tminus1_v_pts = 0;
+  proc_ctx->tminus2_v_pts = 0;
+
+  proc_ctx->vol_ctx_arr = NULL;
+
+  // ************************************
+  proc_ctx->nb_in_streams = 0;
+  proc_ctx->nb_selected_streams = 0;
+  proc_ctx->v_stream_idx = -1;
+  proc_ctx->ctx_map = NULL;
+
+  proc_ctx->stream_cfg_arr = NULL;
+  proc_ctx->stream_ctx_arr = NULL;
+
+  proc_ctx->tonemap = 0;
+  proc_ctx->hdr = 0;
+  proc_ctx->rend_ctx_arr = NULL;
 
   proc_ctx->deint = 0;
   proc_ctx->deint_ctx = NULL;
 
   proc_ctx->burn_in_idx = -1;
   proc_ctx->first_sub = 0;
-  proc_ctx->last_sub_pts = 0;
-  proc_ctx->tminus1_v_pts = 0;
-  proc_ctx->tminus2_v_pts = 0;
   proc_ctx->burn_in_ctx = NULL;
-
-  proc_ctx->tonemap = 0;
-  proc_ctx->hdr = 0;
-  proc_ctx->codecs = NULL;
-  proc_ctx->rend_ctx_arr = NULL;
-
-  proc_ctx->vol_ctx_arr = NULL;
-
-
-  proc_ctx->stream_cfg_arr = NULL;
-  proc_ctx->stream_ctx_arr = NULL;
 
   if ((ret = proc_ctx->nb_in_streams =
     get_input_file_nb_streams(process_job_id, db)) < 0)
@@ -183,13 +219,6 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
     goto end;
   }
 
-  if (!(proc_ctx->codecs =
-    calloc(proc_ctx->nb_selected_streams, sizeof(char *))))
-  {
-    fprintf(stderr, "Failed to allocate codecs array.\n");
-    goto end;
-  }
-
   if (!(proc_ctx->rend_ctx_arr =
     calloc(proc_ctx->nb_selected_streams, sizeof(RenditionFilterContext *))))
   {
@@ -219,7 +248,7 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   }
 
   for (i = 0; i < proc_ctx->nb_selected_streams; i++) {
-    if (!(proc_ctx->stream_ctx_arr[i] = malloc(sizeof(StreamContext)))) {
+    if (!(proc_ctx->stream_ctx_arr[i] = stream_context_alloc())) {
       fprintf(stderr, "Failed to allocate stream context index '%d'.\n", i);
       goto end;
     }
@@ -259,13 +288,6 @@ void processing_context_free(ProcessingContext **proc_ctx)
       volume_filter_context_free(&(*proc_ctx)->vol_ctx_arr[i]);
     }
     free((*proc_ctx)->vol_ctx_arr);
-  }
-
-  if ((*proc_ctx)->codecs) {
-    for (i = 0; i < (*proc_ctx)->nb_selected_streams; i++) {
-      free((*proc_ctx)->codecs[i]);
-    }
-    free((*proc_ctx)->codecs);
   }
 
   if ((*proc_ctx)->rend_ctx_arr) {
@@ -393,6 +415,7 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
   char *process_job_id, int *ctx_idx, int *out_stream_idx, sqlite3 *db)
 {
   StreamConfig *stream_cfg;
+  StreamContext *stream_ctx;
 
   char *select_audio_stream_info_query =
     "SELECT streams.stream_idx, \
@@ -429,6 +452,7 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
     proc_ctx->ctx_map[in_stream_idx] = *ctx_idx;
     proc_ctx->idx_map[in_stream_idx] = *out_stream_idx;
     stream_cfg = proc_ctx->stream_cfg_arr[*ctx_idx];
+    stream_ctx = proc_ctx->stream_ctx_arr[*ctx_idx];
 
     title = (char *) sqlite3_column_text(select_audio_stream_info_stmt, 1);
 
@@ -481,7 +505,7 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
     for (end = codec; *end; end++);
     len_codec = end - codec;
 
-    if (!(proc_ctx->codecs[*ctx_idx] =
+    if (!(stream_ctx->codec =
       calloc(len_codec + 1, sizeof(char))))
     {
       fprintf(stderr, "Failed to allocate memory for codec for stream '%d'\n",
@@ -490,7 +514,7 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
       goto end;
     }
 
-    strncat(proc_ctx->codecs[*ctx_idx], codec, len_codec);
+    strncat(stream_ctx->codec, codec, len_codec);
 
     *out_stream_idx += 1;
     if (stream_cfg->renditions) { *out_stream_idx += 1; }
@@ -625,6 +649,7 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
 {
   int in_stream_idx, ctx_idx, out_stream_idx, passthrough, i, j;
   StreamConfig *stream_cfg;
+  StreamContext *stream_ctx;
   enum AVMediaType codec_type;
   AVCodecContext *dec_ctx, *enc_ctx;
 
@@ -659,6 +684,7 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
     if (ctx_idx == INACTIVE_STREAM) { continue; }
 
     stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
+    stream_ctx = proc_ctx->stream_ctx_arr[ctx_idx];
 
     passthrough = stream_cfg->passthrough;
     if (passthrough) { continue; }
@@ -671,7 +697,7 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
 
     if (stream_cfg->renditions) {
       if (
-        strcmp(proc_ctx->codecs[ctx_idx], "ac3") ||
+        strcmp(stream_ctx->codec, "ac3") ||
         stream_cfg->rend1_gain_boost > 0
       ) {
         j = 2;

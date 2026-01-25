@@ -496,6 +496,7 @@ static int open_encoder(InputContext *in_ctx, ProcessingContext *proc_ctx,
 {
   int ret;
   StreamConfig *stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
+  StreamContext *stream_ctx = proc_ctx->stream_ctx_arr[ctx_idx];
   enum AVMediaType stream_type = in_stream->codecpar->codec_type;
 
   if (stream_type == AVMEDIA_TYPE_VIDEO) {
@@ -523,7 +524,7 @@ static int open_encoder(InputContext *in_ctx, ProcessingContext *proc_ctx,
   {
     if (stream_cfg->renditions) {
       if (
-        strcmp(proc_ctx->codecs[ctx_idx], "ac3") ||
+        strcmp(stream_ctx->codec, "ac3") ||
         stream_cfg->rend1_gain_boost > 0
       ) {
         if ((ret = open_ac3_encoder(&out_ctx->enc_ctx_arr[out_stream_idx],
