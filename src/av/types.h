@@ -108,7 +108,7 @@ typedef struct ProcessingContext {
 
   int tonemap;
   int hdr;
-  RenditionFilterContext **rend_ctx_arr;
+  RenditionFilterContext *rend_ctx;
 
   int deint;
   DeinterlaceFilterContext *deint_ctx;

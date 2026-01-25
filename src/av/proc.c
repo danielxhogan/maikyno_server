@@ -177,7 +177,7 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
 
   proc_ctx->tonemap = 0;
   proc_ctx->hdr = 0;
-  proc_ctx->rend_ctx_arr = NULL;
+  proc_ctx->rend_ctx = NULL;
 
   proc_ctx->deint = 0;
   proc_ctx->deint_ctx = NULL;
@@ -216,13 +216,6 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   {
     fprintf(stderr, "Failed to get stream count for process job: %s\n",
       process_job_id);
-    goto end;
-  }
-
-  if (!(proc_ctx->rend_ctx_arr =
-    calloc(proc_ctx->nb_selected_streams, sizeof(RenditionFilterContext *))))
-  {
-    fprintf(stderr, "Failed to allocate renditions context array.\n");
     goto end;
   }
 
@@ -290,12 +283,7 @@ void processing_context_free(ProcessingContext **proc_ctx)
     free((*proc_ctx)->vol_ctx_arr);
   }
 
-  if ((*proc_ctx)->rend_ctx_arr) {
-    for (i = 0; i < (*proc_ctx)->nb_selected_streams; i++) {
-      rendition_filter_context_free(&(*proc_ctx)->rend_ctx_arr[i]);
-    }
-    free((*proc_ctx)->rend_ctx_arr);
-  }
+  free((*proc_ctx)->rend_ctx);
 
   if ((*proc_ctx)->stream_cfg_arr) {
     for (i = 0; i < (*proc_ctx)->nb_selected_streams; i++) {
@@ -791,7 +779,7 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
 
   if (stream_cfg->renditions)
   {
-    if (!(proc_ctx->rend_ctx_arr[ctx_idx] =
+    if (!(proc_ctx->rend_ctx =
       video_rendition_filter_context_init(proc_ctx, in_ctx->dec_ctx[ctx_idx],
         out_ctx->enc_ctx_arr[out_stream_idx], out_ctx->enc_ctx_arr[out_stream_idx + 1],
         in_ctx->fmt_ctx->streams[proc_ctx->v_stream_idx])))

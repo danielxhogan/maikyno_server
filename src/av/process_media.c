@@ -55,10 +55,10 @@ int encode_video_frame(ProcessingContext *proc_ctx, InputContext *in_ctx,
 }
 
 int make_rendtion(ProcessingContext *proc_ctx, InputContext *in_ctx,
-  OutputContext *out_ctx, int ctx_idx, AVFrame *frame)
+  OutputContext *out_ctx, AVFrame *frame)
 {
   int ret = 0;
-  RenditionFilterContext *rend_ctx = proc_ctx->rend_ctx_arr[ctx_idx];
+  RenditionFilterContext *rend_ctx = proc_ctx->rend_ctx;
 
   if ((ret = av_buffersrc_add_frame_flags(rend_ctx->buffersrc_ctx,
     frame, AV_BUFFERSRC_FLAG_KEEP_REF)) < 0)
@@ -153,9 +153,9 @@ int burn_in_subtitles(ProcessingContext *proc_ctx, InputContext *in_ctx,
       proc_ctx->tminus1_v_pts = filtered_frame->pts;
     }
 
-    if (proc_ctx->rend_ctx_arr[0]) {
+    if (proc_ctx->rend_ctx) {
       if ((ret = make_rendtion(proc_ctx, in_ctx, out_ctx,
-        0, filtered_frame)) < 0)
+        filtered_frame)) < 0)
       {
         fprintf(stderr, "Failed to make renditions of burn in frame.\n");
         return ret;
@@ -214,10 +214,10 @@ int deinterlace_video_frame(ProcessingContext *proc_ctx, InputContext *in_ctx,
         return ret;
       }
     }
-    else if (proc_ctx->rend_ctx_arr[0])
+    else if (proc_ctx->rend_ctx)
     {
       if ((ret = make_rendtion(proc_ctx, in_ctx, out_ctx,
-        0, proc_ctx->deint_ctx->filtered_frame)) < 0)
+        proc_ctx->deint_ctx->filtered_frame)) < 0)
       {
         fprintf(stderr, "Failed to make renditions of deinterlaced frame.\n");
         return ret;
@@ -491,9 +491,9 @@ int decode_av_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
           return ret;
         }
       }
-      else if (proc_ctx->rend_ctx_arr[ctx_idx]) {
+      else if (proc_ctx->rend_ctx) {
         if ((ret = make_rendtion(proc_ctx, in_ctx, out_ctx,
-          ctx_idx, in_ctx->dec_frame)) < 0)
+          in_ctx->dec_frame)) < 0)
         {
           fprintf(stderr, "Failed to make video renditions.\n");
           return ret;
