@@ -490,16 +490,14 @@ static int open_aac_encoder(AVCodecContext **enc_ctx, AVStream *in_stream)
   return 0;
 }
 
-static int open_encoder(InputContext *in_ctx, ProcessingContext *proc_ctx,
+static int open_encoder(StreamContext *stream_ctx, InputContext *in_ctx, ProcessingContext *proc_ctx,
   OutputContext *out_ctx, int ctx_idx, int out_stream_idx, AVStream *in_stream,
   char *in_filename)
 {
   int ret;
   StreamConfig *stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
-  StreamContext *stream_ctx = proc_ctx->stream_ctx_arr[ctx_idx];
-  enum AVMediaType stream_type = in_stream->codecpar->codec_type;
 
-  if (stream_type == AVMEDIA_TYPE_VIDEO) {
+  if (stream_ctx->codec_type == AVMEDIA_TYPE_VIDEO) {
     if ((ret =
       open_video_encoder(&out_ctx->enc_ctx_arr[out_stream_idx],
         proc_ctx, in_stream, ctx_idx, in_filename, 0)) < 0)
@@ -520,7 +518,7 @@ static int open_encoder(InputContext *in_ctx, ProcessingContext *proc_ctx,
     }
   }
 
-  else if (stream_type == AVMEDIA_TYPE_AUDIO)
+  else if (stream_ctx->codec_type == AVMEDIA_TYPE_AUDIO)
   {
     if (stream_cfg->renditions) {
       if (
@@ -756,7 +754,7 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
     out_stream_idx = proc_ctx->idx_map[in_stream_idx];
 
     if (!stream_cfg->passthrough) {
-      if ((ret = open_encoder(in_ctx, proc_ctx, out_ctx, i, out_stream_idx,
+      if ((ret = open_encoder(stream_ctx, in_ctx, proc_ctx, out_ctx, i, out_stream_idx,
         stream_ctx->in_stream, in_ctx->fmt_ctx->url)) < 0)
       {
         fprintf(stderr, "Failed to open encoder for output stream: %d.\n\

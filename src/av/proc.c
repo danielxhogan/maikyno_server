@@ -648,7 +648,6 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
   int in_stream_idx, ctx_idx, out_stream_idx, passthrough, i, j;
   StreamConfig *stream_cfg;
   StreamContext *stream_ctx;
-  enum AVMediaType codec_type;
   AVCodecContext *dec_ctx, *enc_ctx;
 
   if (!(proc_ctx->swr_out_ctx_arr =
@@ -687,8 +686,7 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
     passthrough = stream_cfg->passthrough;
     if (passthrough) { continue; }
 
-    codec_type = in_ctx->fmt_ctx->streams[in_stream_idx]->codecpar->codec_type;
-    if (codec_type != AVMEDIA_TYPE_AUDIO) { continue; }
+    if (stream_ctx->codec_type != AVMEDIA_TYPE_AUDIO) { continue; }
 
     dec_ctx = in_ctx->dec_ctx[ctx_idx];
     out_stream_idx = proc_ctx->idx_map[in_stream_idx];
