@@ -742,7 +742,7 @@ int make_output_filename_string(char **out_filename,
 }
 
 int open_encoders_and_streams(ProcessingContext *proc_ctx,
-  InputContext *in_ctx, OutputContext *out_ctx, char *process_job_id)
+  InputContext *in_ctx, char *process_job_id)
 {
   int out_stream_idx, ret = 0;
   StreamContext *stream_ctx;
@@ -751,7 +751,7 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
     stream_ctx = proc_ctx->stream_ctx_arr[i];
     if (stream_ctx->in_stream_idx == proc_ctx->burn_in_idx) { continue; }
 
-    out_stream_idx = out_ctx->fmt_ctx->nb_streams;
+    out_stream_idx = proc_ctx->out_fmt_ctx->nb_streams;
 
     if (!stream_ctx->passthrough) {
       if ((ret = open_encoder(proc_ctx, stream_ctx, out_stream_idx,
@@ -764,7 +764,7 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
       }
     }
 
-    if ((ret = init_stream(out_ctx->fmt_ctx, stream_ctx->rend0_enc_ctx,
+    if ((ret = init_stream(proc_ctx->out_fmt_ctx, stream_ctx->rend0_enc_ctx,
       stream_ctx->in_stream, stream_ctx->rend0_title)) < 0)
     {
       fprintf(stderr, "Failed to initialize stream for output stream: %d.\n\
@@ -773,12 +773,12 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
       return ret;
     }
 
-    stream_ctx->rend0_out_stream_idx = out_ctx->fmt_ctx->nb_streams - 1;
+    stream_ctx->rend0_out_stream_idx = proc_ctx->out_fmt_ctx->nb_streams - 1;
     stream_ctx->rend0_out_stream =
-      out_ctx->fmt_ctx->streams[out_ctx->fmt_ctx->nb_streams - 1];
+      proc_ctx->out_fmt_ctx->streams[proc_ctx->out_fmt_ctx->nb_streams - 1];
 
     if (stream_ctx->renditions) {
-      if ((ret = init_stream(out_ctx->fmt_ctx, stream_ctx->rend1_enc_ctx,
+      if ((ret = init_stream(proc_ctx->out_fmt_ctx, stream_ctx->rend1_enc_ctx,
         stream_ctx->in_stream, stream_ctx->rend1_title)) < 0)
       {
         fprintf(stderr, "Failed to initialize stream for output stream: %d.\n\
@@ -787,31 +787,22 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
         return ret;
       }
 
-      stream_ctx->rend1_out_stream_idx = out_ctx->fmt_ctx->nb_streams - 1;
+      stream_ctx->rend1_out_stream_idx = proc_ctx->out_fmt_ctx->nb_streams - 1;
       stream_ctx->rend1_out_stream =
-        out_ctx->fmt_ctx->streams[out_ctx->fmt_ctx->nb_streams - 1];
+        proc_ctx->out_fmt_ctx->streams[proc_ctx->out_fmt_ctx->nb_streams - 1];
     }
   }
 
-  proc_ctx->nb_out_streams = out_ctx->fmt_ctx->nb_streams;
+  proc_ctx->nb_out_streams = proc_ctx->out_fmt_ctx->nb_streams;
 
   return 0;
 }
 
-OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
+int open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
   char *process_job_id, sqlite3 *db)
 {
   int extra, ret = 0;
   char *name = NULL, *media_dir_path = NULL, *title = NULL, *out_filename = NULL;
-  OutputContext *out_ctx;
-
-  if (!(out_ctx = malloc(sizeof(OutputContext)))) {
-    ret = -ENOMEM;
-    return NULL;
-  }
-
-  out_ctx->fmt_ctx = NULL;
-  out_ctx->enc_pkt = NULL;
 
   if ((ret = get_file_data(&name, &extra, &media_dir_path, &title,
     db, process_job_id)) < 0)
@@ -832,14 +823,14 @@ OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
   printf("Opening output file \"%s\".\n", out_filename);
 
   if ((ret = avformat_alloc_output_context2(
-    &out_ctx->fmt_ctx, NULL, NULL, out_filename)))
+    &proc_ctx->out_fmt_ctx, NULL, NULL, out_filename)))
   {
     fprintf(stderr, "Failed to allocate output format context:\n video: %s\n\
       process job:%s\nLivav Error: %s\n", name, process_job_id, av_err2str(ret));
     goto end;
   }
 
-  if ((ret = av_dict_copy(&out_ctx->fmt_ctx->metadata,
+  if ((ret = av_dict_copy(&proc_ctx->out_fmt_ctx->metadata,
     in_ctx->fmt_ctx->metadata, AV_DICT_DONT_OVERWRITE)) < 0)
   {
     fprintf(stderr, "Failed to copy file metadata:\nvideo: %s\nprocess job: %s\n\
@@ -848,14 +839,14 @@ OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
   }
 
   if (title) {
-    if ((ret = av_dict_set(&out_ctx->fmt_ctx->metadata, "title", title, 0)) < 0) {
+    if ((ret = av_dict_set(&proc_ctx->out_fmt_ctx->metadata, "title", title, 0)) < 0) {
       fprintf(stderr, "Failed to set title for output format context.\n\
         Libav Error: %s\n", av_err2str(ret));
       goto end;
     }
   }
 
-  if ((ret = copy_chapters(out_ctx->fmt_ctx, in_ctx->fmt_ctx)) < 0)
+  if ((ret = copy_chapters(proc_ctx->out_fmt_ctx, in_ctx->fmt_ctx)) < 0)
   {
     fprintf(stderr, "Failed to copy chapters:\n\
       video: %s\nprocess job: %s\n", name, process_job_id);
@@ -863,22 +854,16 @@ OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
   }
 
   if ((ret = open_encoders_and_streams(proc_ctx,
-    in_ctx, out_ctx, process_job_id)) < 0)
+    in_ctx, process_job_id)) < 0)
   {
     fprintf(stderr, "Failed to open encoders and streams for process job: %s.\n",
       process_job_id);
     goto end;
   }
 
-  if (!(out_ctx->enc_pkt = av_packet_alloc())) {
-    fprintf(stderr, "Failed to allocate output context packet.\n");
-    ret = AVERROR(ENOMEM);
-    goto end;
-  }
-
-  if (!(out_ctx->fmt_ctx->oformat->flags & AVFMT_NOFILE)) {
+  if (!(proc_ctx->out_fmt_ctx->oformat->flags & AVFMT_NOFILE)) {
     if ((ret =
-      avio_open(&out_ctx->fmt_ctx->pb, out_filename, AVIO_FLAG_WRITE)) < 0)
+      avio_open(&proc_ctx->out_fmt_ctx->pb, out_filename, AVIO_FLAG_WRITE)) < 0)
     {
       fprintf(stderr, "Failed to open output file.\n");
       fprintf(stderr, "Libav Error: %s.\n", av_err2str(ret));
@@ -886,7 +871,7 @@ OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
     }
   }
 
-  if ((ret = avformat_write_header(out_ctx->fmt_ctx, NULL)) < 0) {
+  if ((ret = avformat_write_header(proc_ctx->out_fmt_ctx, NULL)) < 0) {
     fprintf(stderr, "Failed to write header for output file.\n");
     fprintf(stderr, "Libav Error: %s.\n", av_err2str(ret));
     goto end;
@@ -898,25 +883,6 @@ end:
   free(media_dir_path);
   free(title);
 
-  if (ret < 0) {
-    close_output(&out_ctx);
-    return NULL;
-  }
-
-  return out_ctx;
-}
-
-void close_output(OutputContext **out_ctx)
-{
-  if (!*out_ctx) { return; }
-
-  if ((*out_ctx)->fmt_ctx && !((*out_ctx)->fmt_ctx->flags & AVFMT_NOFILE))
-    avio_closep(&(*out_ctx)->fmt_ctx->pb);
-  avformat_free_context((*out_ctx)->fmt_ctx);
-
-  if ((*out_ctx)->enc_pkt) { av_packet_unref((*out_ctx)->enc_pkt); }
-  av_packet_free(&(*out_ctx)->enc_pkt);
-
-  free(*out_ctx);
-  *out_ctx = NULL;
+  if (ret < 0) { return ret; }
+  return 0;
 }

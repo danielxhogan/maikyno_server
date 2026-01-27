@@ -233,6 +233,12 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
     }
   }
 
+  if (!(proc_ctx->pkt = av_packet_alloc())) {
+    fprintf(stderr, "Failed to allocate AVPacket.\n");
+    ret = AVERROR(ENOMEM);
+    goto end;
+  }
+
   return proc_ctx;
 
 end:
@@ -276,6 +282,13 @@ void processing_context_free(ProcessingContext **proc_ctx)
   deint_filter_context_free(&(*proc_ctx)->deint_ctx);
   burn_in_filter_context_free(&(*proc_ctx)->burn_in_ctx);
   rendition_filter_context_free(&(*proc_ctx)->rend_ctx);
+
+  if ((*proc_ctx)->pkt) { av_packet_unref((*proc_ctx)->pkt); }
+  av_packet_free(&(*proc_ctx)->pkt);
+
+  if ((*proc_ctx)->out_fmt_ctx && !((*proc_ctx)->out_fmt_ctx->flags & AVFMT_NOFILE))
+    avio_closep(&(*proc_ctx)->out_fmt_ctx->pb);
+  avformat_free_context((*proc_ctx)->out_fmt_ctx);
 
   free((*proc_ctx)->ctx_map);
   free(*proc_ctx);

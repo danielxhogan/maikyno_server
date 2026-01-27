@@ -7,7 +7,7 @@
 #include "utils.h"
 
 int encode_video_frame(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
-  OutputContext *out_ctx, AVFrame *frame, int rendition)
+  AVFrame *frame, int rendition)
 {
   int out_stream_idx, ret = 0;
   AVCodecContext *enc_ctx;
@@ -31,28 +31,28 @@ int encode_video_frame(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
     return ret;
   }
 
-  while ((ret = avcodec_receive_packet( enc_ctx, out_ctx->enc_pkt)) >= 0)
+  while ((ret = avcodec_receive_packet(enc_ctx, proc_ctx->pkt)) >= 0)
   {
-    out_ctx->enc_pkt->stream_index = out_stream_idx;
+    proc_ctx->pkt->stream_index = out_stream_idx;
 
-    av_packet_rescale_ts(out_ctx->enc_pkt,
+    av_packet_rescale_ts(proc_ctx->pkt,
       stream_ctx->in_stream->time_base,
       out_stream->time_base);
 
     if (proc_ctx->deint) {
-      out_ctx->enc_pkt->pts = out_ctx->enc_pkt->pts / 2;
-      out_ctx->enc_pkt->dts = out_ctx->enc_pkt->dts / 2;
+      proc_ctx->pkt->pts = proc_ctx->pkt->pts / 2;
+      proc_ctx->pkt->dts = proc_ctx->pkt->dts / 2;
     }
 
-    if ((ret = av_interleaved_write_frame(out_ctx->fmt_ctx,
-      out_ctx->enc_pkt)) < 0)
+    if ((ret = av_interleaved_write_frame(proc_ctx->out_fmt_ctx,
+      proc_ctx->pkt)) < 0)
     {
       fprintf(stderr, "Failed to write video packet to stream '%d'.\n\
         Libav Error: %s.\n", out_stream_idx,av_err2str(ret));
       return ret;
     }
 
-    if (out_ctx->enc_pkt) { av_packet_unref(out_ctx->enc_pkt); }
+    if (proc_ctx->pkt) { av_packet_unref(proc_ctx->pkt); }
   }
 
   if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
@@ -65,7 +65,7 @@ int encode_video_frame(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
 }
 
 int make_rendtion(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
-  OutputContext *out_ctx, AVFrame *frame)
+  AVFrame *frame)
 {
   int ret = 0;
   RenditionFilterContext *rend_ctx = proc_ctx->rend_ctx;
@@ -81,7 +81,7 @@ int make_rendtion(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
   while ((ret = av_buffersink_get_frame(rend_ctx->buffersink_ctx1,
     rend_ctx->filtered_frame1)) >= 0)
   {
-    if ((ret = encode_video_frame(proc_ctx, stream_ctx, out_ctx,
+    if ((ret = encode_video_frame(proc_ctx, stream_ctx,
       rend_ctx->filtered_frame1, 0)) < 0)
     {
       fprintf(stderr, "Failed to encode first rendition frame.\n");
@@ -100,7 +100,7 @@ int make_rendtion(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
   while ((ret = av_buffersink_get_frame(rend_ctx->buffersink_ctx2,
     rend_ctx->filtered_frame2)) >= 0)
   {
-    if ((ret = encode_video_frame(proc_ctx, stream_ctx, out_ctx,
+    if ((ret = encode_video_frame(proc_ctx, stream_ctx,
       rend_ctx->filtered_frame2, 1)) < 0)
     {
       fprintf(stderr, "Failed to encode second rendition frame.\n");
@@ -120,7 +120,7 @@ int make_rendtion(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
 }
 
 int burn_in_subtitles(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
-  OutputContext *out_ctx, AVFilterContext *buffersrc_ctx, AVFrame *frame)
+  AVFilterContext *buffersrc_ctx, AVFrame *frame)
 {
   int ret = 0;
   AVCodecContext *v_dec_ctx = proc_ctx->stream_ctx_arr[0]->dec_ctx;
@@ -164,7 +164,7 @@ int burn_in_subtitles(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
     }
 
     if (proc_ctx->rend_ctx) {
-      if ((ret = make_rendtion(proc_ctx, stream_ctx, out_ctx,
+      if ((ret = make_rendtion(proc_ctx, stream_ctx,
         filtered_frame)) < 0)
       {
         fprintf(stderr, "Failed to make renditions of burn in frame.\n");
@@ -172,7 +172,7 @@ int burn_in_subtitles(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
       }
     }
     else {
-      if ((ret = encode_video_frame(proc_ctx, stream_ctx, out_ctx,
+      if ((ret = encode_video_frame(proc_ctx, stream_ctx,
         filtered_frame, 0)) < 0)
       {
         fprintf(stderr, "Failed to encode burn in frame.\n");
@@ -194,7 +194,7 @@ int burn_in_subtitles(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
 }
 
 int deinterlace_video_frame(ProcessingContext *proc_ctx,
-  StreamContext *stream_ctx, InputContext *in_ctx, OutputContext *out_ctx)
+  StreamContext *stream_ctx, InputContext *in_ctx)
 {
   int ret = 0;
 
@@ -216,7 +216,7 @@ int deinterlace_video_frame(ProcessingContext *proc_ctx,
         proc_ctx->last_sub_pts = in_ctx->dec_frame->pts;
       }
 
-      if ((ret = burn_in_subtitles(proc_ctx, stream_ctx, out_ctx,
+      if ((ret = burn_in_subtitles(proc_ctx, stream_ctx,
         proc_ctx->burn_in_ctx->v_buffersrc_ctx,
         proc_ctx->deint_ctx->filtered_frame)) < 0)
       {
@@ -226,7 +226,7 @@ int deinterlace_video_frame(ProcessingContext *proc_ctx,
     }
     else if (proc_ctx->rend_ctx)
     {
-      if ((ret = make_rendtion(proc_ctx, stream_ctx, out_ctx,
+      if ((ret = make_rendtion(proc_ctx, stream_ctx,
         proc_ctx->deint_ctx->filtered_frame)) < 0)
       {
         fprintf(stderr, "Failed to make renditions of deinterlaced frame.\n");
@@ -234,7 +234,7 @@ int deinterlace_video_frame(ProcessingContext *proc_ctx,
       }
     }
     else {
-      if ((ret = encode_video_frame(proc_ctx, stream_ctx, out_ctx,
+      if ((ret = encode_video_frame(proc_ctx, stream_ctx,
         proc_ctx->deint_ctx->filtered_frame, 0)) < 0)
       {
         fprintf(stderr, "Failed to encode deinterlaced frame.\n");
@@ -254,19 +254,22 @@ int deinterlace_video_frame(ProcessingContext *proc_ctx,
   return 0;
 }
 
-int encode_audio_frame(StreamContext *stream_ctx, int rendition,
-  OutputContext *out_ctx, AVFrame *frame)
+int encode_audio_frame(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
+  int rendition, AVFrame *frame)
 {
   int out_stream_idx, ret = 0;
   AVCodecContext *enc_ctx;
+  AVStream *out_stream;
 
   if (!rendition) {
     enc_ctx = stream_ctx->rend0_enc_ctx;
     out_stream_idx = stream_ctx->rend0_out_stream_idx;
+    out_stream = stream_ctx->rend0_out_stream;
   }
   else {
     enc_ctx = stream_ctx->rend1_enc_ctx;
     out_stream_idx = stream_ctx->rend1_out_stream_idx;
+    out_stream = stream_ctx->rend1_out_stream;
   }
 
   if ((ret = avcodec_send_frame(enc_ctx, frame)) < 0)
@@ -276,24 +279,22 @@ int encode_audio_frame(StreamContext *stream_ctx, int rendition,
     return ret;
   }
 
-  while ((ret = avcodec_receive_packet(
-    enc_ctx, out_ctx->enc_pkt)) >= 0)
-  {
-    out_ctx->enc_pkt->stream_index = out_stream_idx;
+  while ((ret = avcodec_receive_packet( enc_ctx, proc_ctx->pkt)) >= 0) {
+    proc_ctx->pkt->stream_index = out_stream_idx;
 
-    av_packet_rescale_ts(out_ctx->enc_pkt,
+    av_packet_rescale_ts(proc_ctx->pkt,
       (AVRational) { 1, enc_ctx->sample_rate },
-      out_ctx->fmt_ctx->streams[out_stream_idx]->time_base);
+      out_stream->time_base);
 
     if ((ret =
-      av_interleaved_write_frame(out_ctx->fmt_ctx, out_ctx->enc_pkt)) < 0)
+      av_interleaved_write_frame(proc_ctx->out_fmt_ctx, proc_ctx->pkt)) < 0)
     {
       fprintf(stderr, "Failed to write audio packet to stream '%d'.\n\
         Libav Error: %s.\n", out_stream_idx, av_err2str(ret));
       return ret;
     }
 
-    if (out_ctx->enc_pkt) { av_packet_unref(out_ctx->enc_pkt); }
+    if (proc_ctx->pkt) { av_packet_unref(proc_ctx->pkt); }
   }
 
   if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
@@ -306,7 +307,7 @@ int encode_audio_frame(StreamContext *stream_ctx, int rendition,
 }
 
 int boost_gain(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
-  int rendition, OutputContext *out_ctx, AVFrame *frame)
+  int rendition, AVFrame *frame)
 {
   int out_stream_idx, ret = 0;
 
@@ -327,7 +328,7 @@ int boost_gain(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
   while ((ret = av_buffersink_get_frame(proc_ctx->vol_ctx_arr[out_stream_idx]->buffersink_ctx,
     proc_ctx->vol_ctx_arr[out_stream_idx]->filtered_frame)) >= 0)
   {
-    if ((ret = encode_audio_frame(stream_ctx, rendition, out_ctx,
+    if ((ret = encode_audio_frame(proc_ctx, stream_ctx, rendition,
       proc_ctx->vol_ctx_arr[out_stream_idx]->filtered_frame)))
     {
       fprintf(stderr, "Failed to write audio frame after boosting gain.\n");
@@ -345,8 +346,7 @@ int boost_gain(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
 }
 
 static int convert_audio_frame(ProcessingContext *proc_ctx,
-  StreamContext *stream_ctx, int rendition,
-  OutputContext *out_ctx, AVFrame *frame)
+  StreamContext *stream_ctx, int rendition, AVFrame *frame)
 {
   int out_stream_idx, nb_converted_samples,
     sample_rate, start_time, timestamp, ret = 0;
@@ -418,14 +418,14 @@ flush:
 
     if (proc_ctx->vol_ctx_arr[out_stream_idx])
     {
-      if ((ret = boost_gain(proc_ctx, stream_ctx, rendition, out_ctx,
+      if ((ret = boost_gain(proc_ctx, stream_ctx, rendition,
         fsc_ctx->frame)))
       {
         fprintf(stderr, "Failed to boost gain.\n");
         return ret;
       }
     } else {
-      if ((ret = encode_audio_frame(stream_ctx, rendition, out_ctx,
+      if ((ret = encode_audio_frame(proc_ctx, stream_ctx, rendition,
         fsc_ctx->frame)) < 0)
       {
         fprintf(stderr, "Failed to write audio frame.\n");
@@ -440,7 +440,7 @@ flush:
 }
 
 int decode_sub_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
-  InputContext *in_ctx, OutputContext *out_ctx)
+  InputContext *in_ctx)
 {
   int got_sub_ptr, ret = 0;
   AVCodecContext *s_dec_ctx = stream_ctx->dec_ctx;
@@ -472,7 +472,7 @@ int decode_sub_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
     return ret;
   }
 
-  if ((ret = burn_in_subtitles(proc_ctx, stream_ctx, out_ctx,
+  if ((ret = burn_in_subtitles(proc_ctx, stream_ctx,
     proc_ctx->burn_in_ctx->s_buffersrc_ctx,
     proc_ctx->burn_in_ctx->stf_ctx->subtitle_frame)) < 0)
   {
@@ -483,8 +483,8 @@ int decode_sub_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
   return 0;
 }
 
-int decode_av_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
-  InputContext *in_ctx, OutputContext *out_ctx)
+int decode_av_packet(ProcessingContext *proc_ctx,
+  StreamContext *stream_ctx, InputContext *in_ctx)
 {
   int ret = 0;
 
@@ -504,7 +504,7 @@ int decode_av_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
     if (stream_ctx->codec_type == AVMEDIA_TYPE_VIDEO)
     {
       if (proc_ctx->deint) {
-        if ((ret = deinterlace_video_frame(proc_ctx, stream_ctx, in_ctx, out_ctx)) < 0) {
+        if ((ret = deinterlace_video_frame(proc_ctx, stream_ctx, in_ctx)) < 0) {
           fprintf(stderr, "Failed to deinterlace video frame from input stream: %d.\n",
             stream_ctx->in_stream_idx);
           return ret;
@@ -516,7 +516,7 @@ int decode_av_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
           proc_ctx->last_sub_pts = in_ctx->dec_frame->pts;
         }
 
-        if ((ret = burn_in_subtitles(proc_ctx, stream_ctx, out_ctx,
+        if ((ret = burn_in_subtitles(proc_ctx, stream_ctx,
           proc_ctx->burn_in_ctx->v_buffersrc_ctx,
           in_ctx->dec_frame)) < 0)
         {
@@ -525,7 +525,7 @@ int decode_av_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
         }
       }
       else if (proc_ctx->rend_ctx) {
-        if ((ret = make_rendtion(proc_ctx, stream_ctx, out_ctx,
+        if ((ret = make_rendtion(proc_ctx, stream_ctx,
           in_ctx->dec_frame)) < 0)
         {
           fprintf(stderr, "Failed to make video renditions.\n");
@@ -533,7 +533,7 @@ int decode_av_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
         }
       }
       else {
-        if ((ret = encode_video_frame(proc_ctx, stream_ctx, out_ctx,
+        if ((ret = encode_video_frame(proc_ctx, stream_ctx,
           in_ctx->dec_frame, 0)) < 0)
         {
           fprintf(stderr, "Failed to encode video frame from input stream '%d'.\n",
@@ -547,7 +547,7 @@ int decode_av_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
       if (stream_ctx->transcode_rend0) {
         in_ctx->dec_frame_cpy = av_frame_clone(in_ctx->dec_frame);
 
-        if ((ret = convert_audio_frame(proc_ctx, stream_ctx, 0, out_ctx,
+        if ((ret = convert_audio_frame(proc_ctx, stream_ctx, 0,
           in_ctx->dec_frame_cpy)) < 0)
         {
           fprintf(stderr, "Failed to encode audio frame from input stream '%d'.\n",
@@ -559,7 +559,7 @@ int decode_av_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
       }
 
       if (stream_ctx->renditions) {
-        if ((ret = convert_audio_frame(proc_ctx, stream_ctx, 1, out_ctx,
+        if ((ret = convert_audio_frame(proc_ctx, stream_ctx, 1,
           in_ctx->dec_frame)) < 0)
         {
           fprintf(stderr, "Failed to encode audio frame from input stream '%d'.\n",
@@ -581,8 +581,8 @@ int decode_av_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
   return 0;
 }
 
-int decode_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
-  InputContext *in_ctx, OutputContext *out_ctx)
+int decode_packet(ProcessingContext *proc_ctx,
+  StreamContext *stream_ctx, InputContext *in_ctx)
 {
   int ret = 0;
 
@@ -590,9 +590,7 @@ int decode_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
     stream_ctx->codec_type == AVMEDIA_TYPE_VIDEO ||
     stream_ctx->codec_type == AVMEDIA_TYPE_AUDIO
   ) {
-    if ((ret = decode_av_packet(proc_ctx, stream_ctx,
-      in_ctx, out_ctx)) < 0)
-    {
+    if ((ret = decode_av_packet(proc_ctx, stream_ctx, in_ctx)) < 0) {
       fprintf(stderr, "Failed to decode audio or video packet \
         for input stream '%d'.\n", stream_ctx->in_stream_idx);
       return ret;
@@ -601,7 +599,7 @@ int decode_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
     stream_ctx->codec_type == AVMEDIA_TYPE_SUBTITLE &&
     in_ctx->init_pkt
   ) {
-    if ((ret = decode_sub_packet(proc_ctx, stream_ctx, in_ctx, out_ctx)) < 0) {
+    if ((ret = decode_sub_packet(proc_ctx, stream_ctx, in_ctx)) < 0) {
       fprintf(stderr, "Failed to decode subtitle packet \
         for input stream: %d.\n", stream_ctx->in_stream_idx);
       return ret;
@@ -612,7 +610,7 @@ int decode_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
 }
 
 int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
-  OutputContext *out_ctx, const char *batch_id, char *process_job_id)
+  const char *batch_id, char *process_job_id)
 {
   StreamContext *stream_ctx;
   int in_stream_idx, ctx_idx, frame_count, check_again = 0, out_stream_idx, ret = 0;
@@ -657,7 +655,7 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
       in_ctx->init_pkt->stream_index = out_stream_idx;
 
       if ((ret =
-        av_interleaved_write_frame(out_ctx->fmt_ctx, in_ctx->init_pkt)) < 0)
+        av_interleaved_write_frame(proc_ctx->out_fmt_ctx, in_ctx->init_pkt)) < 0)
       {
         fprintf(stderr, "Failed to write packet from input stream '%d' to "
           "output stream '%d'.\nLibav Error: %s.\n",
@@ -677,7 +675,7 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
       in_ctx->init_pkt_cpy->stream_index = out_stream_idx;
 
       if ((ret =
-        av_interleaved_write_frame(out_ctx->fmt_ctx, in_ctx->init_pkt_cpy)) < 0)
+        av_interleaved_write_frame(proc_ctx->out_fmt_ctx, in_ctx->init_pkt_cpy)) < 0)
       {
         fprintf(stderr, "Failed to write packet to file.\nError: %s.\n",
           av_err2str(ret));
@@ -688,7 +686,7 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
     }
 
     if ((ret = decode_packet(proc_ctx, stream_ctx,
-      in_ctx, out_ctx)) < 0)
+      in_ctx)) < 0)
     {
       fprintf(stderr, "Failed to decode packet.\n");
       return ret;
@@ -716,7 +714,6 @@ int process_video(char *process_job_id, const char *batch_id)
   ProcessingContext *proc_ctx = NULL;
   StreamContext *stream_ctx;
   InputContext *in_ctx = NULL;
-  OutputContext *out_ctx = NULL;
   sqlite3 *db;
 
   av_log_set_level(AV_LOG_ERROR);
@@ -749,9 +746,8 @@ int process_video(char *process_job_id, const char *batch_id)
     goto update_status;
   }
 
-  if (!(out_ctx = open_output(proc_ctx, in_ctx, process_job_id, db))) {
+  if ((ret = open_output(proc_ctx, in_ctx, process_job_id, db)) < 0) {
     fprintf(stderr, "Failed to open output.\n");
-    ret = -1;
     goto update_status;
   }
 
@@ -765,7 +761,7 @@ int process_video(char *process_job_id, const char *batch_id)
   sqlite3_close(db);
   db = NULL;
 
-  if ((ret = transcode(proc_ctx, in_ctx, out_ctx, batch_id, process_job_id)) < 0) {
+  if ((ret = transcode(proc_ctx, in_ctx, batch_id, process_job_id)) < 0) {
     fprintf(stderr, "Failed to transcode.\n");
   }
 
@@ -792,7 +788,7 @@ int process_video(char *process_job_id, const char *batch_id)
       out_stream_idx = stream_ctx->rend1_out_stream_idx;
     }
 
-    if (decode_packet(proc_ctx, stream_ctx, in_ctx, out_ctx) < 0) {
+    if (decode_packet(proc_ctx, stream_ctx, in_ctx) < 0) {
       fprintf(stderr, "Failed to decode packet while flushing \
         decoder for input stream '%d'.\n", in_stream_idx);
     }
@@ -817,7 +813,7 @@ int process_video(char *process_job_id, const char *batch_id)
     if (stream_ctx->renditions) { out_stream_idx += 1; }
     if (stream_ctx->codec_type != AVMEDIA_TYPE_AUDIO) { continue; }
 
-    if (convert_audio_frame(proc_ctx, stream_ctx, 0, out_ctx,
+    if (convert_audio_frame(proc_ctx, stream_ctx, 0,
       in_ctx->dec_frame) < 0)
     {
       fprintf(stderr, "Failed to encode audio frame while flushing \
@@ -826,13 +822,13 @@ int process_video(char *process_job_id, const char *batch_id)
   }
 
   if (proc_ctx->deint_ctx) {
-    if (deinterlace_video_frame(proc_ctx, stream_ctx, in_ctx, out_ctx) < 0) {
+    if (deinterlace_video_frame(proc_ctx, stream_ctx, in_ctx) < 0) {
       fprintf(stderr, "Failed to flush deinterlace filter.\n");
     }
   }
 
   if (proc_ctx->burn_in_ctx) {
-    if (burn_in_subtitles(proc_ctx, stream_ctx, out_ctx,
+    if (burn_in_subtitles(proc_ctx, stream_ctx,
       proc_ctx->burn_in_ctx->v_buffersrc_ctx, NULL) < 0) {
         fprintf(stderr, "Failed to flush burn in filter.\n");
     }
@@ -851,7 +847,7 @@ int process_video(char *process_job_id, const char *batch_id)
     out_stream_idx = stream_ctx->rend0_out_stream_idx;
 
     if (stream_ctx->codec_type == AVMEDIA_TYPE_VIDEO) {
-      if (encode_video_frame(proc_ctx, stream_ctx, out_ctx,
+      if (encode_video_frame(proc_ctx, stream_ctx,
         NULL, 0) < 0)
       {
         fprintf(stderr, "Failed to encode video frame from input stream: %d.\n",
@@ -860,7 +856,7 @@ int process_video(char *process_job_id, const char *batch_id)
     } else if (stream_ctx->codec_type == AVMEDIA_TYPE_AUDIO) {
       if (stream_ctx->renditions) { out_stream_idx += 1; }
 
-      if (encode_audio_frame(stream_ctx, 0, out_ctx,
+      if (encode_audio_frame(proc_ctx, stream_ctx, 0,
         NULL) < 0)
       {
         fprintf(stderr, "Failed to write audio frame.\n");
@@ -868,7 +864,7 @@ int process_video(char *process_job_id, const char *batch_id)
     }
   }
 
-  if (av_write_trailer(out_ctx->fmt_ctx) < 0) {
+  if (av_write_trailer(proc_ctx->out_fmt_ctx) < 0) {
     fprintf(stderr, "Failed to write trailer to file.\n\
       Libav Error: %s.\n", av_err2str(ret));
   }
@@ -904,7 +900,6 @@ update_status:
   sqlite3_close(db);
   processing_context_free(&proc_ctx);
   close_input(&in_ctx);
-  close_output(&out_ctx);
 
 
   if (ret < 0 && ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {

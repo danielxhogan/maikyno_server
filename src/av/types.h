@@ -123,11 +123,6 @@ typedef struct ProcessingContext {
   AVFrame *frame_cpy;
 } ProcessingContext;
 
-typedef struct OutputContext {
-  AVFormatContext *fmt_ctx;
-  AVPacket *enc_pkt;
-} OutputContext;
-
 typedef struct InputContext {
   AVFormatContext *fmt_ctx;
   AVPacket *init_pkt;
