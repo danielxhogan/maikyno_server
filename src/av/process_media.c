@@ -350,20 +350,22 @@ static int convert_audio_frame(ProcessingContext *proc_ctx,
 {
   int out_stream_idx, nb_converted_samples,
     sample_rate, start_time, timestamp, ret = 0;
+  SwrOutputContext *swr_out_ctx;
   AVCodecContext *enc_ctx;
   int64_t stream_start_time;
   AVRational stream_time_base, pts_time_base;
 
   if (!rendition) {
+    swr_out_ctx = stream_ctx->rend0_swr_out_ctx;
     enc_ctx = stream_ctx->rend0_enc_ctx;
     out_stream_idx = stream_ctx->rend0_out_stream_idx;
   }
   else {
+    swr_out_ctx = stream_ctx->rend1_swr_out_ctx;
     enc_ctx = stream_ctx->rend1_enc_ctx;
     out_stream_idx = stream_ctx->rend1_out_stream_idx;
   }
 
-  SwrOutputContext *swr_out_ctx = proc_ctx->swr_out_ctx_arr[out_stream_idx];
   FrameSizeConversionContext *fsc_ctx = proc_ctx->fsc_ctx_arr[out_stream_idx];
 
   if (!frame) {
