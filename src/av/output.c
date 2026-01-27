@@ -741,8 +741,7 @@ int make_output_filename_string(char **out_filename,
   return 0;
 }
 
-int open_encoders_and_streams(ProcessingContext *proc_ctx,
-  InputContext *in_ctx, char *process_job_id)
+int open_encoders_and_streams(ProcessingContext *proc_ctx, char *process_job_id)
 {
   int out_stream_idx, ret = 0;
   StreamContext *stream_ctx;
@@ -755,7 +754,7 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
 
     if (!stream_ctx->passthrough) {
       if ((ret = open_encoder(proc_ctx, stream_ctx, out_stream_idx,
-        in_ctx->fmt_ctx->url)) < 0)
+        proc_ctx->in_fmt_ctx->url)) < 0)
       {
         fprintf(stderr, "Failed to open encoder for output stream: %d.\n\
           process job: %s.\n",
@@ -798,8 +797,7 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
   return 0;
 }
 
-int open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
-  char *process_job_id, sqlite3 *db)
+int open_output(ProcessingContext *proc_ctx, char *process_job_id, sqlite3 *db)
 {
   int extra, ret = 0;
   char *name = NULL, *media_dir_path = NULL, *title = NULL, *out_filename = NULL;
@@ -831,7 +829,7 @@ int open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
   }
 
   if ((ret = av_dict_copy(&proc_ctx->out_fmt_ctx->metadata,
-    in_ctx->fmt_ctx->metadata, AV_DICT_DONT_OVERWRITE)) < 0)
+    proc_ctx->in_fmt_ctx->metadata, AV_DICT_DONT_OVERWRITE)) < 0)
   {
     fprintf(stderr, "Failed to copy file metadata:\nvideo: %s\nprocess job: %s\n\
       Libav Error: %s\n", name, process_job_id, av_err2str(ret));
@@ -846,16 +844,14 @@ int open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
     }
   }
 
-  if ((ret = copy_chapters(proc_ctx->out_fmt_ctx, in_ctx->fmt_ctx)) < 0)
+  if ((ret = copy_chapters(proc_ctx->out_fmt_ctx, proc_ctx->in_fmt_ctx)) < 0)
   {
     fprintf(stderr, "Failed to copy chapters:\n\
       video: %s\nprocess job: %s\n", name, process_job_id);
     goto end;
   }
 
-  if ((ret = open_encoders_and_streams(proc_ctx,
-    in_ctx, process_job_id)) < 0)
-  {
+  if ((ret = open_encoders_and_streams(proc_ctx, process_job_id)) < 0) {
     fprintf(stderr, "Failed to open encoders and streams for process job: %s.\n",
       process_job_id);
     goto end;

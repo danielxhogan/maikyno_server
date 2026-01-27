@@ -194,6 +194,7 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   proc_ctx->pkt_cpy = NULL;
   proc_ctx->frame = NULL;
   proc_ctx->frame_cpy = NULL;
+  proc_ctx->sub = NULL;
 
   if ((ret = proc_ctx->nb_in_streams =
     get_input_file_nb_streams(process_job_id, db)) < 0)
@@ -239,6 +240,18 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
     goto end;
   }
 
+  if (!(proc_ctx->frame = av_frame_alloc())) {
+    fprintf(stderr, "Failed to allocate AVFrame.\n");
+    ret = AVERROR(ENOMEM);
+    goto end;
+  }
+
+  if (!(proc_ctx->sub = av_mallocz(sizeof(AVSubtitle)))) {
+    fprintf(stderr, "Failed to allocate AVSubtitle.\n");
+    ret = AVERROR(ENOMEM);
+    return NULL;
+  }
+
   return proc_ctx;
 
 end:
@@ -257,6 +270,8 @@ void processing_context_free(ProcessingContext **proc_ctx)
     }
     free((*proc_ctx)->stream_ctx_arr);
   }
+
+  free((*proc_ctx)->ctx_map);
 
   if ((*proc_ctx)->swr_out_ctx_arr) {
     for (i = 0; i < (*proc_ctx)->nb_out_streams; i++) {
@@ -285,12 +300,20 @@ void processing_context_free(ProcessingContext **proc_ctx)
 
   if ((*proc_ctx)->pkt) { av_packet_unref((*proc_ctx)->pkt); }
   av_packet_free(&(*proc_ctx)->pkt);
+  if ((*proc_ctx)->pkt_cpy) { av_packet_unref((*proc_ctx)->pkt_cpy); }
+  av_packet_free(&(*proc_ctx)->pkt_cpy);
+
+  av_frame_unref((*proc_ctx)->frame);
+  av_frame_unref((*proc_ctx)->frame_cpy);
+  av_frame_free(&(*proc_ctx)->frame);
+  av_frame_free(&(*proc_ctx)->frame_cpy);
+
+  if ((*proc_ctx)->sub) { avsubtitle_free((*proc_ctx)->sub); }
 
   if ((*proc_ctx)->out_fmt_ctx && !((*proc_ctx)->out_fmt_ctx->flags & AVFMT_NOFILE))
     avio_closep(&(*proc_ctx)->out_fmt_ctx->pb);
   avformat_free_context((*proc_ctx)->out_fmt_ctx);
 
-  free((*proc_ctx)->ctx_map);
   free(*proc_ctx);
   *proc_ctx = NULL;
 }
@@ -675,8 +698,7 @@ int audio_context_init(ProcessingContext *proc_ctx,
   return 0;
 }
 
-int processing_context_init(ProcessingContext *proc_ctx,
-  InputContext *in_ctx, char *process_job_id)
+int processing_context_init(ProcessingContext *proc_ctx, char *process_job_id)
 {
   int in_stream_idx, ctx_idx, ret = 0;
   StreamContext *stream_ctx;
@@ -741,7 +763,7 @@ int processing_context_init(ProcessingContext *proc_ctx,
     !proc_ctx->stream_ctx_arr[0]->passthrough
   ) {
     if (!(proc_ctx->burn_in_ctx =
-      burn_in_filter_context_init(proc_ctx, in_ctx)))
+      burn_in_filter_context_init(proc_ctx)))
     {
       fprintf(stderr, "Failed to allocate burn in filter context \
         for process job: %s\n", process_job_id);

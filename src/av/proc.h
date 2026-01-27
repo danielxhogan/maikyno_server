@@ -6,6 +6,6 @@
 ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db);
 int get_processing_info(ProcessingContext *proc_ctx,
   char *process_job_id, sqlite3 *db);
-int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
+int processing_context_init(ProcessingContext *proc_ctx,
   char *process_job_id);
 void processing_context_free(ProcessingContext **proc_ctx);

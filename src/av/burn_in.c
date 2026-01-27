@@ -104,23 +104,23 @@ int sub_to_frame_sws_context_alloc(SubToFrameContext *stf_ctx,
   return 0;
 }
 
-int sub_to_frame_convert(SubToFrameContext *stf_ctx,
-  InputContext *in_ctx)
+int sub_to_frame_convert(ProcessingContext *proc_ctx)
 {
   int ret = 0;
-  AVSubtitle *sub = in_ctx->dec_sub;
-  AVFrame *subtitle_frame = stf_ctx->subtitle_frame;
+  AVSubtitle *sub = proc_ctx->sub;
+  SubToFrameContext *stf_ctx = proc_ctx->burn_in_ctx->stf_ctx;
+  AVFrame *frame = stf_ctx->subtitle_frame;
   uint8_t *dst_data[AV_NUM_DATA_POINTERS] = { NULL };
 
-  memset(subtitle_frame->data[0], 0,
-    subtitle_frame->height *
-    subtitle_frame->linesize[0]);
+  memset(frame->data[0], 0,
+    frame->height *
+    frame->linesize[0]);
 
   for (unsigned int i = 0; i < sub->num_rects; i++)
   {
-    dst_data[0] = subtitle_frame->data[0] +
+    dst_data[0] = frame->data[0] +
       (sub->rects[i]->y *
-        subtitle_frame->linesize[0] *
+        frame->linesize[0] *
         stf_ctx->height_ratio) +
       (sub->rects[i]->x * 4 * stf_ctx->width_ratio);
 
@@ -132,7 +132,7 @@ int sub_to_frame_convert(SubToFrameContext *stf_ctx,
       return ret;
     }
 
-    if ((ret = av_frame_make_writable(subtitle_frame)) < 0) {
+    if ((ret = av_frame_make_writable(frame)) < 0) {
       fprintf(stderr, "Failed to make frame writable.\n\
         Libav Error: %s.\n", av_err2str(ret));
       return ret;
@@ -143,11 +143,11 @@ int sub_to_frame_convert(SubToFrameContext *stf_ctx,
       sub->rects[i]->linesize,
       0, sub->rects[i]->h,
       dst_data,
-      subtitle_frame->linesize);
+      frame->linesize);
   }
 
-  subtitle_frame->pts = sub->pts;
-  subtitle_frame->pkt_dts = in_ctx->init_pkt->dts;
+  frame->pts = sub->pts;
+  frame->pkt_dts = proc_ctx->pkt->dts;
 
   return 0;
 }
@@ -201,8 +201,7 @@ void sub_to_frame_context_free(SubToFrameContext **stf_ctx)
   *stf_ctx = NULL;
 }
 
-BurnInFilterContext *burn_in_filter_context_init(ProcessingContext *proc_ctx,
-  InputContext *in_ctx)
+BurnInFilterContext *burn_in_filter_context_init(ProcessingContext *proc_ctx)
 {
   int ret = 0;
   char v_args[512], s_args[512],
@@ -214,7 +213,7 @@ BurnInFilterContext *burn_in_filter_context_init(ProcessingContext *proc_ctx,
 
   int v_ctx_idx = proc_ctx->ctx_map[proc_ctx->v_stream_idx];
   AVCodecContext *v_dec_ctx = proc_ctx->stream_ctx_arr[v_ctx_idx]->dec_ctx;
-  AVStream *v_stream = in_ctx->fmt_ctx->streams[proc_ctx->v_stream_idx];
+  AVStream *v_stream = proc_ctx->in_fmt_ctx->streams[proc_ctx->v_stream_idx];
 
   BurnInFilterContext *burn_in_ctx = NULL;
   AVFilterInOut *outputs = NULL;

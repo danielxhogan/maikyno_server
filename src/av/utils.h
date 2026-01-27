@@ -16,6 +16,6 @@ enum ProcessJobStatus {
 int get_core_count();
 const char *job_status_enum_to_string(enum ProcessJobStatus status);
 int check_abort_status(const char *batch_id);
-int calculate_pct_complete(InputContext *in_ctx, char *process_job_id);
+int calculate_pct_complete(ProcessingContext *proc_ctx, char *process_job_id);
 int update_pct_complete(int64_t pct, char *process_job_id);
 int update_process_job_status(char *process_job_id, enum ProcessJobStatus status);

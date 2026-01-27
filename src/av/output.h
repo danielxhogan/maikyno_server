@@ -7,4 +7,4 @@
 #include <sqlite3.h>
 
 int open_output(ProcessingContext *proc_ctx,
-  InputContext *in_ctx, char *process_job_id, sqlite3 *db);
+  char *process_job_id, sqlite3 *db);

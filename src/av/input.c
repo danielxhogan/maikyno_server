@@ -53,12 +53,13 @@ end:
   return ret;
 }
 
-static int open_decoder(StreamContext *stream_ctx, InputContext *in_ctx, int in_stream_idx)
+static int open_decoder(ProcessingContext *proc_ctx,
+  StreamContext *stream_ctx, int in_stream_idx)
 {
   int ret = 0;
   const AVCodec *dec;
 
-  AVStream *stream = in_ctx->fmt_ctx->streams[in_stream_idx];
+  AVStream *stream = proc_ctx->in_fmt_ctx->streams[in_stream_idx];
 
   if (!(dec = avcodec_find_decoder(stream->codecpar->codec_id))) {
     fprintf(stderr, "Failed to find decoder.\n");
@@ -93,26 +94,13 @@ static int open_decoder(StreamContext *stream_ctx, InputContext *in_ctx, int in_
   return ret;
 }
 
-InputContext *open_input(ProcessingContext *proc_ctx,
+int open_input(ProcessingContext *proc_ctx,
   char *process_job_id, sqlite3 *db)
 {
   int in_stream_idx, ret = 0;
   char *input_file = NULL;
   StreamContext *stream_ctx;
   AVDictionary *opts = NULL;
-
-  InputContext *in_ctx = malloc(sizeof(InputContext));
-  if (!in_ctx) {
-    ret = ENOMEM;
-    goto end;
-  }
-
-  in_ctx->fmt_ctx = NULL;
-  in_ctx->init_pkt = NULL;
-  in_ctx->init_pkt_cpy = NULL;
-  in_ctx->dec_frame = NULL;
-  in_ctx->dec_frame_cpy = NULL;
-  in_ctx->dec_sub = NULL;
 
   if ((ret = get_input_file(&input_file, process_job_id, db)) < 0)
   {
@@ -125,22 +113,22 @@ InputContext *open_input(ProcessingContext *proc_ctx,
 
   if ((ret = av_dict_set(&opts, "probesize", "50000000", 0)) < 0) {
     fprintf(stderr, "Failed to set probesize option.\n");
-    return NULL;
+    goto end;
   }
 
   if ((ret = av_dict_set(&opts, "analyzeduration", "10000000", 0)) < 0) {
     fprintf(stderr, "Failed to set analyzeduration option.\n");
-    return NULL;
+    goto end;
   }
 
   if ((ret =
-    avformat_open_input(&in_ctx->fmt_ctx, input_file, NULL, &opts)) < 0)
+    avformat_open_input(&proc_ctx->in_fmt_ctx, input_file, NULL, &opts)) < 0)
   {
     fprintf(stderr, "Failed to open input file \"%s\".\n", input_file);
     goto end;
   }
 
-  if ((ret = avformat_find_stream_info(in_ctx->fmt_ctx, NULL)) < 0) {
+  if ((ret = avformat_find_stream_info(proc_ctx->in_fmt_ctx, NULL)) < 0) {
     fprintf(stderr, "Failed to retrieve input stream info for: %s\n",
       input_file);
     goto end;
@@ -150,12 +138,12 @@ InputContext *open_input(ProcessingContext *proc_ctx,
     stream_ctx = proc_ctx->stream_ctx_arr[i];
 
     in_stream_idx = stream_ctx->in_stream_idx;
-    stream_ctx->in_stream = in_ctx->fmt_ctx->streams[in_stream_idx];
+    stream_ctx->in_stream = proc_ctx->in_fmt_ctx->streams[in_stream_idx];
     stream_ctx->codec_type = stream_ctx->in_stream->codecpar->codec_type;
 
     if (stream_ctx->passthrough) { continue; }
 
-    if ((ret = open_decoder(stream_ctx, in_ctx, in_stream_idx)) < 0) {
+    if ((ret = open_decoder(proc_ctx, stream_ctx, in_stream_idx)) < 0) {
       fprintf(stderr, "Failed to open decoder.\n");
       fprintf(stderr, "stream '%d'.\nprocess job: \"%s\".\n",
         in_stream_idx, process_job_id);
@@ -163,50 +151,13 @@ InputContext *open_input(ProcessingContext *proc_ctx,
     }
   }
 
-  if (!(in_ctx->init_pkt = av_packet_alloc())) {
-    fprintf(stderr, "Failed to allocate AVPacket.\n");
-    ret = AVERROR(ENOMEM);
-    goto end;
-  }
-
-  if (!(in_ctx->dec_frame = av_frame_alloc())) {
-    fprintf(stderr, "Failed to allocate AVFrame.\n");
-    ret = AVERROR(ENOMEM);
-    goto end;
-  }
-
-  if (!(in_ctx->dec_sub = av_mallocz(sizeof(AVSubtitle)))) {
-    fprintf(stderr, "Failed to allocate AVSubtitle.\n");
-    ret = AVERROR(ENOMEM);
-    return NULL;
-  }
-
 end:
   free(input_file);
 
   if (ret < 0) {
     fprintf(stderr, "Libav Error: %s.\n", av_err2str(ret));
-    close_input(&in_ctx);
-    return NULL;
+    return ret;
   }
 
-  return in_ctx;
-}
-
-void close_input(InputContext **in_ctx)
-{
-  if (!*in_ctx) { return; }
-
-  avformat_close_input(&(*in_ctx)->fmt_ctx);
-  if ((*in_ctx)->init_pkt) { av_packet_unref((*in_ctx)->init_pkt); }
-  av_packet_free(&(*in_ctx)->init_pkt);
-  if ((*in_ctx)->init_pkt_cpy) { av_packet_unref((*in_ctx)->init_pkt_cpy); }
-  av_packet_free(&(*in_ctx)->init_pkt_cpy);
-  av_frame_unref((*in_ctx)->dec_frame);
-  av_frame_free(&(*in_ctx)->dec_frame);
-  av_frame_unref((*in_ctx)->dec_frame_cpy);
-  av_frame_free(&(*in_ctx)->dec_frame_cpy);
-  if ((*in_ctx)->dec_sub) { avsubtitle_free((*in_ctx)->dec_sub); }
-  free(*in_ctx);
-  *in_ctx = NULL;
+  return 0;
 }
