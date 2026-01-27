@@ -64,8 +64,8 @@ typedef struct StreamContext {
   char *codec;
   enum AVMediaType codec_type;
 
-  AVStream *in_stream;
   int in_stream_idx;
+  AVStream *in_stream;
   AVCodecContext *dec_ctx;
 
   SwrOutputContext *rend1_swr_out_ctx;
@@ -77,6 +77,8 @@ typedef struct StreamContext {
 
   int rend1_out_stream_idx;
   int rend2_out_stream_idx;
+  AVStream *rend1_out_stream;
+  AVStream *rend2_out_stream;
   AVCodecContext *rend1_enc_ctx;
   AVCodecContext *rend2_enc_ctx;
 } StreamContext;

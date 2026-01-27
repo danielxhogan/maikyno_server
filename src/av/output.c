@@ -773,6 +773,9 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
       return ret;
     }
 
+    stream_ctx->rend1_out_stream =
+      out_ctx->fmt_ctx->streams[out_ctx->fmt_ctx->nb_streams - 1];
+
     if (stream_cfg->renditions) {
       if ((ret = init_stream(out_ctx->fmt_ctx, out_ctx->enc_ctx_arr[out_stream_idx + 1],
         stream_ctx->in_stream, stream_cfg->rend2_title)) < 0)
@@ -782,6 +785,9 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
           in_stream_idx, process_job_id, av_err2str(ret));
         return ret;
       }
+
+      stream_ctx->rend2_out_stream =
+        out_ctx->fmt_ctx->streams[out_ctx->fmt_ctx->nb_streams - 1];
     }
   }
 

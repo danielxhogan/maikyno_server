@@ -114,8 +114,8 @@ StreamContext *stream_context_alloc()
   stream_ctx->codec = NULL;
   stream_ctx->codec_type = AVMEDIA_TYPE_UNKNOWN;
 
-  stream_ctx->in_stream = NULL;
   stream_ctx->in_stream_idx = -1;
+  stream_ctx->in_stream = NULL;
   stream_ctx->dec_ctx = NULL;
 
   stream_ctx->rend1_swr_out_ctx = NULL;
@@ -127,6 +127,8 @@ StreamContext *stream_context_alloc()
 
   stream_ctx->rend1_out_stream_idx = -1;
   stream_ctx->rend2_out_stream_idx = -1;
+  stream_ctx->rend1_out_stream = NULL;
+  stream_ctx->rend2_out_stream = NULL;
   stream_ctx->rend1_enc_ctx = NULL;
   stream_ctx->rend2_enc_ctx = NULL;
 
