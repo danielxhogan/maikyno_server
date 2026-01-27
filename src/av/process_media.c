@@ -351,26 +351,25 @@ static int convert_audio_frame(ProcessingContext *proc_ctx,
   int out_stream_idx, nb_converted_samples,
     sample_rate, start_time, timestamp, ret = 0;
   SwrOutputContext *swr_out_ctx;
+  FrameSizeConversionContext *fsc_ctx;
   AVCodecContext *enc_ctx;
   int64_t stream_start_time;
   AVRational stream_time_base, pts_time_base;
 
   if (!rendition) {
     swr_out_ctx = stream_ctx->rend0_swr_out_ctx;
+    fsc_ctx = stream_ctx->rend0_fsc_ctx;
     enc_ctx = stream_ctx->rend0_enc_ctx;
     out_stream_idx = stream_ctx->rend0_out_stream_idx;
   }
   else {
     swr_out_ctx = stream_ctx->rend1_swr_out_ctx;
+    fsc_ctx = stream_ctx->rend1_fsc_ctx;
     enc_ctx = stream_ctx->rend1_enc_ctx;
     out_stream_idx = stream_ctx->rend1_out_stream_idx;
   }
 
-  FrameSizeConversionContext *fsc_ctx = proc_ctx->fsc_ctx_arr[out_stream_idx];
-
-  if (!frame) {
-    goto flush;
-  }
+  if (!frame) { goto flush; }
 
   if ((ret = av_frame_make_writable(swr_out_ctx->swr_frame)) < 0) {
     fprintf(stderr, "Failed to make frame writable.\nError: %s.\n",

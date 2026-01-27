@@ -155,8 +155,6 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
 
   proc_ctx->nb_out_streams = 0;
 
-  proc_ctx->fsc_ctx_arr = NULL;
-
   proc_ctx->last_sub_pts = 0;
   proc_ctx->tminus1_v_pts = 0;
   proc_ctx->tminus2_v_pts = 0;
@@ -275,13 +273,6 @@ void processing_context_free(ProcessingContext **proc_ctx)
       stream_context_free(&(*proc_ctx)->stream_ctx_arr[i]);
     }
     free((*proc_ctx)->stream_ctx_arr);
-  }
-
-  if ((*proc_ctx)->fsc_ctx_arr) {
-    for (i = 0; i < (*proc_ctx)->nb_out_streams; i++) {
-      fsc_ctx_free(&(*proc_ctx)->fsc_ctx_arr[i]);
-    }
-    free((*proc_ctx)->fsc_ctx_arr);
   }
 
   if ((*proc_ctx)->vol_ctx_arr) {
@@ -651,29 +642,30 @@ int audio_context_init(ProcessingContext *proc_ctx,
 {
   int out_stream_idx, gain_boost;
   SwrOutputContext **swr_out_ctx;
+  FrameSizeConversionContext **fsc_ctx;
   AVCodecContext *enc_ctx;
 
   if (!rendition) {
     out_stream_idx = stream_ctx->rend0_out_stream_idx;
     swr_out_ctx = &stream_ctx->rend0_swr_out_ctx;
+    fsc_ctx = &stream_ctx->rend0_fsc_ctx;
     enc_ctx = stream_ctx->rend0_enc_ctx;
     gain_boost = stream_ctx->rend0_gain_boost;
   } else {
     out_stream_idx = stream_ctx->rend1_out_stream_idx;
     swr_out_ctx = &stream_ctx->rend1_swr_out_ctx;
+    fsc_ctx = &stream_ctx->rend1_fsc_ctx;
     enc_ctx = stream_ctx->rend1_enc_ctx;
     gain_boost = stream_ctx->rend1_gain_boost;
   }
 
-  if (!(*swr_out_ctx =
-    swr_output_context_alloc(stream_ctx->dec_ctx, enc_ctx)))
-  {
+  if (!(*swr_out_ctx = swr_output_context_alloc(stream_ctx->dec_ctx, enc_ctx))) {
     fprintf(stderr, "Failed to allocate swr output context.");
     fprintf(stderr, "output stream '%d'.\n", out_stream_idx);
     return -1;
   }
 
-  if (!(proc_ctx->fsc_ctx_arr[out_stream_idx] = fsc_ctx_alloc(enc_ctx))) {
+  if (!(*fsc_ctx = fsc_ctx_alloc(enc_ctx))) {
     fprintf(stderr, "Failed to allocate fsc output context.");
     fprintf(stderr, "output stream '%d'.\n", out_stream_idx);
     return -1;
@@ -696,14 +688,6 @@ int processing_context_init(ProcessingContext *proc_ctx, char *process_job_id)
 {
   int in_stream_idx, ctx_idx, ret = 0;
   StreamContext *stream_ctx;
-
-  if (!(proc_ctx->fsc_ctx_arr =
-    calloc(proc_ctx->nb_out_streams, sizeof(FrameSizeConversionContext *))))
-  {
-    fprintf(stderr, "Failed to allocate array \
-      for frame size conversion contexts.\n");
-    return -1;
-  }
 
   if (!(proc_ctx->vol_ctx_arr =
     calloc(proc_ctx->nb_out_streams, sizeof(VolumeFilterContext *))))

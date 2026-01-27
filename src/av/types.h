@@ -85,8 +85,6 @@ typedef struct StreamContext {
 typedef struct ProcessingContext {
   unsigned int nb_out_streams;
 
-  FrameSizeConversionContext **fsc_ctx_arr;
-
   int64_t last_sub_pts;
   int64_t tminus1_v_pts;
   int64_t tminus2_v_pts;
