@@ -2,7 +2,6 @@
 
 #include "types.h"
 
-RenditionFilterContext *video_rendition_filter_context_init(
-  ProcessingContext *proc_ctx, AVCodecContext *dec_ctx,
-  AVCodecContext *enc_ctx1, AVCodecContext *enc_ctx2, AVStream *in_stream);
+RenditionFilterContext *rendition_filter_context_init(
+  ProcessingContext *proc_ctx, StreamContext *stream_ctx);
 void rendition_filter_context_free(RenditionFilterContext **rend_ctx);

@@ -6,8 +6,7 @@
 #include <libavutil/pixdesc.h>
 #include <libavutil/opt.h>
 
-DeinterlaceFilterContext *deint_filter_context_init(AVCodecContext *dec_ctx,
-  InputContext *in_ctx, int in_stream_idx)
+DeinterlaceFilterContext *deint_filter_context_init(StreamContext *stream_ctx)
 {
   int ret = 0;
   char args[512], *flt_str = "yadif";
@@ -15,7 +14,8 @@ DeinterlaceFilterContext *deint_filter_context_init(AVCodecContext *dec_ctx,
 
   const AVFilter *buffersrc = avfilter_get_by_name("buffer");
   const AVFilter *buffersink = avfilter_get_by_name("buffersink");
-  AVStream *in_stream = in_ctx->fmt_ctx->streams[in_stream_idx];
+  AVCodecContext *dec_ctx = stream_ctx->dec_ctx;
+  AVStream *in_stream = stream_ctx->in_stream;
 
   DeinterlaceFilterContext *deint_ctx = NULL;
   AVFilterInOut *outputs = NULL;

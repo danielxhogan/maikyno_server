@@ -4,8 +4,7 @@
 #include <libavutil/opt.h>
 
 VolumeFilterContext *volume_filter_context_init(
-  StreamContext *stream_ctx, StreamConfig *stream_cfg,
-  AVCodecContext *enc_ctx, int rendition)
+  StreamConfig *stream_cfg, AVCodecContext *enc_ctx, int rendition)
 {
   int gain_boost, ret = 0;
   char args[512], flt_str[512], ch_layout[512];

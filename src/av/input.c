@@ -114,7 +114,6 @@ InputContext *open_input(ProcessingContext *proc_ctx,
   in_ctx->dec_frame = NULL;
   in_ctx->dec_frame_cpy = NULL;
   in_ctx->dec_sub = NULL;
-  in_ctx->nb_selected_streams = proc_ctx->nb_selected_streams;
 
   if ((ret = get_input_file(&input_file, process_job_id, db)) < 0)
   {

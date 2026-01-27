@@ -251,6 +251,20 @@ void processing_context_free(ProcessingContext **proc_ctx)
   if (!*proc_ctx) { return; }
   unsigned int i;
 
+  if ((*proc_ctx)->stream_cfg_arr) {
+    for (i = 0; i < (*proc_ctx)->nb_selected_streams; i++) {
+      stream_config_free(&(*proc_ctx)->stream_cfg_arr[i]);
+    }
+    free((*proc_ctx)->stream_cfg_arr);
+  }
+
+  if ((*proc_ctx)->stream_ctx_arr) {
+    for (i = 0; i < (*proc_ctx)->nb_selected_streams; i++) {
+      stream_context_free(&(*proc_ctx)->stream_ctx_arr[i]);
+    }
+    free((*proc_ctx)->stream_ctx_arr);
+  }
+
   if ((*proc_ctx)->swr_out_ctx_arr) {
     for (i = 0; i < (*proc_ctx)->nb_out_streams; i++) {
       swr_output_context_free(&(*proc_ctx)->swr_out_ctx_arr[i]);
@@ -265,9 +279,6 @@ void processing_context_free(ProcessingContext **proc_ctx)
     free((*proc_ctx)->fsc_ctx_arr);
   }
 
-  deint_filter_context_free(&(*proc_ctx)->deint_ctx);
-  burn_in_filter_context_free(&(*proc_ctx)->burn_in_ctx);
-
   if ((*proc_ctx)->vol_ctx_arr) {
     for (i = 0; i < (*proc_ctx)->nb_out_streams; i++) {
       volume_filter_context_free(&(*proc_ctx)->vol_ctx_arr[i]);
@@ -275,17 +286,11 @@ void processing_context_free(ProcessingContext **proc_ctx)
     free((*proc_ctx)->vol_ctx_arr);
   }
 
-  free((*proc_ctx)->rend_ctx);
-
-  if ((*proc_ctx)->stream_cfg_arr) {
-    for (i = 0; i < (*proc_ctx)->nb_selected_streams; i++) {
-      stream_config_free(&(*proc_ctx)->stream_cfg_arr[i]);
-    }
-    free((*proc_ctx)->stream_cfg_arr);
-  }
+  deint_filter_context_free(&(*proc_ctx)->deint_ctx);
+  burn_in_filter_context_free(&(*proc_ctx)->burn_in_ctx);
+  rendition_filter_context_free(&(*proc_ctx)->rend_ctx);
 
   free((*proc_ctx)->ctx_map);
-
   free(*proc_ctx);
   *proc_ctx = NULL;
 }
@@ -634,16 +639,18 @@ int get_processing_info(ProcessingContext *proc_ctx,
 }
 
 int audio_context_init(ProcessingContext *proc_ctx,
-  StreamContext *stream_ctx, StreamConfig *stream_cfg,
-  int rendition, AVCodecContext *enc_ctx)
+  StreamContext *stream_ctx, StreamConfig *stream_cfg, int rendition)
 {
   int out_stream_idx, gain_boost;
+  AVCodecContext *enc_ctx;
 
   if (!rendition) {
     out_stream_idx = stream_ctx->rend0_out_stream_idx;
+    enc_ctx = stream_ctx->rend0_enc_ctx;
     gain_boost = stream_cfg->rend0_gain_boost;
   } else {
     out_stream_idx = stream_ctx->rend1_out_stream_idx;
+    enc_ctx = stream_ctx->rend1_enc_ctx;
     gain_boost = stream_cfg->rend1_gain_boost;
   }
 
@@ -663,7 +670,7 @@ int audio_context_init(ProcessingContext *proc_ctx,
 
   if (gain_boost > 0) {
     if (!(proc_ctx->vol_ctx_arr[out_stream_idx] =
-      volume_filter_context_init(stream_ctx, stream_cfg, enc_ctx, rendition)))
+      volume_filter_context_init(stream_cfg, enc_ctx, rendition)))
     {
       fprintf(stderr, "Failed to allocate volume filter context.\n");
       fprintf(stderr, "output stream: '%d'.\n", out_stream_idx);
@@ -680,7 +687,6 @@ int processing_context_init(ProcessingContext *proc_ctx,
   int in_stream_idx, ctx_idx, ret = 0;
   StreamConfig *stream_cfg;
   StreamContext *stream_ctx;
-  AVCodecContext *enc_ctx;
 
   if (!(proc_ctx->swr_out_ctx_arr =
     calloc(proc_ctx->nb_out_streams, sizeof(SwrOutputContext *))))
@@ -712,21 +718,13 @@ int processing_context_init(ProcessingContext *proc_ctx,
     if (stream_ctx->codec_type != AVMEDIA_TYPE_AUDIO) { continue; }
 
     if (stream_ctx->transcode_rend0) {
-      enc_ctx = stream_ctx->rend0_enc_ctx;
-
-      if ((ret = audio_context_init(proc_ctx, stream_ctx, stream_cfg,
-        0, enc_ctx)) < 0)
-      {
+      if ((ret = audio_context_init(proc_ctx, stream_ctx, stream_cfg, 0)) < 0) {
         fprintf(stderr, "Failed to initialize audio context.");
       }
     }
 
     if (stream_cfg->renditions) {
-      enc_ctx = stream_ctx->rend1_enc_ctx;
-
-      if ((ret = audio_context_init(proc_ctx, stream_ctx, stream_cfg,
-        1, enc_ctx)) < 0)
-      {
+      if ((ret = audio_context_init(proc_ctx, stream_ctx, stream_cfg, 1)) < 0) {
         fprintf(stderr, "Failed to initialize audio context.");
       }
     }
@@ -740,7 +738,7 @@ int processing_context_init(ProcessingContext *proc_ctx,
 
   if (proc_ctx->deint) {
     if (!(proc_ctx->deint_ctx =
-      deint_filter_context_init(stream_ctx->dec_ctx, in_ctx, proc_ctx->v_stream_idx)))
+      deint_filter_context_init(stream_ctx)))
     {
       fprintf(stderr, "Failed to allocate deinterlace filter context \
         for process job: %s\n", process_job_id);
@@ -764,10 +762,7 @@ int processing_context_init(ProcessingContext *proc_ctx,
   if (stream_cfg->renditions)
   {
     if (!(proc_ctx->rend_ctx =
-      video_rendition_filter_context_init(proc_ctx, stream_ctx->dec_ctx,
-        stream_ctx->rend0_enc_ctx,
-        stream_ctx->rend1_enc_ctx,
-        in_ctx->fmt_ctx->streams[proc_ctx->v_stream_idx])))
+      rendition_filter_context_init(proc_ctx, stream_ctx)))
     {
       fprintf(stderr, "Failed to allocate video rendition context for \
         input stream: %d\nprocess job: %s\n", proc_ctx->v_stream_idx, process_job_id);

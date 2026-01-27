@@ -32,24 +32,28 @@ int buffersink_ctx_init(AVFilterContext **buffersink_ctx,
   return 0;
 }
 
-RenditionFilterContext *video_rendition_filter_context_init(
-  ProcessingContext *proc_ctx, AVCodecContext *dec_ctx,
-  AVCodecContext *enc_ctx1, AVCodecContext *enc_ctx2, AVStream *in_stream)
+RenditionFilterContext *rendition_filter_context_init(
+  ProcessingContext *proc_ctx, StreamContext *stream_ctx)
 {
   int ret = 0;
   char args[512], flt_str[512];
+
+  AVCodecContext *dec_ctx = stream_ctx->dec_ctx;
+  AVCodecContext *enc_ctx1 = stream_ctx->rend0_enc_ctx;
+  AVCodecContext *enc_ctx2 = stream_ctx->rend1_enc_ctx;
+  AVStream *in_stream = stream_ctx->in_stream;
 
   const char *pix_fmt_str1 = av_get_pix_fmt_name(enc_ctx1->pix_fmt);
   const char *pix_fmt_str2 = av_get_pix_fmt_name(enc_ctx2->pix_fmt);
 
   if (proc_ctx->tonemap && proc_ctx->hdr) {
     snprintf(flt_str, sizeof(flt_str),
-    "[in]split[out1][tmp];[tmp]zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable,zscale=w=%d:h=%d:t=bt709:m=bt709:c=left,format=%s[out2]",
-    enc_ctx2->width, enc_ctx2->height, pix_fmt_str2);
+      "[in]split[out1][tmp];[tmp]zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable,zscale=w=%d:h=%d:t=bt709:m=bt709:c=left,format=%s[out2]",
+      enc_ctx2->width, enc_ctx2->height, pix_fmt_str2);
   } else {
     snprintf(flt_str, sizeof(flt_str),
-    "[in]split[out1][tmp];[tmp]scale=w=%d:h=%d,format=%s[out2]",
-    enc_ctx2->width, enc_ctx2->height, pix_fmt_str2);
+      "[in]split[out1][tmp];[tmp]scale=w=%d:h=%d,format=%s[out2]",
+      enc_ctx2->width, enc_ctx2->height, pix_fmt_str2);
   }
 
   const AVFilter *buffersrc = avfilter_get_by_name("buffer");
@@ -160,9 +164,7 @@ end:
   avfilter_inout_free(&inputs);
   avfilter_inout_free(&outputs);
 
-  if (ret < 0) {
-    return NULL;
-  }
+  if (ret < 0) { return NULL; }
   return v_rend_ctx;
 }
 

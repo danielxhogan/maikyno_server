@@ -500,9 +500,7 @@ static int open_aac_encoder(StreamContext *stream_ctx, int rendition)
 }
 
 static int open_encoder(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
-  StreamConfig *stream_cfg,
-  int out_stream_idx, AVStream *in_stream,
-  char *in_filename)
+  StreamConfig *stream_cfg, int out_stream_idx, char *in_filename)
 {
   int rendition = 0, ret = 0;
 
@@ -759,7 +757,7 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
 
     if (!stream_cfg->passthrough) {
       if ((ret = open_encoder(proc_ctx, stream_ctx, stream_cfg, out_stream_idx,
-        stream_ctx->in_stream, in_ctx->fmt_ctx->url)) < 0)
+        in_ctx->fmt_ctx->url)) < 0)
       {
         fprintf(stderr, "Failed to open encoder for output stream: %d.\n\
           process job: %s.\n",
@@ -798,7 +796,6 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
   }
 
   proc_ctx->nb_out_streams = out_ctx->fmt_ctx->nb_streams;
-  out_ctx->nb_out_streams = out_ctx->fmt_ctx->nb_streams;
 
   return 0;
 }
