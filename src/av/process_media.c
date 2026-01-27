@@ -556,6 +556,7 @@ int decode_av_packet(ProcessingContext *proc_ctx,
         }
 
         av_frame_unref(in_ctx->dec_frame_cpy);
+        av_frame_free(&in_ctx->dec_frame_cpy);
       }
 
       if (stream_ctx->renditions) {
@@ -683,6 +684,7 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
       }
 
       if (in_ctx->init_pkt_cpy) { av_packet_unref(in_ctx->init_pkt_cpy); }
+      av_packet_free(&in_ctx->init_pkt_cpy);
     }
 
     if ((ret = decode_packet(proc_ctx, stream_ctx,

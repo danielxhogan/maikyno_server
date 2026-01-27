@@ -175,12 +175,6 @@ InputContext *open_input(ProcessingContext *proc_ctx,
     goto end;
   }
 
-  if (!(in_ctx->dec_frame_cpy = av_frame_alloc())) {
-    fprintf(stderr, "Failed to allocate AVFrame.\n");
-    ret = AVERROR(ENOMEM);
-    goto end;
-  }
-
   if (!(in_ctx->dec_sub = av_mallocz(sizeof(AVSubtitle)))) {
     fprintf(stderr, "Failed to allocate AVSubtitle.\n");
     ret = AVERROR(ENOMEM);
