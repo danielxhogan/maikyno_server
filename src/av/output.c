@@ -64,7 +64,7 @@ static int get_len_params_str(char *hdr_params_str, char *additional_params_str)
 
 static int open_video_encoder(AVCodecContext **enc_ctx,
   ProcessingContext *proc_ctx, StreamContext *stream_ctx,
-  StreamConfig *stream_cfg, char *in_filename, int rendition)
+  char *in_filename, int rendition)
 {
   int len_params_str, cores, pools, ret = 0;
   const AVCodec *enc;
@@ -138,7 +138,7 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
   cores = get_core_count();
   if (cores <= 0) { cores = 4; }
 
-  if (stream_cfg->renditions) {
+  if (stream_ctx->renditions) {
     pools = (cores + 1) / 2;
   } else {
     pools = ((cores * 2) + 2) / 3;
@@ -500,24 +500,24 @@ static int open_aac_encoder(StreamContext *stream_ctx, int rendition)
 }
 
 static int open_encoder(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
-  StreamConfig *stream_cfg, int out_stream_idx, char *in_filename)
+  int out_stream_idx, char *in_filename)
 {
   int rendition = 0, ret = 0;
 
   if (stream_ctx->codec_type == AVMEDIA_TYPE_VIDEO) {
     if ((ret =
       open_video_encoder(&stream_ctx->rend0_enc_ctx,
-        proc_ctx, stream_ctx, stream_cfg, in_filename, 0)) < 0)
+        proc_ctx, stream_ctx, in_filename, 0)) < 0)
     {
       fprintf(stderr, "Failed to open video encoder for output stream.\n");
       return ret;
     }
 
-    if (stream_cfg->renditions) {
+    if (stream_ctx->renditions) {
       out_stream_idx += 1;
 
       if ((ret = open_video_encoder(&stream_ctx->rend1_enc_ctx,
-        proc_ctx, stream_ctx, stream_cfg, in_filename, 1)) < 0)
+        proc_ctx, stream_ctx, in_filename, 1)) < 0)
       {
         fprintf(stderr, "Failed to open video encoder for output stream.\n");
         return ret;
@@ -527,7 +527,7 @@ static int open_encoder(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
 
   else if (stream_ctx->codec_type == AVMEDIA_TYPE_AUDIO)
   {
-    if (stream_cfg->renditions) {
+    if (stream_ctx->renditions) {
       if (stream_ctx->transcode_rend0) {
         if ((ret = open_ac3_encoder(stream_ctx)) < 0)
         {
@@ -745,18 +745,16 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
   InputContext *in_ctx, OutputContext *out_ctx, char *process_job_id)
 {
   int out_stream_idx, ret = 0;
-  StreamConfig *stream_cfg;
   StreamContext *stream_ctx;
 
   for (unsigned int i = 0; i < proc_ctx->nb_selected_streams; i++) {
-    stream_cfg = proc_ctx->stream_cfg_arr[i];
     stream_ctx = proc_ctx->stream_ctx_arr[i];
     if (stream_ctx->in_stream_idx == proc_ctx->burn_in_idx) { continue; }
 
     out_stream_idx = out_ctx->fmt_ctx->nb_streams;
 
-    if (!stream_cfg->passthrough) {
-      if ((ret = open_encoder(proc_ctx, stream_ctx, stream_cfg, out_stream_idx,
+    if (!stream_ctx->passthrough) {
+      if ((ret = open_encoder(proc_ctx, stream_ctx, out_stream_idx,
         in_ctx->fmt_ctx->url)) < 0)
       {
         fprintf(stderr, "Failed to open encoder for output stream: %d.\n\
@@ -767,7 +765,7 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
     }
 
     if ((ret = init_stream(out_ctx->fmt_ctx, stream_ctx->rend0_enc_ctx,
-      stream_ctx->in_stream, stream_cfg->rend0_title)) < 0)
+      stream_ctx->in_stream, stream_ctx->rend0_title)) < 0)
     {
       fprintf(stderr, "Failed to initialize stream for output stream: %d.\n\
         process_job: %s.\nLibav Error: %s.\n",
@@ -779,9 +777,9 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
     stream_ctx->rend0_out_stream =
       out_ctx->fmt_ctx->streams[out_ctx->fmt_ctx->nb_streams - 1];
 
-    if (stream_cfg->renditions) {
+    if (stream_ctx->renditions) {
       if ((ret = init_stream(out_ctx->fmt_ctx, stream_ctx->rend1_enc_ctx,
-        stream_ctx->in_stream, stream_cfg->rend1_title)) < 0)
+        stream_ctx->in_stream, stream_ctx->rend1_title)) < 0)
       {
         fprintf(stderr, "Failed to initialize stream for output stream: %d.\n\
           process_job: %s.\nLibav Error: %s.\n",

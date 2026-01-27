@@ -98,7 +98,6 @@ InputContext *open_input(ProcessingContext *proc_ctx,
 {
   int in_stream_idx, ret = 0;
   char *input_file = NULL;
-  StreamConfig *stream_cfg;
   StreamContext *stream_ctx;
   AVDictionary *opts = NULL;
 
@@ -148,14 +147,13 @@ InputContext *open_input(ProcessingContext *proc_ctx,
   }
 
   for (unsigned int i = 0; i < proc_ctx->nb_selected_streams; i++) {
-    stream_cfg = proc_ctx->stream_cfg_arr[i];
     stream_ctx = proc_ctx->stream_ctx_arr[i];
 
     in_stream_idx = stream_ctx->in_stream_idx;
     stream_ctx->in_stream = in_ctx->fmt_ctx->streams[in_stream_idx];
     stream_ctx->codec_type = stream_ctx->in_stream->codecpar->codec_type;
 
-    if (stream_cfg->passthrough) { continue; }
+    if (stream_ctx->passthrough) { continue; }
 
     if ((ret = open_decoder(stream_ctx, in_ctx, in_stream_idx)) < 0) {
       fprintf(stderr, "Failed to open decoder.\n");

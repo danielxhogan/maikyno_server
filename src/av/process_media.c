@@ -484,7 +484,7 @@ int decode_sub_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
 }
 
 int decode_av_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
-  StreamConfig *stream_cfg, InputContext *in_ctx, OutputContext *out_ctx)
+  InputContext *in_ctx, OutputContext *out_ctx)
 {
   int ret = 0;
 
@@ -558,7 +558,7 @@ int decode_av_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
         av_frame_unref(in_ctx->dec_frame_cpy);
       }
 
-      if (stream_cfg->renditions) {
+      if (stream_ctx->renditions) {
         if ((ret = convert_audio_frame(proc_ctx, stream_ctx, 1, out_ctx,
           in_ctx->dec_frame)) < 0)
         {
@@ -582,7 +582,7 @@ int decode_av_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
 }
 
 int decode_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
-  StreamConfig *stream_cfg, InputContext *in_ctx, OutputContext *out_ctx)
+  InputContext *in_ctx, OutputContext *out_ctx)
 {
   int ret = 0;
 
@@ -590,7 +590,7 @@ int decode_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
     stream_ctx->codec_type == AVMEDIA_TYPE_VIDEO ||
     stream_ctx->codec_type == AVMEDIA_TYPE_AUDIO
   ) {
-    if ((ret = decode_av_packet(proc_ctx, stream_ctx, stream_cfg,
+    if ((ret = decode_av_packet(proc_ctx, stream_ctx,
       in_ctx, out_ctx)) < 0)
     {
       fprintf(stderr, "Failed to decode audio or video packet \
@@ -614,7 +614,6 @@ int decode_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
 int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
   OutputContext *out_ctx, const char *batch_id, char *process_job_id)
 {
-  StreamConfig *stream_cfg;
   StreamContext *stream_ctx;
   int in_stream_idx, ctx_idx, frame_count, check_again = 0, out_stream_idx, ret = 0;
   enum AVMediaType codec_type;
@@ -651,11 +650,10 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
       continue;
     }
 
-    stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
     stream_ctx = proc_ctx->stream_ctx_arr[ctx_idx];
     out_stream_idx = stream_ctx->rend0_out_stream_idx;
 
-    if (stream_cfg->passthrough) {
+    if (stream_ctx->passthrough) {
       in_ctx->init_pkt->stream_index = out_stream_idx;
 
       if ((ret =
@@ -689,7 +687,7 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
       if (in_ctx->init_pkt_cpy) { av_packet_unref(in_ctx->init_pkt_cpy); }
     }
 
-    if ((ret = decode_packet(proc_ctx, stream_ctx, stream_cfg,
+    if ((ret = decode_packet(proc_ctx, stream_ctx,
       in_ctx, out_ctx)) < 0)
     {
       fprintf(stderr, "Failed to decode packet.\n");
@@ -716,7 +714,6 @@ int process_video(char *process_job_id, const char *batch_id)
   }
 
   ProcessingContext *proc_ctx = NULL;
-  StreamConfig *stream_cfg;
   StreamContext *stream_ctx;
   InputContext *in_ctx = NULL;
   OutputContext *out_ctx = NULL;
@@ -784,20 +781,18 @@ int process_video(char *process_job_id, const char *batch_id)
     ctx_idx = proc_ctx->ctx_map[in_stream_idx];
     if (ctx_idx == INACTIVE_STREAM) { continue; }
 
-    stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
-    if (stream_cfg->passthrough) { continue; }
-
     stream_ctx = proc_ctx->stream_ctx_arr[ctx_idx];
+    if (stream_ctx->passthrough) { continue; }
     out_stream_idx = stream_ctx->rend0_out_stream_idx;
 
     if (
-      stream_cfg->renditions &&
+      stream_ctx->renditions &&
       stream_ctx->codec_type == AVMEDIA_TYPE_AUDIO
     ) {
       out_stream_idx = stream_ctx->rend1_out_stream_idx;
     }
 
-    if (decode_packet(proc_ctx, stream_ctx, stream_cfg, in_ctx, out_ctx) < 0) {
+    if (decode_packet(proc_ctx, stream_ctx, in_ctx, out_ctx) < 0) {
       fprintf(stderr, "Failed to decode packet while flushing \
         decoder for input stream '%d'.\n", in_stream_idx);
     }
@@ -816,11 +811,10 @@ int process_video(char *process_job_id, const char *batch_id)
     out_stream_idx = stream_ctx->rend0_out_stream_idx;
     if (ctx_idx == INACTIVE_STREAM) { continue; }
 
-    stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
     stream_ctx = proc_ctx->stream_ctx_arr[ctx_idx];
 
-    if (stream_cfg->passthrough) { continue; }
-    if (stream_cfg->renditions) { out_stream_idx += 1; }
+    if (stream_ctx->passthrough) { continue; }
+    if (stream_ctx->renditions) { out_stream_idx += 1; }
     if (stream_ctx->codec_type != AVMEDIA_TYPE_AUDIO) { continue; }
 
     if (convert_audio_frame(proc_ctx, stream_ctx, 0, out_ctx,
@@ -852,10 +846,8 @@ int process_video(char *process_job_id, const char *batch_id)
     ctx_idx = proc_ctx->ctx_map[in_stream_idx];
     if (ctx_idx == INACTIVE_STREAM) { continue; }
 
-    stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
-    if (stream_cfg->passthrough) { continue; }
-
     stream_ctx = proc_ctx->stream_ctx_arr[ctx_idx];
+    if (stream_ctx->passthrough) { continue; }
     out_stream_idx = stream_ctx->rend0_out_stream_idx;
 
     if (stream_ctx->codec_type == AVMEDIA_TYPE_VIDEO) {
@@ -866,7 +858,7 @@ int process_video(char *process_job_id, const char *batch_id)
           in_stream_idx);
       }
     } else if (stream_ctx->codec_type == AVMEDIA_TYPE_AUDIO) {
-      if (stream_cfg->renditions) { out_stream_idx += 1; }
+      if (stream_ctx->renditions) { out_stream_idx += 1; }
 
       if (encode_audio_frame(stream_ctx, 0, out_ctx,
         NULL) < 0)

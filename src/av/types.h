@@ -49,17 +49,6 @@ typedef struct VolumeFilterContext {
   AVFrame *filtered_frame;
 } VolumeFilterContext;
 
-typedef struct StreamConfig {
-  char *rend0_title;
-  char *rend1_title;
-
-  int passthrough;
-  int renditions;
-
-  int rend0_gain_boost;
-  int rend1_gain_boost;
-} StreamConfig;
-
 typedef struct StreamContext {
   char *codec;
   enum AVMediaType codec_type;
@@ -68,20 +57,30 @@ typedef struct StreamContext {
   AVStream *in_stream;
   AVCodecContext *dec_ctx;
 
+  int passthrough;
+  int renditions;
+
   SwrOutputContext *rend0_swr_out_ctx;
   SwrOutputContext *rend1_swr_out_ctx;
+
   FrameSizeConversionContext *rend0_fsc_ctx;
   FrameSizeConversionContext *rend1_fsc_ctx;
+
+  int rend0_gain_boost;
+  int rend1_gain_boost;
   VolumeFilterContext *rend0_vol_ctx;
   VolumeFilterContext *rend1_vol_ctx;
 
+  int transcode_rend0;
+  AVCodecContext *rend0_enc_ctx;
+  AVCodecContext *rend1_enc_ctx;
+
+  char *rend0_title;
+  char *rend1_title;
   int rend0_out_stream_idx;
   int rend1_out_stream_idx;
   AVStream *rend0_out_stream;
   AVStream *rend1_out_stream;
-  int transcode_rend0;
-  AVCodecContext *rend0_enc_ctx;
-  AVCodecContext *rend1_enc_ctx;
 } StreamContext;
 
 typedef struct ProcessingContext {
@@ -105,7 +104,6 @@ typedef struct ProcessingContext {
   AVFormatContext *in_fmt_ctx;
   AVFormatContext *out_fmt_ctx;
 
-  StreamConfig **stream_cfg_arr;
   StreamContext **stream_ctx_arr;
 
   int tonemap;
@@ -119,10 +117,10 @@ typedef struct ProcessingContext {
   int first_sub;
   BurnInFilterContext *burn_in_ctx;
 
-  AVPacket *init_pkt;
-  AVPacket *init_pkt_cpy;
-  AVFrame *dec_frame;
-  AVFrame *dec_frame_cpy;
+  AVPacket *pkt;
+  AVPacket *pkt_cpy;
+  AVFrame *frame;
+  AVFrame *frame_cpy;
 } ProcessingContext;
 
 typedef struct OutputContext {

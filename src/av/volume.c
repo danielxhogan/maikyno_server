@@ -4,16 +4,16 @@
 #include <libavutil/opt.h>
 
 VolumeFilterContext *volume_filter_context_init(
-  StreamConfig *stream_cfg, AVCodecContext *enc_ctx, int rendition)
+  StreamContext *stream_ctx, AVCodecContext *enc_ctx, int rendition)
 {
   int gain_boost, ret = 0;
   char args[512], flt_str[512], ch_layout[512];
   const char *sample_fmt;
 
   if (!rendition) {
-    gain_boost = stream_cfg->rend0_gain_boost;
+    gain_boost = stream_ctx->rend0_gain_boost;
   } else {
-    gain_boost = stream_cfg->rend1_gain_boost;
+    gain_boost = stream_ctx->rend1_gain_boost;
   }
 
   snprintf(flt_str, sizeof(flt_str), "volume=%d", gain_boost);
