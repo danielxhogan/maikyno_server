@@ -792,8 +792,6 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx, char *process_job_id)
     }
   }
 
-  proc_ctx->nb_out_streams = proc_ctx->out_fmt_ctx->nb_streams;
-
   return 0;
 }
 

@@ -153,8 +153,6 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   ProcessingContext *proc_ctx = malloc(sizeof(ProcessingContext));
   if(!proc_ctx) { return NULL; }
 
-  proc_ctx->nb_out_streams = 0;
-
   proc_ctx->last_sub_pts = 0;
   proc_ctx->tminus1_v_pts = 0;
   proc_ctx->tminus2_v_pts = 0;
