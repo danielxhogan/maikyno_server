@@ -126,6 +126,20 @@ void stream_context_free(StreamContext **stream_ctx)
   if (!*stream_ctx) { return; }
 
   free((*stream_ctx)->codec);
+  avcodec_free_context(&(*stream_ctx)->dec_ctx);
+
+  swr_output_context_free(&(*stream_ctx)->rend0_swr_out_ctx);
+  swr_output_context_free(&(*stream_ctx)->rend1_swr_out_ctx);
+
+  fsc_ctx_free(&(*stream_ctx)->rend0_fsc_ctx);
+  fsc_ctx_free(&(*stream_ctx)->rend1_fsc_ctx);
+
+  volume_filter_context_free(&(*stream_ctx)->rend0_vol_ctx);
+  volume_filter_context_free(&(*stream_ctx)->rend1_vol_ctx);
+
+  avcodec_free_context(&(*stream_ctx)->rend0_enc_ctx);
+  avcodec_free_context(&(*stream_ctx)->rend1_enc_ctx);
+
   free((*stream_ctx)->rend0_title);
   free((*stream_ctx)->rend1_title);
 
