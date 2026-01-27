@@ -127,7 +127,6 @@ typedef struct ProcessingContext {
 
 typedef struct OutputContext {
   AVFormatContext *fmt_ctx;
-  AVCodecContext **enc_ctx_arr;
   AVPacket *enc_pkt;
   int nb_out_streams;
 } OutputContext;

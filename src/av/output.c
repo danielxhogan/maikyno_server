@@ -62,13 +62,14 @@ static int get_len_params_str(char *hdr_params_str, char *additional_params_str)
   return len_hdr_params_str + len_additional_params_str;
 }
 
-static int open_video_encoder(AVCodecContext **enc_ctx, ProcessingContext *proc_ctx,
-  AVStream *in_stream, int ctx_idx, char *in_filename, int rendition2)
+static int open_video_encoder(AVCodecContext **enc_ctx,
+  ProcessingContext *proc_ctx, StreamContext *stream_ctx,
+  StreamConfig *stream_cfg, char *in_filename, int rendition)
 {
   int len_params_str, cores, pools, ret = 0;
   const AVCodec *enc;
-  StreamConfig *stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
   HdrMetadataContext *hdr_ctx = NULL;
+  AVStream *in_stream = stream_ctx->in_stream;
   char *params_str = NULL, *hdr_params_str = NULL, additional_params_str[128];
 
   if (!(enc = avcodec_find_encoder_by_name("libx265"))) {
@@ -97,7 +98,7 @@ static int open_video_encoder(AVCodecContext **enc_ctx, ProcessingContext *proc_
   if (hdr_ctx->mdm && hdr_ctx->cll) {
     proc_ctx->hdr = 1;
 
-    if (!rendition2) {
+    if (!rendition) {
       if ((ret = inject_hdr_metadta(hdr_ctx, *enc_ctx, &hdr_params_str)) < 0) {
         fprintf(stderr, "Failed to inject hdr metadata.\n");
         goto end;
@@ -108,7 +109,7 @@ static int open_video_encoder(AVCodecContext **enc_ctx, ProcessingContext *proc_
   (*enc_ctx)->time_base = in_stream->time_base;
   (*enc_ctx)->framerate = in_stream->avg_frame_rate;
 
-  if (rendition2) {
+  if (rendition) {
     (*enc_ctx)->width = in_stream->codecpar->width / 2;
     (*enc_ctx)->height = in_stream->codecpar->height / 2;
   } else {
@@ -116,7 +117,7 @@ static int open_video_encoder(AVCodecContext **enc_ctx, ProcessingContext *proc_
     (*enc_ctx)->height = in_stream->codecpar->height;
   }
 
-  if (rendition2 && proc_ctx->tonemap && proc_ctx->hdr) {
+  if (rendition && proc_ctx->tonemap && proc_ctx->hdr) {
     (*enc_ctx)->pix_fmt = AV_PIX_FMT_YUV420P;
     (*enc_ctx)->color_primaries = AVCOL_PRI_BT709;
     (*enc_ctx)->color_trc = AVCOL_TRC_BT709;
@@ -399,10 +400,11 @@ int select_ac3_sample_fmt(AVCodecContext *enc_ctx, enum AVSampleFormat preferred
   return 0;
 }
 
-int open_ac3_encoder(AVCodecContext **enc_ctx, AVCodecContext *dec_ctx, AVStream *in_stream)
+int open_ac3_encoder(StreamContext *stream_ctx)
 {
   int ret;
   const AVCodec *enc;
+  AVCodecContext **enc_ctx = &stream_ctx->rend0_enc_ctx;
 
   if (!(enc = avcodec_find_encoder_by_name("ac3"))) {
     fprintf(stderr, "Failed to find ac3 encoder.\n");
@@ -416,17 +418,17 @@ int open_ac3_encoder(AVCodecContext **enc_ctx, AVCodecContext *dec_ctx, AVStream
     return ret;
   }
 
-  if ((ret = select_channel_layout(*enc_ctx, &dec_ctx->ch_layout)) < 0) {
+  if ((ret = select_channel_layout(*enc_ctx, &stream_ctx->dec_ctx->ch_layout)) < 0) {
     fprintf(stderr, "Failed to select channel layout.\n");
     return ret;
   }
 
-  if ((ret = select_ac3_sample_fmt(*enc_ctx, dec_ctx->sample_fmt)) < 0) {
+  if ((ret = select_ac3_sample_fmt(*enc_ctx, stream_ctx->dec_ctx->sample_fmt)) < 0) {
     fprintf(stderr, "Failed to select sample format.\n");
     return ret;
   }
 
-  (*enc_ctx)->sample_rate = in_stream->codecpar->sample_rate;
+  (*enc_ctx)->sample_rate = stream_ctx->in_stream->codecpar->sample_rate;
 
   if ((*enc_ctx)->ch_layout.nb_channels > 2) {
     (*enc_ctx)->bit_rate = 640000;
@@ -442,11 +444,18 @@ int open_ac3_encoder(AVCodecContext **enc_ctx, AVCodecContext *dec_ctx, AVStream
   return 0;
 }
 
-static int open_aac_encoder(AVCodecContext **enc_ctx, AVStream *in_stream)
+static int open_aac_encoder(StreamContext *stream_ctx, int rendition)
 {
   int ret;
   const AVCodec *enc;
   AVChannelLayout *stereo = NULL;
+  AVCodecContext **enc_ctx;
+
+  if (!rendition) {
+    enc_ctx = &stream_ctx->rend0_enc_ctx;
+  } else {
+    enc_ctx = &stream_ctx->rend1_enc_ctx;
+  }
 
   if (!(enc = avcodec_find_encoder_by_name("libfdk_aac"))) {
     fprintf(stderr, "Failed to find libfdk_aac encoder.\n");
@@ -466,7 +475,7 @@ static int open_aac_encoder(AVCodecContext **enc_ctx, AVStream *in_stream)
   if ((ret = av_channel_layout_copy(&(*enc_ctx)->ch_layout, stereo)) < 0) {
     fprintf(stderr, "Failed to set output stream channel layout \
       for input stream: '%d'.\nLibav Error: %s.\n",
-      in_stream->index, av_err2str(ret));
+      stream_ctx->in_stream->index, av_err2str(ret));
 
     free(stereo);
     return ret;
@@ -479,7 +488,7 @@ static int open_aac_encoder(AVCodecContext **enc_ctx, AVStream *in_stream)
     return ret;
   }
 
-  (*enc_ctx)->sample_rate = in_stream->codecpar->sample_rate;
+  (*enc_ctx)->sample_rate = stream_ctx->in_stream->codecpar->sample_rate;
   (*enc_ctx)->bit_rate = 224000;
 
   if ((ret = avcodec_open2(*enc_ctx, enc, NULL)) < 0) {
@@ -490,17 +499,17 @@ static int open_aac_encoder(AVCodecContext **enc_ctx, AVStream *in_stream)
   return 0;
 }
 
-static int open_encoder(StreamContext *stream_ctx, ProcessingContext *proc_ctx,
-  OutputContext *out_ctx, int ctx_idx, int out_stream_idx, AVStream *in_stream,
+static int open_encoder(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
+  StreamConfig *stream_cfg,
+  int out_stream_idx, AVStream *in_stream,
   char *in_filename)
 {
-  int ret;
-  StreamConfig *stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
+  int rendition = 0, ret = 0;
 
   if (stream_ctx->codec_type == AVMEDIA_TYPE_VIDEO) {
     if ((ret =
-      open_video_encoder(&out_ctx->enc_ctx_arr[out_stream_idx],
-        proc_ctx, in_stream, ctx_idx, in_filename, 0)) < 0)
+      open_video_encoder(&stream_ctx->rend0_enc_ctx,
+        proc_ctx, stream_ctx, stream_cfg, in_filename, 0)) < 0)
     {
       fprintf(stderr, "Failed to open video encoder for output stream.\n");
       return ret;
@@ -509,8 +518,8 @@ static int open_encoder(StreamContext *stream_ctx, ProcessingContext *proc_ctx,
     if (stream_cfg->renditions) {
       out_stream_idx += 1;
 
-      if ((ret = open_video_encoder(&out_ctx->enc_ctx_arr[out_stream_idx], proc_ctx,
-        in_stream, ctx_idx, in_filename, 1)) < 0)
+      if ((ret = open_video_encoder(&stream_ctx->rend1_enc_ctx,
+        proc_ctx, stream_ctx, stream_cfg, in_filename, 1)) < 0)
       {
         fprintf(stderr, "Failed to open video encoder for output stream.\n");
         return ret;
@@ -522,8 +531,7 @@ static int open_encoder(StreamContext *stream_ctx, ProcessingContext *proc_ctx,
   {
     if (stream_cfg->renditions) {
       if (stream_ctx->transcode_rend0) {
-        if ((ret = open_ac3_encoder(&out_ctx->enc_ctx_arr[out_stream_idx],
-           stream_ctx->dec_ctx, in_stream)) < 0)
+        if ((ret = open_ac3_encoder(stream_ctx)) < 0)
         {
           fprintf(stderr, "Failed to open ac3 encoder \
             for output stream '%d'.\n", out_stream_idx);
@@ -532,10 +540,10 @@ static int open_encoder(StreamContext *stream_ctx, ProcessingContext *proc_ctx,
       }
 
       out_stream_idx = stream_ctx->rend1_out_stream_idx;
+      rendition = 1;
     }
 
-    if ((ret = open_aac_encoder(&out_ctx->enc_ctx_arr[out_stream_idx],
-      in_stream)) < 0)
+    if ((ret = open_aac_encoder(stream_ctx, rendition)) < 0)
     {
       fprintf(stderr, "Failed to open aac encoder for output stream '%d'.\n",
         out_stream_idx);
@@ -738,7 +746,7 @@ int make_output_filename_string(char **out_filename,
 int open_encoders_and_streams(ProcessingContext *proc_ctx,
   InputContext *in_ctx, OutputContext *out_ctx, char *process_job_id)
 {
-  int in_stream_idx, out_stream_idx, ret = 0;
+  int out_stream_idx, ret = 0;
   StreamConfig *stream_cfg;
   StreamContext *stream_ctx;
 
@@ -747,26 +755,25 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
     stream_ctx = proc_ctx->stream_ctx_arr[i];
     if (stream_ctx->in_stream_idx == proc_ctx->burn_in_idx) { continue; }
 
-    in_stream_idx = stream_ctx->in_stream_idx;
     out_stream_idx = out_ctx->fmt_ctx->nb_streams;
 
     if (!stream_cfg->passthrough) {
-      if ((ret = open_encoder(stream_ctx, proc_ctx, out_ctx, i, out_stream_idx,
+      if ((ret = open_encoder(proc_ctx, stream_ctx, stream_cfg, out_stream_idx,
         stream_ctx->in_stream, in_ctx->fmt_ctx->url)) < 0)
       {
         fprintf(stderr, "Failed to open encoder for output stream: %d.\n\
           process job: %s.\n",
-          in_stream_idx, process_job_id);
+          out_stream_idx, process_job_id);
         return ret;
       }
     }
 
-    if ((ret = init_stream(out_ctx->fmt_ctx, out_ctx->enc_ctx_arr[out_stream_idx],
+    if ((ret = init_stream(out_ctx->fmt_ctx, stream_ctx->rend0_enc_ctx,
       stream_ctx->in_stream, stream_cfg->rend0_title)) < 0)
     {
       fprintf(stderr, "Failed to initialize stream for output stream: %d.\n\
         process_job: %s.\nLibav Error: %s.\n",
-        in_stream_idx, process_job_id, av_err2str(ret));
+        out_stream_idx, process_job_id, av_err2str(ret));
       return ret;
     }
 
@@ -775,12 +782,12 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
       out_ctx->fmt_ctx->streams[out_ctx->fmt_ctx->nb_streams - 1];
 
     if (stream_cfg->renditions) {
-      if ((ret = init_stream(out_ctx->fmt_ctx, out_ctx->enc_ctx_arr[out_stream_idx + 1],
+      if ((ret = init_stream(out_ctx->fmt_ctx, stream_ctx->rend1_enc_ctx,
         stream_ctx->in_stream, stream_cfg->rend1_title)) < 0)
       {
         fprintf(stderr, "Failed to initialize stream for output stream: %d.\n\
           process_job: %s.\nLibav Error: %s.\n",
-          in_stream_idx, process_job_id, av_err2str(ret));
+          out_stream_idx, process_job_id, av_err2str(ret));
         return ret;
       }
 
@@ -809,7 +816,6 @@ OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
   }
 
   out_ctx->fmt_ctx = NULL;
-  out_ctx->enc_ctx_arr = NULL;
   out_ctx->enc_pkt = NULL;
 
   if ((ret = get_file_data(&name, &extra, &media_dir_path, &title,
@@ -861,16 +867,6 @@ OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
     goto end;
   }
 
-  if (!(out_ctx->enc_ctx_arr =
-    // calloc(out_ctx->nb_out_streams, sizeof(AVCodecContext *))))
-    calloc(6, sizeof(AVCodecContext *))))
-  {
-    fprintf(stderr, "Failed to allocate array for encoder contexts:\n\
-      video: %s\nprocess job: %s\n", name, process_job_id);
-    ret = -ENOMEM;
-    goto end;
-  }
-
   if ((ret = open_encoders_and_streams(proc_ctx,
     in_ctx, out_ctx, process_job_id)) < 0)
   {
@@ -917,23 +913,15 @@ end:
 
 void close_output(OutputContext **out_ctx)
 {
-  int i;
-
   if (!*out_ctx) { return; }
 
   if ((*out_ctx)->fmt_ctx && !((*out_ctx)->fmt_ctx->flags & AVFMT_NOFILE))
     avio_closep(&(*out_ctx)->fmt_ctx->pb);
   avformat_free_context((*out_ctx)->fmt_ctx);
 
-  if ((*out_ctx)->enc_ctx_arr) {
-    for (i = 0; i < (*out_ctx)->nb_out_streams; i++) {
-      avcodec_free_context(&(*out_ctx)->enc_ctx_arr[i]);
-    }
-    free((*out_ctx)->enc_ctx_arr);
-  }
-
   if ((*out_ctx)->enc_pkt) { av_packet_unref((*out_ctx)->enc_pkt); }
   av_packet_free(&(*out_ctx)->enc_pkt);
+
   free(*out_ctx);
   *out_ctx = NULL;
 }

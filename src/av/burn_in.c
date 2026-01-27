@@ -153,7 +153,7 @@ int sub_to_frame_convert(SubToFrameContext *stf_ctx,
 }
 
 int push_dummy_subtitle(ProcessingContext *proc_ctx,
-  OutputContext *out_ctx, int out_stream_idx, int64_t pts)
+  StreamContext *stream_ctx, int64_t pts)
 {
   int ret = 0;
   AVFrame *dummy;
@@ -164,8 +164,8 @@ int push_dummy_subtitle(ProcessingContext *proc_ctx,
   }
 
   dummy->format = SUBTITLE_OUTPUT_PIX_FMT;
-  dummy->width = out_ctx->enc_ctx_arr[out_stream_idx]->width;
-  dummy->height = out_ctx->enc_ctx_arr[out_stream_idx]->height;
+  dummy->width = stream_ctx->rend0_enc_ctx->width;
+  dummy->width = stream_ctx->rend0_enc_ctx->height;
   dummy->pts = pts;
 
   if ((ret = av_frame_get_buffer(dummy, 0)) < 0) {
