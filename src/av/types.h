@@ -50,14 +50,14 @@ typedef struct VolumeFilterContext {
 } VolumeFilterContext;
 
 typedef struct StreamConfig {
+  char *rend0_title;
   char *rend1_title;
-  char *rend2_title;
 
   int passthrough;
   int renditions;
 
+  int rend0_gain_boost;
   int rend1_gain_boost;
-  int rend2_gain_boost;
 } StreamConfig;
 
 typedef struct StreamContext {
@@ -68,24 +68,24 @@ typedef struct StreamContext {
   AVStream *in_stream;
   AVCodecContext *dec_ctx;
 
+  SwrOutputContext *rend0_swr_out_ctx;
   SwrOutputContext *rend1_swr_out_ctx;
-  SwrOutputContext *rend2_swr_out_ctx;
+  FrameSizeConversionContext *rend0_fsc_ctx;
   FrameSizeConversionContext *rend1_fsc_ctx;
-  FrameSizeConversionContext *rend2_fsc_ctx;
+  VolumeFilterContext *rend0_vol_ctx;
   VolumeFilterContext *rend1_vol_ctx;
-  VolumeFilterContext *rend2_vol_ctx;
 
+  int rend0_out_stream_idx;
   int rend1_out_stream_idx;
-  int rend2_out_stream_idx;
+  AVStream *rend0_out_stream;
   AVStream *rend1_out_stream;
-  AVStream *rend2_out_stream;
+  int transcode_rend0;
+  AVCodecContext *rend0_enc_ctx;
   AVCodecContext *rend1_enc_ctx;
-  AVCodecContext *rend2_enc_ctx;
 } StreamContext;
 
 typedef struct ProcessingContext {
   unsigned int nb_out_streams;
-  int *idx_map;
 
   SwrOutputContext **swr_out_ctx_arr;
   FrameSizeConversionContext **fsc_ctx_arr;

@@ -25,8 +25,8 @@ int encode_video_frame(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
   {
     out_ctx->enc_pkt->stream_index = out_stream_idx;
 
-    if (!out_stream_idx) {out_stream = stream_ctx->rend1_out_stream; }
-    else { out_stream = stream_ctx->rend2_out_stream; }
+    if (!out_stream_idx) {out_stream = stream_ctx->rend0_out_stream; }
+    else { out_stream = stream_ctx->rend1_out_stream; }
 
     av_packet_rescale_ts(out_ctx->enc_pkt,
       stream_ctx->in_stream->time_base,
@@ -512,13 +512,7 @@ int decode_av_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
     }
     else if (stream_ctx->codec_type == AVMEDIA_TYPE_AUDIO)
     {
-      if (
-        stream_cfg->renditions &&
-        (
-          strcmp(stream_ctx->codec, "ac3") ||
-          stream_cfg->rend1_gain_boost > 0
-        )
-      ) {
+      if (stream_ctx->transcode_rend0) {
         in_ctx->dec_frame_cpy = av_frame_clone(in_ctx->dec_frame);
 
         if ((ret = convert_audio_frame(proc_ctx, in_ctx, out_ctx,
@@ -530,15 +524,18 @@ int decode_av_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
         }
 
         av_frame_unref(in_ctx->dec_frame_cpy);
-        out_stream_idx += 1;
       }
 
-      if ((ret = convert_audio_frame(proc_ctx, in_ctx, out_ctx,
-        in_stream_idx, out_stream_idx, in_ctx->dec_frame)) < 0)
-      {
-        fprintf(stderr, "Failed to encode audio frame from input stream '%d'.\n",
-          in_stream_idx);
-        return ret;
+      if (stream_cfg->renditions) {
+        out_stream_idx = stream_ctx->rend1_out_stream_idx;
+
+        if ((ret = convert_audio_frame(proc_ctx, in_ctx, out_ctx,
+          in_stream_idx, out_stream_idx, in_ctx->dec_frame)) < 0)
+        {
+          fprintf(stderr, "Failed to encode audio frame from input stream '%d'.\n",
+            in_stream_idx);
+          return ret;
+        }
       }
     }
 
@@ -590,13 +587,12 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
 {
   StreamConfig *stream_cfg;
   StreamContext *stream_ctx;
-  int frame_count, check_again = 0, ret = 0;
+  int frame_count, check_again = 0, out_stream_idx, ret = 0;
 
   while ((ret = av_read_frame(in_ctx->fmt_ctx, in_ctx->init_pkt)) >= 0)
   {
     int in_stream_idx = in_ctx->init_pkt->stream_index;
     int ctx_idx = proc_ctx->ctx_map[in_stream_idx];
-    int out_stream_idx = proc_ctx->idx_map[in_stream_idx];
 
     enum AVMediaType codec_type =
       in_ctx->fmt_ctx->streams[in_stream_idx]->codecpar->codec_type;
@@ -629,6 +625,7 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
 
     stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
     stream_ctx = proc_ctx->stream_ctx_arr[ctx_idx];
+    out_stream_idx = stream_ctx->rend0_out_stream_idx;
 
     if (stream_cfg->passthrough) {
       in_ctx->init_pkt->stream_index = out_stream_idx;
@@ -648,9 +645,7 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
 
     if (
       codec_type == AVMEDIA_TYPE_AUDIO &&
-      stream_cfg->renditions &&
-      !strcmp(stream_ctx->codec, "ac3") &&
-      stream_cfg->rend1_gain_boost <= 0
+      !stream_ctx->transcode_rend0
     ) {
       in_ctx->init_pkt_cpy = av_packet_clone(in_ctx->init_pkt);
       in_ctx->init_pkt_cpy->stream_index = out_stream_idx;
@@ -664,7 +659,6 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
       }
 
       if (in_ctx->init_pkt_cpy) { av_packet_unref(in_ctx->init_pkt_cpy); }
-      out_stream_idx += 1;
     }
 
     if ((ret = decode_packet(proc_ctx, stream_ctx, stream_cfg, in_ctx, out_ctx,
@@ -760,18 +754,19 @@ int process_video(char *process_job_id, const char *batch_id)
     in_stream_idx++
   ) {
     ctx_idx = proc_ctx->ctx_map[in_stream_idx];
-    stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
-    stream_ctx = proc_ctx->stream_ctx_arr[ctx_idx];
-    out_stream_idx = proc_ctx->idx_map[in_stream_idx];
-
     if (ctx_idx == INACTIVE_STREAM) { continue; }
+
+    stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
     if (stream_cfg->passthrough) { continue; }
+
+    stream_ctx = proc_ctx->stream_ctx_arr[ctx_idx];
+    out_stream_idx = stream_ctx->rend0_out_stream_idx;
 
     if (
       stream_cfg->renditions &&
       stream_ctx->codec_type == AVMEDIA_TYPE_AUDIO
     ) {
-      out_stream_idx += 1;
+      out_stream_idx = stream_ctx->rend1_out_stream_idx;
     }
 
     if (decode_packet(proc_ctx, stream_ctx, stream_cfg, in_ctx, out_ctx,
@@ -792,7 +787,7 @@ int process_video(char *process_job_id, const char *batch_id)
     in_stream_idx++
   ) {
     ctx_idx = proc_ctx->ctx_map[in_stream_idx];
-    out_stream_idx = proc_ctx->idx_map[in_stream_idx];
+    out_stream_idx = stream_ctx->rend0_out_stream_idx;
     if (ctx_idx == INACTIVE_STREAM) { continue; }
 
     stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
@@ -829,12 +824,13 @@ int process_video(char *process_job_id, const char *batch_id)
     in_stream_idx++
   ) {
     ctx_idx = proc_ctx->ctx_map[in_stream_idx];
-    stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
-    stream_ctx = proc_ctx->stream_ctx_arr[ctx_idx];
-    out_stream_idx = proc_ctx->idx_map[in_stream_idx];
-
     if (ctx_idx == INACTIVE_STREAM) { continue; }
+
+    stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
     if (stream_cfg->passthrough) { continue; }
+
+    stream_ctx = proc_ctx->stream_ctx_arr[ctx_idx];
+    out_stream_idx = stream_ctx->rend0_out_stream_idx;
 
     if (stream_ctx->codec_type == AVMEDIA_TYPE_VIDEO) {
       if (encode_video_frame(proc_ctx, stream_ctx, out_ctx,

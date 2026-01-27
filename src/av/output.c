@@ -521,10 +521,7 @@ static int open_encoder(StreamContext *stream_ctx, ProcessingContext *proc_ctx,
   else if (stream_ctx->codec_type == AVMEDIA_TYPE_AUDIO)
   {
     if (stream_cfg->renditions) {
-      if (
-        strcmp(stream_ctx->codec, "ac3") ||
-        stream_cfg->rend1_gain_boost > 0
-      ) {
+      if (stream_ctx->transcode_rend0) {
         if ((ret = open_ac3_encoder(&out_ctx->enc_ctx_arr[out_stream_idx],
            stream_ctx->dec_ctx, in_stream)) < 0)
         {
@@ -534,7 +531,7 @@ static int open_encoder(StreamContext *stream_ctx, ProcessingContext *proc_ctx,
         }
       }
 
-      out_stream_idx += 1;
+      out_stream_idx = stream_ctx->rend1_out_stream_idx;
     }
 
     if ((ret = open_aac_encoder(&out_ctx->enc_ctx_arr[out_stream_idx],
@@ -751,7 +748,7 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
     if (stream_ctx->in_stream_idx == proc_ctx->burn_in_idx) { continue; }
 
     in_stream_idx = stream_ctx->in_stream_idx;
-    out_stream_idx = proc_ctx->idx_map[in_stream_idx];
+    out_stream_idx = out_ctx->fmt_ctx->nb_streams;
 
     if (!stream_cfg->passthrough) {
       if ((ret = open_encoder(stream_ctx, proc_ctx, out_ctx, i, out_stream_idx,
@@ -765,7 +762,7 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
     }
 
     if ((ret = init_stream(out_ctx->fmt_ctx, out_ctx->enc_ctx_arr[out_stream_idx],
-      stream_ctx->in_stream, stream_cfg->rend1_title)) < 0)
+      stream_ctx->in_stream, stream_cfg->rend0_title)) < 0)
     {
       fprintf(stderr, "Failed to initialize stream for output stream: %d.\n\
         process_job: %s.\nLibav Error: %s.\n",
@@ -773,12 +770,13 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
       return ret;
     }
 
-    stream_ctx->rend1_out_stream =
+    stream_ctx->rend0_out_stream_idx = out_ctx->fmt_ctx->nb_streams - 1;
+    stream_ctx->rend0_out_stream =
       out_ctx->fmt_ctx->streams[out_ctx->fmt_ctx->nb_streams - 1];
 
     if (stream_cfg->renditions) {
       if ((ret = init_stream(out_ctx->fmt_ctx, out_ctx->enc_ctx_arr[out_stream_idx + 1],
-        stream_ctx->in_stream, stream_cfg->rend2_title)) < 0)
+        stream_ctx->in_stream, stream_cfg->rend1_title)) < 0)
       {
         fprintf(stderr, "Failed to initialize stream for output stream: %d.\n\
           process_job: %s.\nLibav Error: %s.\n",
@@ -786,10 +784,14 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
         return ret;
       }
 
-      stream_ctx->rend2_out_stream =
+      stream_ctx->rend1_out_stream_idx = out_ctx->fmt_ctx->nb_streams - 1;
+      stream_ctx->rend1_out_stream =
         out_ctx->fmt_ctx->streams[out_ctx->fmt_ctx->nb_streams - 1];
     }
   }
+
+  proc_ctx->nb_out_streams = out_ctx->fmt_ctx->nb_streams;
+  out_ctx->nb_out_streams = out_ctx->fmt_ctx->nb_streams;
 
   return 0;
 }
@@ -809,7 +811,6 @@ OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
   out_ctx->fmt_ctx = NULL;
   out_ctx->enc_ctx_arr = NULL;
   out_ctx->enc_pkt = NULL;
-  out_ctx->nb_out_streams = proc_ctx->nb_out_streams;
 
   if ((ret = get_file_data(&name, &extra, &media_dir_path, &title,
     db, process_job_id)) < 0)
@@ -861,7 +862,8 @@ OutputContext *open_output(ProcessingContext *proc_ctx, InputContext *in_ctx,
   }
 
   if (!(out_ctx->enc_ctx_arr =
-    calloc(out_ctx->nb_out_streams, sizeof(AVCodecContext *))))
+    // calloc(out_ctx->nb_out_streams, sizeof(AVCodecContext *))))
+    calloc(6, sizeof(AVCodecContext *))))
   {
     fprintf(stderr, "Failed to allocate array for encoder contexts:\n\
       video: %s\nprocess job: %s\n", name, process_job_id);

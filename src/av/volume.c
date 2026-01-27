@@ -3,25 +3,24 @@
 #include <libavutil/pixdesc.h>
 #include <libavutil/opt.h>
 
-VolumeFilterContext *volume_filter_context_init(ProcessingContext *proc_ctx,
-  OutputContext *out_ctx, int ctx_idx, int out_stream_idx, int rendition2)
+VolumeFilterContext *volume_filter_context_init(
+  StreamContext *stream_ctx, StreamConfig *stream_cfg,
+  AVCodecContext *enc_ctx, int rendition)
 {
   int gain_boost, ret = 0;
   char args[512], flt_str[512], ch_layout[512];
   const char *sample_fmt;
-  StreamConfig *stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
 
-  if (!rendition2) {
-    gain_boost = stream_cfg->rend1_gain_boost;
+  if (!rendition) {
+    gain_boost = stream_cfg->rend0_gain_boost;
   } else {
-    gain_boost = stream_cfg->rend2_gain_boost;
+    gain_boost = stream_cfg->rend1_gain_boost;
   }
 
   snprintf(flt_str, sizeof(flt_str), "volume=%d", gain_boost);
 
   const AVFilter *buffersrc = avfilter_get_by_name("abuffer");
   const AVFilter *buffersink = avfilter_get_by_name("abuffersink");
-  AVCodecContext *enc_ctx = out_ctx->enc_ctx_arr[out_stream_idx];
 
   VolumeFilterContext *vol_ctx = NULL;
   AVFilterInOut *outputs = NULL;
