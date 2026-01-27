@@ -265,8 +265,7 @@ int encode_audio_frame(ProcessingContext *proc_ctx,
     enc_ctx = stream_ctx->rend0_enc_ctx;
     out_stream_idx = stream_ctx->rend0_out_stream_idx;
     out_stream = stream_ctx->rend0_out_stream;
-  }
-  else {
+  } else {
     enc_ctx = stream_ctx->rend1_enc_ctx;
     out_stream_idx = stream_ctx->rend1_out_stream_idx;
     out_stream = stream_ctx->rend1_out_stream;
@@ -309,15 +308,16 @@ int encode_audio_frame(ProcessingContext *proc_ctx,
 int boost_gain(ProcessingContext *proc_ctx,
   StreamContext *stream_ctx, int rendition, AVFrame *frame)
 {
-  int out_stream_idx, ret = 0;
+  int ret = 0;
+  VolumeFilterContext *vol_ctx;
 
   if (!rendition) {
-    out_stream_idx = stream_ctx->rend0_out_stream_idx;
+    vol_ctx = stream_ctx->rend0_vol_ctx;
   } else {
-    out_stream_idx = stream_ctx->rend1_out_stream_idx;
+    vol_ctx = stream_ctx->rend1_vol_ctx;
   }
 
-  if ((ret = av_buffersrc_add_frame_flags(proc_ctx->vol_ctx_arr[out_stream_idx]->buffersrc_ctx,
+  if ((ret = av_buffersrc_add_frame_flags(vol_ctx->buffersrc_ctx,
     frame, AV_BUFFERSRC_FLAG_KEEP_REF)) < 0)
   {
     fprintf(stderr, "Failed to add frame to boost gain buffer source.\n\
@@ -325,11 +325,11 @@ int boost_gain(ProcessingContext *proc_ctx,
     return ret;
   }
 
-  while ((ret = av_buffersink_get_frame(proc_ctx->vol_ctx_arr[out_stream_idx]->buffersink_ctx,
-    proc_ctx->vol_ctx_arr[out_stream_idx]->filtered_frame)) >= 0)
+  while ((ret = av_buffersink_get_frame(vol_ctx->buffersink_ctx,
+    vol_ctx->frame)) >= 0)
   {
-    if ((ret = encode_audio_frame(proc_ctx, stream_ctx, rendition,
-      proc_ctx->vol_ctx_arr[out_stream_idx]->filtered_frame)))
+    if ((ret = encode_audio_frame(proc_ctx, stream_ctx,
+      rendition, vol_ctx->frame)))
     {
       fprintf(stderr, "Failed to write audio frame after boosting gain.\n");
       return ret;
@@ -348,10 +348,11 @@ int boost_gain(ProcessingContext *proc_ctx,
 static int convert_audio_frame(ProcessingContext *proc_ctx,
   StreamContext *stream_ctx, int rendition, AVFrame *frame)
 {
-  int out_stream_idx, nb_converted_samples,
+  int nb_converted_samples,
     sample_rate, start_time, timestamp, ret = 0;
   SwrOutputContext *swr_out_ctx;
   FrameSizeConversionContext *fsc_ctx;
+  VolumeFilterContext *vol_ctx;
   AVCodecContext *enc_ctx;
   int64_t stream_start_time;
   AVRational stream_time_base, pts_time_base;
@@ -359,14 +360,13 @@ static int convert_audio_frame(ProcessingContext *proc_ctx,
   if (!rendition) {
     swr_out_ctx = stream_ctx->rend0_swr_out_ctx;
     fsc_ctx = stream_ctx->rend0_fsc_ctx;
+    vol_ctx = stream_ctx->rend0_vol_ctx;
     enc_ctx = stream_ctx->rend0_enc_ctx;
-    out_stream_idx = stream_ctx->rend0_out_stream_idx;
-  }
-  else {
+  } else {
     swr_out_ctx = stream_ctx->rend1_swr_out_ctx;
     fsc_ctx = stream_ctx->rend1_fsc_ctx;
+    vol_ctx = stream_ctx->rend1_vol_ctx;
     enc_ctx = stream_ctx->rend1_enc_ctx;
-    out_stream_idx = stream_ctx->rend1_out_stream_idx;
   }
 
   if (!frame) { goto flush; }
@@ -404,9 +404,7 @@ flush:
 
   start_time = av_rescale_q(stream_start_time, stream_time_base, pts_time_base);
 
-  while (fsc_ctx->nb_samples_in_buffer >=
-    enc_ctx->frame_size || !frame)
-  {
+  while (fsc_ctx->nb_samples_in_buffer >= enc_ctx->frame_size || !frame) {
     timestamp = swr_out_ctx->nb_converted_samples + start_time;
 
     if ((ret = fsc_ctx_make_frame(fsc_ctx, timestamp)) < 0) {
@@ -416,7 +414,7 @@ flush:
 
     swr_out_ctx->nb_converted_samples += enc_ctx->frame_size;
 
-    if (proc_ctx->vol_ctx_arr[out_stream_idx])
+    if (vol_ctx)
     {
       if ((ret = boost_gain(proc_ctx, stream_ctx, rendition,
         fsc_ctx->frame)))

@@ -46,7 +46,7 @@ typedef struct VolumeFilterContext {
   AVFilterContext *buffersink_ctx;
   AVFilterContext *buffersrc_ctx;
   AVFilterGraph *filter_graph;
-  AVFrame *filtered_frame;
+  AVFrame *frame;
 } VolumeFilterContext;
 
 typedef struct StreamContext {
@@ -88,8 +88,6 @@ typedef struct ProcessingContext {
   int64_t last_sub_pts;
   int64_t tminus1_v_pts;
   int64_t tminus2_v_pts;
-
-  VolumeFilterContext **vol_ctx_arr;
 
   // *************************************
   unsigned int nb_in_streams;

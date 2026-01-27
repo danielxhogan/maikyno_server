@@ -34,7 +34,7 @@ VolumeFilterContext *volume_filter_context_init(
   vol_ctx->buffersink_ctx = NULL;
   vol_ctx->buffersrc_ctx = NULL;
   vol_ctx->filter_graph = NULL;
-  vol_ctx->filtered_frame = NULL;
+  vol_ctx->frame = NULL;
 
   if (!(outputs = avfilter_inout_alloc())) {
     fprintf(stderr, "Failed to allocate outputs.\n");
@@ -127,7 +127,7 @@ VolumeFilterContext *volume_filter_context_init(
     goto end;
   }
 
-  if (!(vol_ctx->filtered_frame = av_frame_alloc())) {
+  if (!(vol_ctx->frame = av_frame_alloc())) {
     fprintf(stderr, "Failed to allocate AVFrame.\n");
     ret = AVERROR(ENOMEM);
     goto end;
@@ -145,8 +145,8 @@ void volume_filter_context_free(VolumeFilterContext **vol_ctx)
 {
   if (!*vol_ctx) return;
   avfilter_graph_free(&(*vol_ctx)->filter_graph);
-  av_frame_unref((*vol_ctx)->filtered_frame);
-  av_frame_free(&(*vol_ctx)->filtered_frame);
+  av_frame_unref((*vol_ctx)->frame);
+  av_frame_free(&(*vol_ctx)->frame);
   free(*vol_ctx);
   *vol_ctx = NULL;
 }
