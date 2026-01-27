@@ -1,15 +1,14 @@
 #include "burn_in.h"
 
-SubToFrameContext *sub_to_frame_context_alloc(ProcessingContext *proc_ctx,
-  InputContext *in_ctx)
+SubToFrameContext *sub_to_frame_context_alloc(ProcessingContext *proc_ctx)
 {
   int ret = 0;
 
   int v_ctx_idx = proc_ctx->ctx_map[proc_ctx->v_stream_idx];
   int s_ctx_idx = proc_ctx->ctx_map[proc_ctx->burn_in_idx];
 
-  AVCodecContext *v_dec_ctx = in_ctx->dec_ctx[v_ctx_idx];
-  AVCodecContext *s_dec_ctx = in_ctx->dec_ctx[s_ctx_idx];
+  AVCodecContext *v_dec_ctx = proc_ctx->stream_ctx_arr[v_ctx_idx]->dec_ctx;
+  AVCodecContext *s_dec_ctx = proc_ctx->stream_ctx_arr[s_ctx_idx]->dec_ctx;
 
   SubToFrameContext *stf_ctx;
 
@@ -214,7 +213,7 @@ BurnInFilterContext *burn_in_filter_context_init(ProcessingContext *proc_ctx,
   const AVFilter *buffersink = avfilter_get_by_name("buffersink");
 
   int v_ctx_idx = proc_ctx->ctx_map[proc_ctx->v_stream_idx];
-  AVCodecContext *v_dec_ctx = in_ctx->dec_ctx[v_ctx_idx];
+  AVCodecContext *v_dec_ctx = proc_ctx->stream_ctx_arr[v_ctx_idx]->dec_ctx;
   AVStream *v_stream = in_ctx->fmt_ctx->streams[proc_ctx->v_stream_idx];
 
   BurnInFilterContext *burn_in_ctx = NULL;
@@ -356,7 +355,7 @@ BurnInFilterContext *burn_in_filter_context_init(ProcessingContext *proc_ctx,
   burn_in_ctx->filtered_frame->color_range = v_dec_ctx->color_range;
 
   if (!(burn_in_ctx->stf_ctx =
-    sub_to_frame_context_alloc(proc_ctx, in_ctx)))
+    sub_to_frame_context_alloc(proc_ctx)))
   {
     fprintf(stderr,
       "Failed to initialize subtitle to frame converter context.\n");

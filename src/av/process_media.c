@@ -113,7 +113,7 @@ int burn_in_subtitles(ProcessingContext *proc_ctx, InputContext *in_ctx,
   OutputContext *out_ctx, AVFilterContext *buffersrc_ctx, AVFrame *frame)
 {
   int ret = 0;
-  AVCodecContext *v_dec_ctx = in_ctx->dec_ctx[proc_ctx->v_stream_idx];
+  AVCodecContext *v_dec_ctx = proc_ctx->stream_ctx_arr[0]->dec_ctx;
   AVFrame *filtered_frame;
 
   if ((ret = av_buffersrc_add_frame_flags(buffersrc_ctx,
@@ -405,8 +405,9 @@ flush:
 int decode_sub_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
   OutputContext *out_ctx, int ctx_idx)
 {
+  StreamContext *stream_ctx = proc_ctx->stream_ctx_arr[ctx_idx];
   int got_sub_ptr, ret = 0;
-  AVCodecContext *s_dec_ctx = in_ctx->dec_ctx[ctx_idx];
+  AVCodecContext *s_dec_ctx = stream_ctx->dec_ctx;
 
   if (proc_ctx->first_sub == 0) {
     proc_ctx->first_sub = 1;
@@ -455,14 +456,14 @@ int decode_av_packet(ProcessingContext *proc_ctx, InputContext *in_ctx,
 
 
   if ((ret =
-    avcodec_send_packet(in_ctx->dec_ctx[ctx_idx], in_ctx->init_pkt)) < 0)
+    avcodec_send_packet(stream_ctx->dec_ctx, in_ctx->init_pkt)) < 0)
   {
     fprintf(stderr, "Failed to send packet from input stream: %d to decoder.\n\
       Error: %s.\n", in_stream_idx, av_err2str(ret));
     return ret;
   }
 
-  while ((ret = avcodec_receive_frame(in_ctx->dec_ctx[ctx_idx],
+  while ((ret = avcodec_receive_frame(stream_ctx->dec_ctx,
     in_ctx->dec_frame)) >= 0)
   {
     in_ctx->dec_frame->pict_type = AV_PICTURE_TYPE_NONE;
@@ -602,7 +603,7 @@ int transcode(ProcessingContext *proc_ctx, InputContext *in_ctx,
     if (codec_type == AVMEDIA_TYPE_VIDEO) {
       frame_count += 1;
 
-      if (frame_count % 300 == 0) {
+      if (frame_count % 100 == 0) {
         if (check_abort_status(batch_id) == ABORTED) {
           return ABORTED;
         }

@@ -78,8 +78,8 @@ pub fn select_media_dir(pool: web::Data<DBPool>, media_dir_id: String)
     .filter(media_dirs::id.eq(&media_dir_id))
     .get_result::<MediaDir>(&mut db)
     .map_err(|err| {
-      let err_msg = format!("Failed to get media dir with id:
-        {:?}\nError: {:?}", media_dir_id, err);
+      let err_msg = format!("Failed to get media dir with id '{}'.", media_dir_id);
+      let err_msg = format!("{err_msg} Error: {:?}", err);
 
       eprintln!("{err_msg:?}");
       return MKError::new(MKErrorType::DBError, err_msg);

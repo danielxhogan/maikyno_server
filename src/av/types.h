@@ -132,7 +132,6 @@ typedef struct OutputContext {
 
 typedef struct InputContext {
   AVFormatContext *fmt_ctx;
-  AVCodecContext **dec_ctx;
   AVPacket *init_pkt;
   AVPacket *init_pkt_cpy;
   AVFrame *dec_frame;

@@ -53,7 +53,7 @@ end:
   return ret;
 }
 
-static int open_decoder(InputContext *in_ctx, int in_stream_idx, int ctx_idx)
+static int open_decoder(StreamContext *stream_ctx, InputContext *in_ctx, int in_stream_idx)
 {
   int ret = 0;
   const AVCodec *dec;
@@ -66,7 +66,7 @@ static int open_decoder(InputContext *in_ctx, int in_stream_idx, int ctx_idx)
     return ret;
   }
 
-  if (!(in_ctx->dec_ctx[ctx_idx] = avcodec_alloc_context3(dec))) {
+  if (!(stream_ctx->dec_ctx = avcodec_alloc_context3(dec))) {
     fprintf(stderr, "Failed to allocate decoder context "
       "for stream_idx: %d.\n", stream->index);
     ret = AVERROR(ENOMEM);
@@ -74,7 +74,7 @@ static int open_decoder(InputContext *in_ctx, int in_stream_idx, int ctx_idx)
   }
 
   if ((ret =
-    avcodec_parameters_to_context(in_ctx->dec_ctx[ctx_idx],
+    avcodec_parameters_to_context(stream_ctx->dec_ctx,
       stream->codecpar)) < 0)
   {
     fprintf(stderr, "Failed to copy codec parameters to decoder context "
@@ -83,7 +83,7 @@ static int open_decoder(InputContext *in_ctx, int in_stream_idx, int ctx_idx)
   }
 
   if ((ret =
-    avcodec_open2(in_ctx->dec_ctx[ctx_idx], dec, NULL)) < 0)
+    avcodec_open2(stream_ctx->dec_ctx, dec, NULL)) < 0)
   {
     fprintf(stderr, "Failed to open decoder for stream_idx: %d.\n",
       stream->index);
@@ -109,7 +109,6 @@ InputContext *open_input(ProcessingContext *proc_ctx,
   }
 
   in_ctx->fmt_ctx = NULL;
-  in_ctx->dec_ctx = NULL;
   in_ctx->init_pkt = NULL;
   in_ctx->init_pkt_cpy = NULL;
   in_ctx->dec_frame = NULL;
@@ -132,8 +131,8 @@ InputContext *open_input(ProcessingContext *proc_ctx,
   }
 
   if ((ret = av_dict_set(&opts, "analyzeduration", "10000000", 0)) < 0) {
-      fprintf(stderr, "Failed to set analyzeduration option.\n");
-      return NULL;
+    fprintf(stderr, "Failed to set analyzeduration option.\n");
+    return NULL;
   }
 
   if ((ret =
@@ -149,13 +148,6 @@ InputContext *open_input(ProcessingContext *proc_ctx,
     goto end;
   }
 
-  if (!(in_ctx->dec_ctx =
-    calloc(in_ctx->nb_selected_streams, sizeof(AVCodecContext *))))
-  {
-    fprintf(stderr, "Failed to allocate in_ctx->dec_ctx array.\n");
-    goto end;
-  }
-
   for (unsigned int i = 0; i < proc_ctx->nb_selected_streams; i++) {
     stream_cfg = proc_ctx->stream_cfg_arr[i];
     stream_ctx = proc_ctx->stream_ctx_arr[i];
@@ -166,8 +158,7 @@ InputContext *open_input(ProcessingContext *proc_ctx,
 
     if (stream_cfg->passthrough) { continue; }
 
-
-    if ((ret = open_decoder(in_ctx, in_stream_idx, i)) < 0) {
+    if ((ret = open_decoder(stream_ctx, in_ctx, in_stream_idx)) < 0) {
       fprintf(stderr, "Failed to open decoder.\n");
       fprintf(stderr, "stream '%d'.\nprocess job: \"%s\".\n",
         in_stream_idx, process_job_id);
@@ -213,18 +204,9 @@ end:
 
 void close_input(InputContext **in_ctx)
 {
-  if (!*in_ctx) return;
-  int i;
-
-  if ((*in_ctx)->dec_ctx) {
-    for (i = 0; i < (*in_ctx)->nb_selected_streams; i++) {
-      avcodec_free_context(&(*in_ctx)->dec_ctx[i]);
-    }
-    free((*in_ctx)->dec_ctx);
-  }
+  if (!*in_ctx) { return; }
 
   avformat_close_input(&(*in_ctx)->fmt_ctx);
-
   if ((*in_ctx)->init_pkt) { av_packet_unref((*in_ctx)->init_pkt); }
   av_packet_free(&(*in_ctx)->init_pkt);
   if ((*in_ctx)->init_pkt_cpy) { av_packet_unref((*in_ctx)->init_pkt_cpy); }

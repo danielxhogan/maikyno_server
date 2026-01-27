@@ -490,7 +490,7 @@ static int open_aac_encoder(AVCodecContext **enc_ctx, AVStream *in_stream)
   return 0;
 }
 
-static int open_encoder(StreamContext *stream_ctx, InputContext *in_ctx, ProcessingContext *proc_ctx,
+static int open_encoder(StreamContext *stream_ctx, ProcessingContext *proc_ctx,
   OutputContext *out_ctx, int ctx_idx, int out_stream_idx, AVStream *in_stream,
   char *in_filename)
 {
@@ -526,7 +526,7 @@ static int open_encoder(StreamContext *stream_ctx, InputContext *in_ctx, Process
         stream_cfg->rend1_gain_boost > 0
       ) {
         if ((ret = open_ac3_encoder(&out_ctx->enc_ctx_arr[out_stream_idx],
-           in_ctx->dec_ctx[ctx_idx], in_stream)) < 0)
+           stream_ctx->dec_ctx, in_stream)) < 0)
         {
           fprintf(stderr, "Failed to open ac3 encoder \
             for output stream '%d'.\n", out_stream_idx);
@@ -741,7 +741,7 @@ int make_output_filename_string(char **out_filename,
 int open_encoders_and_streams(ProcessingContext *proc_ctx,
   InputContext *in_ctx, OutputContext *out_ctx, char *process_job_id)
 {
-  int in_stream_idx, ctx_idx, out_stream_idx, ret = 0;
+  int in_stream_idx, out_stream_idx, ret = 0;
   StreamConfig *stream_cfg;
   StreamContext *stream_ctx;
 
@@ -754,7 +754,7 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx,
     out_stream_idx = proc_ctx->idx_map[in_stream_idx];
 
     if (!stream_cfg->passthrough) {
-      if ((ret = open_encoder(stream_ctx, in_ctx, proc_ctx, out_ctx, i, out_stream_idx,
+      if ((ret = open_encoder(stream_ctx, proc_ctx, out_ctx, i, out_stream_idx,
         stream_ctx->in_stream, in_ctx->fmt_ctx->url)) < 0)
       {
         fprintf(stderr, "Failed to open encoder for output stream: %d.\n\

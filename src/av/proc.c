@@ -345,7 +345,6 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
   stream_cfg = proc_ctx->stream_cfg_arr[*ctx_idx];
   stream_ctx = proc_ctx->stream_ctx_arr[*ctx_idx];
 
-
   in_stream_idx = sqlite3_column_int(select_video_info_stmt, 0);
   proc_ctx->v_stream_idx = in_stream_idx;
   proc_ctx->ctx_map[in_stream_idx] = *ctx_idx;
@@ -353,8 +352,8 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
   stream_ctx->in_stream_idx = in_stream_idx;
 
   title = (char *) sqlite3_column_text(select_video_info_stmt, 1);
-
-  if (title) {
+  if (title)
+  {
     for (end = title; *end; end++);
     len_title = end - title;
 
@@ -373,9 +372,10 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
   stream_cfg->passthrough = sqlite3_column_int(select_video_info_stmt, 2);
   proc_ctx->deint = sqlite3_column_int(select_video_info_stmt, 3);
   stream_cfg->renditions = sqlite3_column_int(select_video_info_stmt, 4);
-  title2 = (char *) sqlite3_column_text(select_video_info_stmt, 5);
 
-  if (title2) {
+  title2 = (char *) sqlite3_column_text(select_video_info_stmt, 5);
+  if (title2)
+  {
     for (end = title2; *end; end++);
     len_title2 = end - title2;
 
@@ -688,7 +688,7 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
 
     if (stream_ctx->codec_type != AVMEDIA_TYPE_AUDIO) { continue; }
 
-    dec_ctx = in_ctx->dec_ctx[ctx_idx];
+    dec_ctx = stream_ctx->dec_ctx;
     out_stream_idx = proc_ctx->idx_map[in_stream_idx];
 
     if (stream_cfg->renditions) {
@@ -757,14 +757,13 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
 
   in_stream_idx = proc_ctx->v_stream_idx;
   ctx_idx = proc_ctx->ctx_map[in_stream_idx];
-
   stream_cfg = proc_ctx->stream_cfg_arr[ctx_idx];
-
+  stream_ctx = proc_ctx->stream_ctx_arr[ctx_idx];
   out_stream_idx = proc_ctx->idx_map[in_stream_idx];
 
   if (proc_ctx->deint) {
     if (!(proc_ctx->deint_ctx =
-      deint_filter_context_init(in_ctx, proc_ctx->v_stream_idx, ctx_idx)))
+      deint_filter_context_init(stream_ctx->dec_ctx, in_ctx, proc_ctx->v_stream_idx)))
     {
       fprintf(stderr, "Failed to allocate deinterlace filter context \
         for process job: %s\n", process_job_id);
@@ -788,7 +787,7 @@ int processing_context_init(ProcessingContext *proc_ctx, InputContext *in_ctx,
   if (stream_cfg->renditions)
   {
     if (!(proc_ctx->rend_ctx =
-      video_rendition_filter_context_init(proc_ctx, in_ctx->dec_ctx[ctx_idx],
+      video_rendition_filter_context_init(proc_ctx, stream_ctx->dec_ctx,
         out_ctx->enc_ctx_arr[out_stream_idx], out_ctx->enc_ctx_arr[out_stream_idx + 1],
         in_ctx->fmt_ctx->streams[proc_ctx->v_stream_idx])))
     {
