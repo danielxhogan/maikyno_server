@@ -784,7 +784,7 @@ void flush_encoders(ProcessingContext *proc_ctx)
 
 int process_video(char *process_job_id, const char *batch_id)
 {
-  int in_stream_idx, out_stream_idx, ctx_idx, ret;
+  int ret = 0;
 
   if ((ret = check_abort_status(batch_id)) == ABORTED) {
     goto update_status;
