@@ -57,5 +57,5 @@ async fn main() -> std::io::Result<()>
       .service(af::Files::new("media",
         root_media_dir_pathbuf.clone()));
     })
-    .bind(("0.0.0.0", 8081))?.run().await;
+    .bind(("0.0.0.0", 8080))?.run().await;
 }
