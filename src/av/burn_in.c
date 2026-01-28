@@ -128,13 +128,13 @@ int sub_to_frame_convert(ProcessingContext *proc_ctx)
       sub_to_frame_sws_context_alloc(stf_ctx, sub->rects[i])) < 0)
     {
       fprintf(stderr,
-        "Failed to initialize sws_context for stf_ctx.\n");
+        "Failed to initialize sws context for stf context.\n");
       return ret;
     }
 
     if ((ret = av_frame_make_writable(frame)) < 0) {
-      fprintf(stderr, "Failed to make frame writable.\n\
-        Libav Error: %s.\n", av_err2str(ret));
+      fprintf(stderr, "Failed to make frame writable.\n"
+        "Libav Error: %s.\n", av_err2str(ret));
       return ret;
     }
 
@@ -169,8 +169,8 @@ int push_dummy_subtitle(ProcessingContext *proc_ctx,
   dummy->pts = pts;
 
   if ((ret = av_frame_get_buffer(dummy, 0)) < 0) {
-    fprintf(stderr, "Failed to get frame buffers for dummy frame.\n\
-      Libav Error: %s.\n", av_err2str(ret));
+    fprintf(stderr, "Failed to get frame buffers for dummy frame.\n"
+      "Libav Error: %s.\n", av_err2str(ret));
     goto end;
   }
 
@@ -180,8 +180,8 @@ int push_dummy_subtitle(ProcessingContext *proc_ctx,
     av_buffersrc_add_frame_flags(proc_ctx->burn_in_ctx->s_buffersrc_ctx,
     dummy, AV_BUFFERSRC_FLAG_PUSH)) < 0)
   {
-    fprintf(stderr, "Failed to add dummy frame to buffersrc.\n\
-      Libav Error: %s.\n", av_err2str(ret));
+    fprintf(stderr, "Failed to add dummy frame to buffersrc.\n"
+      "Libav Error: %s.\n", av_err2str(ret));
     goto end;
   }
 

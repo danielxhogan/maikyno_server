@@ -101,7 +101,7 @@ int update_pct_complete(int64_t pct, char *process_job_id)
 
   if ((ret = sqlite3_open(DATABASE_URL, &db)) != SQLITE_OK)
   {
-    fprintf(stderr, "Failed to open database: %s\nError: %s\n",
+    fprintf(stderr, "Failed to open database \"%s\"\nSqlite Error: %s\n",
       DATABASE_URL, sqlite3_errmsg(db));
     goto end;
   }
@@ -109,8 +109,8 @@ int update_pct_complete(int64_t pct, char *process_job_id)
   if ((ret = sqlite3_prepare_v2(db, update_pct_complete_query,
     -1, &update_pct_complete_stmt, 0)) != SQLITE_OK)
   {
-    fprintf(stderr, "Failed to prepare update pct_complete statement. \
-      \nError: %s\n", sqlite3_errmsg(db));
+    fprintf(stderr, "Failed to prepare update pct_complete statement.\n"
+      "Sqlite Error: %s\n", sqlite3_errmsg(db));
     goto end;
   }
 
@@ -120,8 +120,7 @@ int update_pct_complete(int64_t pct, char *process_job_id)
 
   if ((ret = sqlite3_step(update_pct_complete_stmt)) != SQLITE_DONE) {
     fprintf(stderr,
-      "Failed to update pct_complete for process_job: %s\nError: %s\n",
-      process_job_id, sqlite3_errmsg(db));
+      "Failed to update pct_complete.\nError: %s\n", sqlite3_errmsg(db));
     goto end;
   }
 
@@ -145,8 +144,7 @@ int calculate_pct_complete(ProcessingContext *proc_ctx, char *process_job_id)
   printf("pct_complete: %ld%%\n", pct_complete);
 
   if ((ret = update_pct_complete(pct_complete, process_job_id)) < 0) {
-    fprintf(stderr, "Failed to update pct_complete for process_job: %s\n",
-      process_job_id);
+    fprintf(stderr, "Failed to update pct_complete.\n");
     return ret;
   }
 

@@ -271,8 +271,8 @@ pub fn select_video(pool: web::Data<DBPool>, video_id: String)
     .filter(videos::id.eq(&video_id))
     .get_result::<Video>(&mut db)
     .map_err(|err| {
-      let err_msg = format!("Failed to get video with id:
-        {:?}\nError: {:?}", video_id, err);
+      let mut err_msg = format!("Failed to get video with id: '{}'. ", video_id);
+      err_msg = format!("{err_msg}Error: {}.", err);
 
       eprintln!("{err_msg:?}");
       return MKError::new(MKErrorType::DBError, err_msg);

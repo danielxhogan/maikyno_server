@@ -111,7 +111,7 @@ int fsc_ctx_add_samples_to_buffer(FrameSizeConversionContext *fsc_ctx,
 
   if (ret < 0) {
     fprintf(stderr,
-      "Failed to copy samples from decoded frame to fsc_ctx->sample_buffer.\n");
+      "Failed to copy samples from decoded frame to sample_buffer.\n");
     return ret;
   }
 
