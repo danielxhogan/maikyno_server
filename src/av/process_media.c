@@ -6,10 +6,10 @@
 #include "burn_in.h"
 #include "utils.h"
 
-int encode_video_frame(ProcessingContext *proc_ctx,
-  StreamContext *stream_ctx, int rendition, AVFrame *frame)
+int encode_video_frame(ProcessingContext *proc_ctx, int rendition, AVFrame *frame)
 {
   int out_stream_idx, ret = 0;
+  StreamContext *stream_ctx = proc_ctx->stream_ctx_arr[0];
   AVCodecContext *enc_ctx;
   AVStream *out_stream;
 
@@ -24,7 +24,7 @@ int encode_video_frame(ProcessingContext *proc_ctx,
     out_stream_idx = stream_ctx->rend1_out_stream_idx;
   }
 
-  if ((ret = avcodec_send_frame( enc_ctx, frame)) < 0)
+  if ((ret = avcodec_send_frame(enc_ctx, frame)) < 0)
   {
     fprintf(stderr, "Failed to send video frame to encoder.\n\
       Libav Error: %s.\n", av_err2str(ret));
@@ -64,8 +64,7 @@ int encode_video_frame(ProcessingContext *proc_ctx,
   return 0;
 }
 
-int make_rendtion(ProcessingContext *proc_ctx,
-  StreamContext *stream_ctx, AVFrame *frame)
+int make_rendtion(ProcessingContext *proc_ctx, AVFrame *frame)
 {
   int ret = 0;
   RenditionFilterContext *rend_ctx = proc_ctx->rend_ctx;
@@ -81,9 +80,7 @@ int make_rendtion(ProcessingContext *proc_ctx,
   while ((ret = av_buffersink_get_frame(rend_ctx->buffersink_ctx1,
     rend_ctx->filtered_frame1)) >= 0)
   {
-    if ((ret = encode_video_frame(proc_ctx, stream_ctx, 0,
-      rend_ctx->filtered_frame1)) < 0)
-    {
+    if ((ret = encode_video_frame(proc_ctx, 0, rend_ctx->filtered_frame1)) < 0) {
       fprintf(stderr, "Failed to encode first rendition frame.\n");
       return ret;
     }
@@ -100,9 +97,7 @@ int make_rendtion(ProcessingContext *proc_ctx,
   while ((ret = av_buffersink_get_frame(rend_ctx->buffersink_ctx2,
     rend_ctx->filtered_frame2)) >= 0)
   {
-    if ((ret = encode_video_frame(proc_ctx, stream_ctx, 1,
-      rend_ctx->filtered_frame2)) < 0)
-    {
+    if ((ret = encode_video_frame(proc_ctx, 1, rend_ctx->filtered_frame2)) < 0) {
       fprintf(stderr, "Failed to encode second rendition frame.\n");
       return ret;
     }
@@ -119,11 +114,10 @@ int make_rendtion(ProcessingContext *proc_ctx,
   return 0;
 }
 
-int burn_in_subtitles(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
+int burn_in_subtitles(ProcessingContext *proc_ctx,
   AVFilterContext *buffersrc_ctx, AVFrame *frame)
 {
   int ret = 0;
-  AVCodecContext *v_dec_ctx = proc_ctx->stream_ctx_arr[0]->dec_ctx;
   AVFrame *filtered_frame;
 
   if ((ret = av_buffersrc_add_frame_flags(buffersrc_ctx,
@@ -146,35 +140,15 @@ int burn_in_subtitles(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
     }
 
     filtered_frame = proc_ctx->burn_in_ctx->filtered_frame;
-    filtered_frame->width = v_dec_ctx->width;
-    filtered_frame->height = v_dec_ctx->height;
-    filtered_frame->format = v_dec_ctx->pix_fmt;
-    filtered_frame->color_primaries = v_dec_ctx->color_primaries;
-    filtered_frame->color_trc = v_dec_ctx->color_trc;
-    filtered_frame->colorspace = v_dec_ctx->colorspace;
-    filtered_frame->chroma_location = v_dec_ctx->chroma_sample_location;
-    filtered_frame->color_range = v_dec_ctx->color_range;
-
-    if (filtered_frame->pts <= 0) {
-      filtered_frame->pts =
-        (proc_ctx->tminus1_v_pts * 2) - proc_ctx->tminus2_v_pts;
-    } else {
-      proc_ctx->tminus2_v_pts = proc_ctx->tminus1_v_pts;
-      proc_ctx->tminus1_v_pts = filtered_frame->pts;
-    }
 
     if (proc_ctx->rend_ctx) {
-      if ((ret = make_rendtion(proc_ctx, stream_ctx,
-        filtered_frame)) < 0)
-      {
+      if ((ret = make_rendtion(proc_ctx, filtered_frame)) < 0) {
         fprintf(stderr, "Failed to make renditions of burn in frame.\n");
         return ret;
       }
     }
     else {
-      if ((ret = encode_video_frame(proc_ctx, stream_ctx, 0,
-        filtered_frame)) < 0)
-      {
+      if ((ret = encode_video_frame(proc_ctx, 0, filtered_frame)) < 0) {
         fprintf(stderr, "Failed to encode burn in frame.\n");
         return ret;
       }
@@ -216,7 +190,7 @@ int deinterlace_video_frame(ProcessingContext *proc_ctx,
         proc_ctx->last_sub_pts = proc_ctx->frame->pts;
       }
 
-      if ((ret = burn_in_subtitles(proc_ctx, stream_ctx,
+      if ((ret = burn_in_subtitles(proc_ctx,
         proc_ctx->burn_in_ctx->v_buffersrc_ctx,
         proc_ctx->deint_ctx->filtered_frame)) < 0)
       {
@@ -226,7 +200,7 @@ int deinterlace_video_frame(ProcessingContext *proc_ctx,
     }
     else if (proc_ctx->rend_ctx)
     {
-      if ((ret = make_rendtion(proc_ctx, stream_ctx,
+      if ((ret = make_rendtion(proc_ctx,
         proc_ctx->deint_ctx->filtered_frame)) < 0)
       {
         fprintf(stderr, "Failed to make renditions of deinterlaced frame.\n");
@@ -234,7 +208,7 @@ int deinterlace_video_frame(ProcessingContext *proc_ctx,
       }
     }
     else {
-      if ((ret = encode_video_frame(proc_ctx, stream_ctx, 0,
+      if ((ret = encode_video_frame(proc_ctx, 0,
         proc_ctx->deint_ctx->filtered_frame)) < 0)
       {
         fprintf(stderr, "Failed to encode deinterlaced frame.\n");
@@ -440,14 +414,13 @@ flush:
 int decode_sub_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx)
 {
   int got_sub_ptr, ret = 0;
-  AVCodecContext *s_dec_ctx = stream_ctx->dec_ctx;
 
   if (proc_ctx->first_sub == 0) {
     proc_ctx->first_sub = 1;
     printf("Found first subtitle\n");
   }
 
-  if ((ret = avcodec_decode_subtitle2(s_dec_ctx, proc_ctx->sub,
+  if ((ret = avcodec_decode_subtitle2(stream_ctx->dec_ctx, proc_ctx->sub,
     &got_sub_ptr, proc_ctx->pkt)) < 0)
   {
     fprintf(stderr, "Failed to decode subtitle.\n\
@@ -469,7 +442,7 @@ int decode_sub_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx)
     return ret;
   }
 
-  if ((ret = burn_in_subtitles(proc_ctx, stream_ctx,
+  if ((ret = burn_in_subtitles(proc_ctx,
     proc_ctx->burn_in_ctx->s_buffersrc_ctx,
     proc_ctx->burn_in_ctx->stf_ctx->subtitle_frame)) < 0)
   {
@@ -514,7 +487,7 @@ int decode_av_packet(ProcessingContext *proc_ctx,
           proc_ctx->last_sub_pts = proc_ctx->frame->pts;
         }
 
-        if ((ret = burn_in_subtitles(proc_ctx, stream_ctx,
+        if ((ret = burn_in_subtitles(proc_ctx,
           proc_ctx->burn_in_ctx->v_buffersrc_ctx, proc_ctx->frame)) < 0)
         {
           fprintf(stderr, "Failed to burn in subtitles.\n");
@@ -522,17 +495,13 @@ int decode_av_packet(ProcessingContext *proc_ctx,
         }
       }
       else if (proc_ctx->rend_ctx) {
-        if ((ret = make_rendtion(proc_ctx, stream_ctx,
-          proc_ctx->frame)) < 0)
-        {
+        if ((ret = make_rendtion(proc_ctx, proc_ctx->frame)) < 0) {
           fprintf(stderr, "Failed to make video renditions.\n");
           return ret;
         }
       }
       else {
-        if ((ret = encode_video_frame(proc_ctx, stream_ctx, 0,
-          proc_ctx->frame)) < 0)
-        {
+        if ((ret = encode_video_frame(proc_ctx, 0, proc_ctx->frame)) < 0) {
           fprintf(stderr, "Failed to encode video frame from input stream '%d'.\n",
             stream_ctx->in_stream_idx);
           return ret;
@@ -700,6 +669,119 @@ int transcode(ProcessingContext *proc_ctx,
   return 0;
 }
 
+void flush_decoders(ProcessingContext *proc_ctx)
+{
+  StreamContext *stream_ctx;
+
+  for (unsigned int i = 0; i < proc_ctx->nb_selected_streams; i++) {
+    stream_ctx = proc_ctx->stream_ctx_arr[i];
+    if (stream_ctx->passthrough) { continue; }
+
+    if (decode_packet(proc_ctx, stream_ctx, NULL) < 0) {
+      fprintf(stderr, "Failed to flush decoder "
+        "for input stream '%d'.\n", stream_ctx->in_stream_idx);
+    }
+  }
+}
+
+void flush_fsc_ctx(ProcessingContext *proc_ctx)
+{
+  StreamContext *stream_ctx;
+
+  for (unsigned int i = 0; i < proc_ctx->nb_selected_streams; i++) {
+    stream_ctx = proc_ctx->stream_ctx_arr[i];
+
+    if (
+      stream_ctx->passthrough ||
+      stream_ctx->codec_type != AVMEDIA_TYPE_AUDIO
+    ) { continue; }
+
+    if (stream_ctx->transcode_rend0) {
+      if (convert_audio_frame(proc_ctx, stream_ctx, 0, NULL) < 0) {
+        fprintf(stderr, "Failed to flush frame size converter "
+          "for output stream '%d'.\n", stream_ctx->rend0_out_stream_idx);
+      }
+    }
+
+    if (stream_ctx->renditions) {
+      if (convert_audio_frame(proc_ctx, stream_ctx, 1, NULL) < 0) {
+        fprintf(stderr, "Failed to flush frame size converter "
+          "for output stream '%d'.\n", stream_ctx->rend1_out_stream_idx);
+      }
+    }
+  }
+}
+
+void flush_vol_ctx(ProcessingContext *proc_ctx)
+{
+  StreamContext *stream_ctx;
+
+  for (unsigned int i = 0; i < proc_ctx->nb_selected_streams; i++) {
+    stream_ctx = proc_ctx->stream_ctx_arr[i];
+
+    if (
+      stream_ctx->passthrough ||
+      stream_ctx->codec_type != AVMEDIA_TYPE_AUDIO
+    ) { continue; }
+
+    if (stream_ctx->rend0_vol_ctx) {
+      if (boost_gain(proc_ctx, stream_ctx, 0, NULL)) {
+        fprintf(stderr, "Failed to flush volume filter context "
+          "for output stream '%d'.\n", stream_ctx->rend0_out_stream_idx);
+      }
+    }
+
+    if (stream_ctx->rend1_vol_ctx) {
+      if (boost_gain(proc_ctx, stream_ctx, 1, NULL))
+      {
+        fprintf(stderr, "Failed to flush volume filter context "
+          "for output stream '%d'.\n", stream_ctx->rend1_out_stream_idx);
+      }
+    }
+  }
+}
+
+void flush_encoders(ProcessingContext *proc_ctx)
+{
+  StreamContext *stream_ctx;
+
+  for (unsigned int i = 0; i < proc_ctx->nb_selected_streams; i++) {
+    stream_ctx = proc_ctx->stream_ctx_arr[i];
+    if (stream_ctx->passthrough) { continue; }
+
+    if (stream_ctx->codec_type == AVMEDIA_TYPE_VIDEO)
+    {
+      if (encode_video_frame(proc_ctx, 0, NULL) < 0) {
+        fprintf(stderr, "Failed to flush enocder for output stream: %d.\n",
+          stream_ctx->rend0_out_stream_idx);
+      }
+
+      if (!stream_ctx->renditions) { continue; }
+
+      if (encode_video_frame(proc_ctx, 1, NULL) < 0) {
+        fprintf(stderr, "Failed to flush enocder for output stream: %d.\n",
+          stream_ctx->rend1_out_stream_idx);
+      }
+    }
+    else if (stream_ctx->codec_type == AVMEDIA_TYPE_AUDIO)
+    {
+      if (stream_ctx->transcode_rend0) {
+        if (encode_audio_frame(proc_ctx, stream_ctx, 0, NULL) < 0) {
+          fprintf(stderr, "Failed to flush encoder for output stream: '%d'.\n",
+            stream_ctx->rend0_out_stream_idx);
+        }
+      }
+
+      if (stream_ctx->renditions) {
+        if (encode_audio_frame(proc_ctx, stream_ctx, 1, NULL) < 0) {
+          fprintf(stderr, "Failed to flush encoder for output stream: '%d'.\n",
+            stream_ctx->rend1_out_stream_idx);
+        }
+      }
+    }
+  }
+}
+
 int process_video(char *process_job_id, const char *batch_id)
 {
   int in_stream_idx, out_stream_idx, ctx_idx, ret;
@@ -759,95 +841,39 @@ int process_video(char *process_job_id, const char *batch_id)
     fprintf(stderr, "Failed to transcode.\n");
   }
 
-  for (
-    in_stream_idx = 0;
-    in_stream_idx < (int) proc_ctx->in_fmt_ctx->nb_streams;
-    in_stream_idx++
-  ) {
-    ctx_idx = proc_ctx->ctx_map[in_stream_idx];
-    if (ctx_idx == INACTIVE_STREAM) { continue; }
-
-    stream_ctx = proc_ctx->stream_ctx_arr[ctx_idx];
-    if (stream_ctx->passthrough) { continue; }
-    out_stream_idx = stream_ctx->rend0_out_stream_idx;
-
-    if (
-      stream_ctx->renditions &&
-      stream_ctx->codec_type == AVMEDIA_TYPE_AUDIO
-    ) {
-      out_stream_idx = stream_ctx->rend1_out_stream_idx;
-    }
-
-    if (decode_packet(proc_ctx, stream_ctx, NULL) < 0) {
-      fprintf(stderr, "Failed to decode packet while flushing \
-        decoder for input stream '%d'.\n", in_stream_idx);
-    }
-  }
-
-  for (
-    in_stream_idx = 0;
-    in_stream_idx < (int) proc_ctx->in_fmt_ctx->nb_streams;
-    in_stream_idx++
-  ) {
-    ctx_idx = proc_ctx->ctx_map[in_stream_idx];
-    out_stream_idx = stream_ctx->rend0_out_stream_idx;
-    if (ctx_idx == INACTIVE_STREAM) { continue; }
-
-    stream_ctx = proc_ctx->stream_ctx_arr[ctx_idx];
-
-    if (stream_ctx->passthrough) { continue; }
-    if (stream_ctx->renditions) { out_stream_idx += 1; }
-    if (stream_ctx->codec_type != AVMEDIA_TYPE_AUDIO) { continue; }
-
-    if (convert_audio_frame(proc_ctx, stream_ctx, 0,
-      NULL) < 0)
-    {
-      fprintf(stderr, "Failed to encode audio frame while flushing \
-        frame size converter for input stream '%d'.\n", in_stream_idx);
-    }
-  }
+  flush_decoders(proc_ctx);
 
   if (proc_ctx->deint_ctx) {
+    stream_ctx = proc_ctx->stream_ctx_arr[0];
     if (deinterlace_video_frame(proc_ctx, stream_ctx, NULL) < 0) {
       fprintf(stderr, "Failed to flush deinterlace filter.\n");
     }
   }
 
   if (proc_ctx->burn_in_ctx) {
-    if (burn_in_subtitles(proc_ctx, stream_ctx,
-      proc_ctx->burn_in_ctx->v_buffersrc_ctx, NULL) < 0) {
+    // if (burn_in_subtitles(proc_ctx,
+    //   proc_ctx->burn_in_ctx->v_buffersrc_ctx, NULL) < 0)
+    // {
+    //     fprintf(stderr, "Failed to flush burn in filter.\n");
+    // }
+
+    if (burn_in_subtitles(proc_ctx,
+      proc_ctx->burn_in_ctx->s_buffersrc_ctx, NULL) < 0)
+    {
         fprintf(stderr, "Failed to flush burn in filter.\n");
     }
   }
 
-  for (
-    in_stream_idx = 0;
-    in_stream_idx < (int) proc_ctx->in_fmt_ctx->nb_streams;
-    in_stream_idx++
-  ) {
-    ctx_idx = proc_ctx->ctx_map[in_stream_idx];
-    if (ctx_idx == INACTIVE_STREAM) { continue; }
-
-    stream_ctx = proc_ctx->stream_ctx_arr[ctx_idx];
-    if (stream_ctx->passthrough) { continue; }
-    out_stream_idx = stream_ctx->rend0_out_stream_idx;
-
-    if (stream_ctx->codec_type == AVMEDIA_TYPE_VIDEO) {
-      if (encode_video_frame(proc_ctx, stream_ctx, 0, NULL) < 0)
-      {
-        fprintf(stderr, "Failed to encode video frame from input stream: %d.\n",
-          in_stream_idx);
-      }
-    } else if (stream_ctx->codec_type == AVMEDIA_TYPE_AUDIO) {
-      if (stream_ctx->renditions) { out_stream_idx += 1; }
-
-      if (encode_audio_frame(proc_ctx, stream_ctx, 0,
-        NULL) < 0)
-      {
-        fprintf(stderr, "Failed to write audio frame.\n");
-      }
+  if (proc_ctx->rend_ctx) {
+    if ((ret = make_rendtion(proc_ctx, NULL)) < 0) {
+      fprintf(stderr, "Failed to flush rendition context.\n");
+      return ret;
     }
   }
+
+  flush_fsc_ctx(proc_ctx);
+  flush_vol_ctx(proc_ctx);
+  flush_encoders(proc_ctx);
 
   if (av_write_trailer(proc_ctx->out_fmt_ctx) < 0) {
     fprintf(stderr, "Failed to write trailer to file.\n\

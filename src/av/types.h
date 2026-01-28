@@ -83,11 +83,6 @@ typedef struct StreamContext {
 } StreamContext;
 
 typedef struct ProcessingContext {
-  int64_t last_sub_pts;
-  int64_t tminus1_v_pts;
-  int64_t tminus2_v_pts;
-
-  // *************************************
   unsigned int nb_in_streams;
   unsigned int nb_selected_streams;
   unsigned int v_stream_idx;
@@ -103,6 +98,7 @@ typedef struct ProcessingContext {
 
   int burn_in_idx;
   int first_sub;
+  int64_t last_sub_pts;
   BurnInFilterContext *burn_in_ctx;
 
   int tonemap;

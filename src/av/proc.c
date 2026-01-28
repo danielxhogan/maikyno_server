@@ -153,11 +153,6 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   ProcessingContext *proc_ctx = malloc(sizeof(ProcessingContext));
   if(!proc_ctx) { return NULL; }
 
-  proc_ctx->last_sub_pts = 0;
-  proc_ctx->tminus1_v_pts = 0;
-  proc_ctx->tminus2_v_pts = 0;
-
-  // ************************************
   proc_ctx->nb_in_streams = 0;
   proc_ctx->nb_selected_streams = 0;
   proc_ctx->v_stream_idx = -1;
@@ -173,6 +168,7 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
 
   proc_ctx->burn_in_idx = -1;
   proc_ctx->first_sub = 0;
+  proc_ctx->last_sub_pts = 0;
   proc_ctx->burn_in_ctx = NULL;
 
   proc_ctx->tonemap = 0;
@@ -380,6 +376,16 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
 
   proc_ctx->tonemap = sqlite3_column_int(select_video_info_stmt, 6);
 
+  if (stream_ctx->passthrough) {
+    stream_ctx->renditions = 0;
+    proc_ctx->tonemap = 0;
+    proc_ctx->deint = 0;
+  }
+
+  if (!stream_ctx->renditions) {
+    stream_ctx->rend1_title = NULL;
+  }
+
   *ctx_idx = 1;
 
 end:
@@ -492,13 +498,27 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
 
     strncat(stream_ctx->codec, codec, len_codec);
 
+    if (stream_ctx->passthrough) {
+      stream_ctx->renditions = 0;
+      stream_ctx->rend0_gain_boost = 0;
+      stream_ctx->rend1_gain_boost = 0;
+    }
+
+    if (!stream_ctx->renditions) {
+      stream_ctx->rend1_gain_boost = 0;
+      stream_ctx->rend1_title = NULL;
+    }
+
     if (
       (stream_ctx->renditions &&
         (strcmp(stream_ctx->codec, "ac3") ||
           stream_ctx->rend0_gain_boost > 0
         )
       ) ||
-      !stream_ctx->renditions
+      (
+        !stream_ctx->passthrough &&
+        !stream_ctx->renditions
+      )
     ) {
       stream_ctx->transcode_rend0 = 1;
     }
