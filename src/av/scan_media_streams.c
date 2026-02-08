@@ -275,7 +275,9 @@ int scan_video(char *video_id, char *video_name,
     if (
       profile_name &&
       (!strcmp(profile_name, "DTS-HD MA") ||
-        !strcmp(profile_name, "DTS-HD MA + DTS:X"))
+        !strcmp(profile_name, "DTS-HD MA + DTS:X") ||
+        !strcmp(profile_name, "Dolby TrueHD") ||
+        !strcmp(profile_name, "Dolby TrueHD + Dolby Atmos"))
     ) {
       codec_name = profile_name;
     }
@@ -283,12 +285,11 @@ int scan_video(char *video_id, char *video_name,
     if (stream_type == AVMEDIA_TYPE_VIDEO) {
       height = stream->codecpar->height;
       width = stream->codecpar->width;
-      
-      if (stream->codecpar->field_order == AV_FIELD_PROGRESSIVE ||
-        stream->codecpar->field_order == AV_FIELD_UNKNOWN)
-      {
-        interlaced = 0;
-      }
+
+      if (
+        stream->codecpar->field_order == AV_FIELD_PROGRESSIVE ||
+        stream->codecpar->field_order == AV_FIELD_UNKNOWN
+      ) { interlaced = 0; }
       else { interlaced = 1; }
     }
 
