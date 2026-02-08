@@ -20,8 +20,8 @@ int get_input_file_nb_streams(char *process_job_id, sqlite3 *db)
   if ((ret = sqlite3_prepare_v2(db, select_input_stream_count_querey, -1,
     &select_input_stream_count_stmt, 0)) != SQLITE_OK)
   {
-    fprintf(stderr, "Failed to prepare select stream count statement.\nSqlite Error%s\n",
-      sqlite3_errmsg(db));
+    fprintf(stderr, "Failed to prepare select stream count statement.\n"
+      "Sqlite Error: %s.\n", sqlite3_errmsg(db));
     ret = -ret;
     goto end;
   }
@@ -35,8 +35,8 @@ int get_input_file_nb_streams(char *process_job_id, sqlite3 *db)
   }
 
   if (ret != SQLITE_DONE) {
-    fprintf(stderr, "Failed to get number of streams in input file \
-      for process_job: %s\nSqlite Error: %s.\n", process_job_id, sqlite3_errmsg(db));
+    fprintf(stderr, "Failed to get number of streams in input file.\n"
+      "Sqlite Error: %s.\n", sqlite3_errmsg(db));
     ret = -ret;
     goto end;
   }
@@ -58,17 +58,18 @@ int get_nb_selected_streams(char *process_job_id, sqlite3 *db)
   if ((ret = sqlite3_prepare_v2(db, select_stream_count_query, -1,
     &select_stream_count_stmt, 0)) != SQLITE_OK)
   {
-    fprintf(stderr, "Failed to prepare select stream count statement.\nSqlite Error%s\n",
-      sqlite3_errmsg(db));
+    fprintf(stderr, "Failed to prepare select stream count statement.\n"
+      "Sqlite Error: %s.\n", sqlite3_errmsg(db));
     ret = -ret;
     goto end;
   }
 
-  sqlite3_bind_text(select_stream_count_stmt, 1, process_job_id, -1, SQLITE_STATIC);
+  sqlite3_bind_text(select_stream_count_stmt, 1, process_job_id,
+    -1, SQLITE_STATIC);
 
   if ((ret = sqlite3_step(select_stream_count_stmt)) != SQLITE_ROW) {
-    fprintf(stderr, "Failed to get stream count for process_job: %s\nSqlite Error: %s\n",
-      process_job_id, sqlite3_errmsg(db));
+    fprintf(stderr, "Failed to get stream count.\n"
+      "Sqlite Error: %s\n", sqlite3_errmsg(db));
     ret = -ret;
     goto end;
   }
@@ -309,9 +310,8 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
   if ((ret = sqlite3_prepare_v2(db, select_video_info_query, -1,
     &select_video_info_stmt, 0)) != SQLITE_OK)
   {
-    fprintf(stderr, "Failed to prepare select process job video streams statement.");
-    fprintf(stderr, "process job: \"%s\".\nSqlite Error: %s.\n",
-      process_job_id, sqlite3_errmsg(db));
+    fprintf(stderr, "Failed to prepare select process job video streams "
+      "statement.\nSqlite Error: %s.\n", sqlite3_errmsg(db));
     ret = -ret;
     goto end;
   }
@@ -320,8 +320,8 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
     -1, SQLITE_STATIC);
 
   if ((ret = sqlite3_step(select_video_info_stmt)) != SQLITE_ROW) {
-    fprintf(stderr, "Failed to get video stream id for process job: %s.\n\
-      Sqlite Error: %s.\n", process_job_id, sqlite3_errmsg(db));
+    fprintf(stderr, "Failed to get video stream id.\n"
+      "Sqlite Error: %s.\n", sqlite3_errmsg(db));
       ret = -ret;
     goto end;
   }
@@ -343,8 +343,8 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
     if (!(stream_ctx->rend0_title =
       calloc(len_title + 1, sizeof(char))))
     {
-      fprintf(stderr, "Failed to allocate memory for title for stream: %d\n",
-        in_stream_idx);
+      fprintf(stderr, "Failed to allocate memory "
+        "for title for stream: '%d'.\n", in_stream_idx);
       ret = AVERROR(ENOMEM);
       goto end;
     }
@@ -365,8 +365,8 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
     if (!(stream_ctx->rend1_title =
       calloc(len_title2 + 1, sizeof(char))))
     {
-      fprintf(stderr, "Failed to allocate memory for title2 for stream: %d\n",
-        in_stream_idx);
+      fprintf(stderr, "Failed to allocate memory "
+        "for title2 for stream: '%d'.\n", in_stream_idx);
       ret = AVERROR(ENOMEM);
       goto end;
     }
@@ -419,8 +419,8 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
   if ((ret = sqlite3_prepare_v2(db, select_audio_stream_info_query, -1,
     &select_audio_stream_info_stmt, 0)) != SQLITE_OK)
   {
-    fprintf(stderr, "Failed to prepare select process job audio streams statement \
-      for process job: %s\nSqlite Error: %s\n", process_job_id, sqlite3_errmsg(db));
+    fprintf(stderr, "Failed to prepare select process job audio streams "
+      "statement.\nSqlite Error: %s.\n", sqlite3_errmsg(db));
       ret = -ret;
       goto end;
   }
@@ -445,8 +445,8 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
       if (!(stream_ctx->rend0_title =
         calloc(len_title + 1, sizeof(char))))
       {
-        fprintf(stderr, "Failed to allocate memory for title for stream: %d\n",
-          in_stream_idx);
+        fprintf(stderr, "Failed to allocate memory "
+          "for title for stream: '%d'.\n", in_stream_idx);
         ret = AVERROR(ENOMEM);
         goto end;
       }
@@ -454,12 +454,14 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
       strncat(stream_ctx->rend0_title, title, len_title);
     }
 
-    stream_ctx->passthrough = sqlite3_column_int(select_audio_stream_info_stmt, 2);
+    stream_ctx->passthrough =
+      sqlite3_column_int(select_audio_stream_info_stmt, 2);
 
     stream_ctx->rend0_gain_boost =
       sqlite3_column_int(select_audio_stream_info_stmt, 3);
 
-    stream_ctx->renditions = sqlite3_column_int(select_audio_stream_info_stmt, 4);
+    stream_ctx->renditions =
+      sqlite3_column_int(select_audio_stream_info_stmt, 4);
 
     title2 = (char *) sqlite3_column_text(select_audio_stream_info_stmt, 5);
 
@@ -470,8 +472,8 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
       if (!(stream_ctx->rend1_title =
         calloc(len_title2 + 1, sizeof(char))))
       {
-        fprintf(stderr, "Failed to allocate memory for title2 for stream '%d'\n",
-          in_stream_idx);
+        fprintf(stderr, "Failed to allocate memory "
+          "for title2 for stream '%d'.\n", in_stream_idx);
         ret = AVERROR(ENOMEM);
         goto end;
       }
@@ -490,8 +492,8 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
     if (!(stream_ctx->codec =
       calloc(len_codec + 1, sizeof(char))))
     {
-      fprintf(stderr, "Failed to allocate memory for codec for stream '%d'\n",
-        in_stream_idx);
+      fprintf(stderr, "Failed to allocate memory "
+        "for codec for stream '%d'.\n", in_stream_idx);
       ret = AVERROR(ENOMEM);
       goto end;
     }
@@ -510,15 +512,15 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
     }
 
     if (
-      (stream_ctx->renditions &&
-        (strcmp(stream_ctx->codec, "ac3") ||
-          stream_ctx->rend0_gain_boost > 0
-        )
-      ) ||
-      (
-        !stream_ctx->passthrough &&
-        !stream_ctx->renditions
-      )
+      stream_ctx->renditions &&
+      (strcmp(stream_ctx->codec, "ac3") || stream_ctx->rend0_gain_boost > 0)
+    ) {
+      stream_ctx->transcode_rend0 = 1;
+    }
+
+    if (
+      !stream_ctx->passthrough &&
+      !stream_ctx->renditions
     ) {
       stream_ctx->transcode_rend0 = 1;
     }
@@ -527,8 +529,8 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
   }
 
   if (ret != SQLITE_DONE) {
-    fprintf(stderr, "Failed to step through audio info query.\n\
-      Sqlite Error: %s.\n", sqlite3_errmsg(db));
+    fprintf(stderr, "Failed to step through audio info query.\n"
+      "Sqlite Error: %s.\n", sqlite3_errmsg(db));
     ret = -ret;
   }
 
@@ -558,8 +560,8 @@ int get_subtitle_process_info(ProcessingContext *proc_ctx,
   if ((ret = sqlite3_prepare_v2(db, select_subtitle_stream_idx_query, -1,
     &select_subtitle_stream_idx_stmt, 0)) != SQLITE_OK)
   {
-    fprintf(stderr, "Failed to prepare select process job subtitle streams statement \
-      for process job: %s\nError: %s\n", process_job_id, sqlite3_errmsg(db));
+    fprintf(stderr, "Failed to prepare select process job subtitle streams "
+      "statement\nError: %s.\n", sqlite3_errmsg(db));
       ret = -ret;
       goto end;
   }
@@ -584,8 +586,8 @@ int get_subtitle_process_info(ProcessingContext *proc_ctx,
       if (!(stream_ctx->rend0_title =
         calloc(len_title + 1, sizeof(char))))
       {
-        fprintf(stderr, "Failed to allocate memory for title for stream: %d\n",
-          in_stream_idx);
+        fprintf(stderr, "Failed to allocate memory "
+          "for title for stream: %d\n", in_stream_idx);
         ret = AVERROR(ENOMEM);
         goto end;
       }
@@ -619,27 +621,24 @@ int get_processing_info(ProcessingContext *proc_ctx,
 {
   int ctx_idx = 0, ret = 0;
 
-  if ((ret = get_video_processing_info(proc_ctx, process_job_id,
-    &ctx_idx, db)) < 0)
+  if ((ret = get_video_processing_info(proc_ctx,
+    process_job_id, &ctx_idx, db)) < 0)
   {
     fprintf(stderr, "Failed to get video processing info.\n");
-    fprintf(stderr, "process job: %s.\n", process_job_id);
     return ret;
   }
 
-  if ((ret = get_audio_process_info(proc_ctx, process_job_id,
-    &ctx_idx, db)) < 0)
+  if ((ret = get_audio_process_info(proc_ctx,
+    process_job_id, &ctx_idx, db)) < 0)
   {
     fprintf(stderr, "Failed to get audio processing info.\n");
-    fprintf(stderr, "process job: %s.\n", process_job_id);
     return ret;
   }
 
-  if ((ret = get_subtitle_process_info(proc_ctx, process_job_id,
-    &ctx_idx, db)) < 0)
+  if ((ret = get_subtitle_process_info(proc_ctx,
+    process_job_id, &ctx_idx, db)) < 0)
   {
     fprintf(stderr, "Failed to get subtitle processing info.\n");
-    fprintf(stderr, "process job: %s.\n", process_job_id);
     return ret;
   }
 
@@ -670,7 +669,9 @@ int audio_context_init(StreamContext *stream_ctx, int rendition)
     gain_boost = stream_ctx->rend1_gain_boost;
   }
 
-  if (!(*swr_out_ctx = swr_output_context_alloc(stream_ctx->dec_ctx, enc_ctx))) {
+  if (!(*swr_out_ctx =
+    swr_output_context_alloc(stream_ctx->dec_ctx, enc_ctx)))
+  {
     fprintf(stderr, "Failed to allocate swr output context.");
     fprintf(stderr, "output stream '%d'.\n", out_stream_idx);
     return -1;
@@ -727,8 +728,7 @@ int processing_context_init(ProcessingContext *proc_ctx, char *process_job_id)
     if (!(proc_ctx->deint_ctx =
       deint_filter_context_init(stream_ctx)))
     {
-      fprintf(stderr, "Failed to allocate deinterlace filter context \
-        for process job: %s\n", process_job_id);
+      fprintf(stderr, "Failed to allocate deinterlace filter context.\n");
       return -1;
     }
   }
@@ -740,8 +740,7 @@ int processing_context_init(ProcessingContext *proc_ctx, char *process_job_id)
     if (!(proc_ctx->burn_in_ctx =
       burn_in_filter_context_init(proc_ctx)))
     {
-      fprintf(stderr, "Failed to allocate burn in filter context \
-        for process job: %s\n", process_job_id);
+      fprintf(stderr, "Failed to allocate burn in filter context.\n");
       return -1;
     }
   }
@@ -751,8 +750,7 @@ int processing_context_init(ProcessingContext *proc_ctx, char *process_job_id)
     if (!(proc_ctx->rend_ctx =
       rendition_filter_context_init(proc_ctx, stream_ctx)))
     {
-      fprintf(stderr, "Failed to allocate video rendition context for \
-        input stream: %d\nprocess job: %s\n", proc_ctx->v_stream_idx, process_job_id);
+      fprintf(stderr, "Failed to allocate video rendition context.\n");
       return -1;
     }
   }
