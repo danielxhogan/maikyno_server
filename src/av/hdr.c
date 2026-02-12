@@ -240,8 +240,8 @@ end:
   return ret;
 }
 
-int inject_hdr_metadta(HdrMetadataContext *hdr_ctx, AVCodecContext *enc_ctx,
-  char **params_str)
+int inject_hdr_metadta(HdrMetadataContext *hdr_ctx,
+  AVCodecContext *enc_ctx, char **params_str)
 {
   int ret;
 
@@ -274,7 +274,7 @@ int inject_hdr_metadta(HdrMetadataContext *hdr_ctx, AVCodecContext *enc_ctx,
         (uint8_t *) hdr_ctx->dovi, sizeof(AVDOVIMetadata), 0))
       {
         fprintf(stderr,
-          "Failed to add content light level metadata to encoder context.\n");
+          "Failed to add dolbyvision metadata to encoder context.\n");
         return AVERROR_UNKNOWN;
       }
 

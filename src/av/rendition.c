@@ -82,7 +82,7 @@ RenditionFilterContext *rendition_filter_context_init(
   }
 
   if (!(inputs = avfilter_inout_alloc())) {
-    fprintf(stderr, "Failed to allocate outputs.\n");
+    fprintf(stderr, "Failed to allocate inputs.\n");
     ret = AVERROR(ENOMEM);
     goto end;
   }

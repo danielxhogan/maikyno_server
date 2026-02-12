@@ -717,7 +717,6 @@ int processing_context_init(ProcessingContext *proc_ctx, char *process_job_id)
         fprintf(stderr, "Failed to initialize audio context.");
       }
     }
-
   }
 
   in_stream_idx = proc_ctx->v_stream_idx;

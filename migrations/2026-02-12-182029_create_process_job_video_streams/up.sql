@@ -2,6 +2,8 @@ CREATE TABLE IF NOT EXISTS process_job_video_streams (
   id VARCHAR PRIMARY KEY NOT NULL,
   title VARCHAR,
   passthrough BOOL NOT NULL,
+  codec INT NOT NULL,
+  hwaccel BOOL NOT NULL,
   create_renditions BOOL NOT NULL,
   title2 VARCHAR,
   tonemap BOOL NOT NULL,

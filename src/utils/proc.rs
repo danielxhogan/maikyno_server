@@ -11,6 +11,8 @@ pub struct ProcessVideoStreamInfo {
   pub id: String,
   pub title: Option<String>,
   pub passthrough: bool,
+  pub codec: i32,
+  pub hwaccel: bool,
   pub create_renditions: bool,
   pub title2: Option<String>,
   pub tonemap: bool,

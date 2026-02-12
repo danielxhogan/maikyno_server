@@ -100,6 +100,8 @@ diesel::table! {
         id -> Text,
         title -> Nullable<Text>,
         passthrough -> Bool,
+        codec -> Integer,
+        hwaccel -> Bool,
         create_renditions -> Bool,
         title2 -> Nullable<Text>,
         tonemap -> Bool,

@@ -118,11 +118,11 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
   }
 
   if (rendition && proc_ctx->tonemap && proc_ctx->hdr) {
-    (*enc_ctx)->pix_fmt = AV_PIX_FMT_YUV420P;
+    (*enc_ctx)->pix_fmt = AV_PIX_FMT_YUV420P10LE;
     (*enc_ctx)->color_primaries = AVCOL_PRI_BT709;
     (*enc_ctx)->color_trc = AVCOL_TRC_BT709;
     (*enc_ctx)->colorspace = AVCOL_SPC_BT709;
-    (*enc_ctx)->color_range = AVCOL_RANGE_UNSPECIFIED;
+    (*enc_ctx)->color_range = AVCOL_RANGE_MPEG;
     (*enc_ctx)->chroma_sample_location = AVCHROMA_LOC_LEFT;
   } else {
     (*enc_ctx)->pix_fmt = in_stream->codecpar->format;
@@ -418,12 +418,16 @@ int open_ac3_encoder(StreamContext *stream_ctx)
     return ret;
   }
 
-  if ((ret = select_channel_layout(*enc_ctx, &stream_ctx->dec_ctx->ch_layout)) < 0) {
+  if ((ret = select_channel_layout(*enc_ctx,
+    &stream_ctx->dec_ctx->ch_layout)) < 0)
+  {
     fprintf(stderr, "Failed to select channel layout.\n");
     return ret;
   }
 
-  if ((ret = select_ac3_sample_fmt(*enc_ctx, stream_ctx->dec_ctx->sample_fmt)) < 0) {
+  if ((ret = select_ac3_sample_fmt(*enc_ctx,
+    stream_ctx->dec_ctx->sample_fmt)) < 0)
+  {
     fprintf(stderr, "Failed to select sample format.\n");
     return ret;
   }
