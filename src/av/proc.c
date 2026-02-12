@@ -164,6 +164,12 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
 
   proc_ctx->stream_ctx_arr = NULL;
 
+  proc_ctx->codec;
+  proc_ctx->hwaccel;
+
+  proc_ctx->hw_pix_fmt = AV_PIX_FMT_NONE;
+  proc_ctx->formatted_pix_fmt = AV_PIX_FMT_NONE;
+  proc_ctx->formatted_hdr = 0;
   proc_ctx->rend0_pix_fmt = AV_PIX_FMT_NONE;
   proc_ctx->rend0_hdr = 0;
   proc_ctx->rend1_pix_fmt = AV_PIX_FMT_NONE;

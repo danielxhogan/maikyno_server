@@ -93,9 +93,15 @@ typedef struct ProcessingContext {
 
   StreamContext **stream_ctx_arr;
 
-  enum AVPixelFormat *rend0_pix_fmt;
-  enum AVPixelFormat *rend1_pix_fmt;
+  int codec;
+  int hwaccel;
+
+  enum AVPixelFormat hw_pix_fmt;
+  enum AVPixelFormat formatted_pix_fmt;
+  int formatted_hdr;
+  enum AVPixelFormat rend0_pix_fmt;
   int rend0_hdr;
+  enum AVPixelFormat rend1_pix_fmt;
   int rend1_hdr;
 
   int deint;
