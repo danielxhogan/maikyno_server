@@ -93,6 +93,11 @@ typedef struct ProcessingContext {
 
   StreamContext **stream_ctx_arr;
 
+  enum AVPixelFormat *rend0_pix_fmt;
+  enum AVPixelFormat *rend1_pix_fmt;
+  int rend0_hdr;
+  int rend1_hdr;
+
   int deint;
   DeinterlaceFilterContext *deint_ctx;
 
