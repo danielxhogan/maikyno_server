@@ -93,7 +93,7 @@ typedef struct ProcessingContext {
 
   StreamContext **stream_ctx_arr;
 
-  int codec;
+  enum AVCodecID codec;
   int hwaccel;
 
   enum AVPixelFormat hw_pix_fmt;

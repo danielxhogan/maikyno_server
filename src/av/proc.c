@@ -164,8 +164,8 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
 
   proc_ctx->stream_ctx_arr = NULL;
 
-  proc_ctx->codec;
-  proc_ctx->hwaccel;
+  proc_ctx->codec = AV_CODEC_ID_NONE;
+  proc_ctx->hwaccel = 0;
 
   proc_ctx->hw_pix_fmt = AV_PIX_FMT_NONE;
   proc_ctx->formatted_pix_fmt = AV_PIX_FMT_NONE;
@@ -306,6 +306,8 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
     "SELECT streams.stream_idx, \
       process_job_video_streams.title, \
       process_job_video_streams.passthrough, \
+      process_job_video_streams.codec, \
+      process_job_video_streams.hwaccel, \
       process_job_video_streams.deinterlace, \
       process_job_video_streams.create_renditions, \
       process_job_video_streams.title2, \
@@ -364,10 +366,12 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
   }
 
   stream_ctx->passthrough = sqlite3_column_int(select_video_info_stmt, 2);
-  proc_ctx->deint = sqlite3_column_int(select_video_info_stmt, 3);
-  stream_ctx->renditions = sqlite3_column_int(select_video_info_stmt, 4);
+  proc_ctx->codec = sqlite3_column_int(select_video_info_stmt, 3);
+  proc_ctx->hwaccel = sqlite3_column_int(select_video_info_stmt, 4);
+  proc_ctx->deint = sqlite3_column_int(select_video_info_stmt, 5);
+  stream_ctx->renditions = sqlite3_column_int(select_video_info_stmt, 6);
 
-  title2 = (char *) sqlite3_column_text(select_video_info_stmt, 5);
+  title2 = (char *) sqlite3_column_text(select_video_info_stmt, 7);
   if (title2)
   {
     for (end = title2; *end; end++);
@@ -385,7 +389,7 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
     strncat(stream_ctx->rend1_title, title2, len_title2);
   }
 
-  proc_ctx->tonemap = sqlite3_column_int(select_video_info_stmt, 6);
+  proc_ctx->tonemap = sqlite3_column_int(select_video_info_stmt, 8);
 
   if (stream_ctx->passthrough) {
     stream_ctx->renditions = 0;
