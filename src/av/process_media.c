@@ -823,6 +823,12 @@ int process_video(char *process_job_id, const char *batch_id)
     goto update_status;
   }
 
+  if (proc_ctx->hwaccel) {
+    if ((ret = hw_ctx_init(proc_ctx)) < 0) {
+      fprintf(stderr, "Failed to initialize hardware context.\n");
+    }
+  }
+
   if ((ret = open_input(proc_ctx, process_job_id, db)) < 0) {
     fprintf(stderr, "Failed to open input.\n");
     goto update_status;

@@ -53,6 +53,52 @@ end:
   return ret;
 }
 
+static enum AVPixelFormat hw_pix_fmt;
+
+int init_hw_dec_ctx(ProcessingContext *proc_ctx, const AVCodec *dec)
+{
+  const AVCodecHWConfig *config;
+
+  for (int i = 0;; i++)
+  {
+    if(!(config = avcodec_get_hw_config(dec, i))) {
+      fprintf(stderr, "Decoder %s does not support device type %s.\n",
+        dec->name, av_hwdevice_get_type_name(proc_ctx->hw_type));
+      break;
+    }
+
+    if (
+      config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX &&
+      config->device_type == proc_ctx->hw_type
+    ) {
+      hw_pix_fmt = config->pix_fmt;
+      proc_ctx->hw_dec = 1;
+
+      if (hw_pix_fmt != proc_ctx->hw_pix_fmt) {
+        printf("hw_pix_fmt mismatch:\nhw_pix_fmt: %d\n"
+          "proc_ctx->hw_pix_fmt: %d\n", hw_pix_fmt, proc_ctx->hw_pix_fmt);
+        proc_ctx->hw_pix_fmt = hw_pix_fmt;
+      }
+      break;
+    }
+  }
+
+  return 0;
+}
+
+enum AVPixelFormat get_hw_fmt(AVCodecContext *dec_ctx,
+  const enum AVPixelFormat *pix_fmts)
+{
+  const enum AVPixelFormat *pix_fmt;
+
+  for (pix_fmt = pix_fmts; *pix_fmt != -1; pix_fmt++) {
+    if (*pix_fmt == hw_pix_fmt) { return *pix_fmt; }
+  }
+
+  fprintf(stderr, "Failed to get hardware pixel format.\n");
+  return AV_PIX_FMT_NONE;
+}
+
 static int open_decoder(ProcessingContext *proc_ctx,
   StreamContext *stream_ctx, int in_stream_idx)
 {
@@ -65,6 +111,14 @@ static int open_decoder(ProcessingContext *proc_ctx,
     fprintf(stderr, "Failed to find decoder.\n");
     ret = AVERROR(EINVAL);
     return ret;
+  }
+
+  if (
+    proc_ctx->hwaccel &&
+    (unsigned int) stream_ctx->in_stream_idx == proc_ctx->v_stream_idx) {
+    if ((ret = init_hw_dec_ctx(proc_ctx, dec)) < 0) {
+      fprintf(stderr, "Failed to initialize hardware decoder.\n");
+    }
   }
 
   if (!(stream_ctx->dec_ctx = avcodec_alloc_context3(dec))) {
@@ -83,15 +137,23 @@ static int open_decoder(ProcessingContext *proc_ctx,
     return ret;
   }
 
-  if ((ret =
-    avcodec_open2(stream_ctx->dec_ctx, dec, NULL)) < 0)
-  {
+  if (proc_ctx->hw_dec) {
+    if (!(stream_ctx->dec_ctx->hw_device_ctx = av_buffer_ref(proc_ctx->hw_ctx))) {
+      fprintf(stderr, "Failed to create reference between decoder "
+        "context and hardware device context.\n");
+      return AVERROR(ENOMEM);
+    }
+  }
+
+  stream_ctx->dec_ctx->get_format = get_hw_fmt;
+
+  if ((ret = avcodec_open2(stream_ctx->dec_ctx, dec, NULL)) < 0) {
     fprintf(stderr, "Failed to open decoder for stream_idx: %d.\n",
       stream->index);
     return ret;
   }
 
-  return ret;
+  return 0;
 }
 
 int open_input(ProcessingContext *proc_ctx,

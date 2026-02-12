@@ -165,9 +165,14 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   proc_ctx->stream_ctx_arr = NULL;
 
   proc_ctx->codec = AV_CODEC_ID_NONE;
-  proc_ctx->hwaccel = 0;
 
+  proc_ctx->hwaccel = 0;
+  proc_ctx->hw_type = AV_HWDEVICE_TYPE_NONE;
+  proc_ctx->hw_ctx = NULL;
   proc_ctx->hw_pix_fmt = AV_PIX_FMT_NONE;
+
+  proc_ctx->hw_dec = 0;
+
   proc_ctx->formatted_pix_fmt = AV_PIX_FMT_NONE;
   proc_ctx->formatted_hdr = 0;
   proc_ctx->rend0_pix_fmt = AV_PIX_FMT_NONE;
@@ -271,6 +276,7 @@ void processing_context_free(ProcessingContext **proc_ctx)
   }
   avformat_free_context((*proc_ctx)->out_fmt_ctx);
   avformat_close_input(&(*proc_ctx)->in_fmt_ctx);
+  av_buffer_unref(&(*proc_ctx)->hw_ctx);
 
   if ((*proc_ctx)->stream_ctx_arr) {
     for (i = 0; i < (*proc_ctx)->nb_selected_streams; i++) {
@@ -656,6 +662,25 @@ int get_processing_info(ProcessingContext *proc_ctx,
     fprintf(stderr, "Failed to get subtitle processing info.\n");
     return ret;
   }
+
+  return 0;
+}
+
+int hw_ctx_init(ProcessingContext *proc_ctx)
+{
+  int ret = 0;
+  enum AVHWDeviceType hw_type = AV_HWDEVICE_TYPE_CUDA;
+
+  if ((ret = av_hwdevice_ctx_create(&proc_ctx->hw_ctx,
+    hw_type, NULL, NULL, 0)) < 0)
+  {
+    fprintf(stderr, "Failed to create hardware device context.\n"
+      "Libav Error: %s.\n", av_err2str(ret));
+    return ret;
+  }
+
+  proc_ctx->hw_pix_fmt = AV_PIX_FMT_CUDA;
+  proc_ctx->hw_type = hw_type;
 
   return 0;
 }
