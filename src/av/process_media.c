@@ -24,8 +24,7 @@ int encode_video_frame(ProcessingContext *proc_ctx, int rendition, AVFrame *fram
     out_stream_idx = stream_ctx->rend1_out_stream_idx;
   }
 
-  if ((ret = avcodec_send_frame(enc_ctx, frame)) < 0)
-  {
+  if ((ret = avcodec_send_frame(enc_ctx, frame)) < 0) {
     fprintf(stderr, "Failed to send video frame to encoder.\n"
       "Libav Error: %s.\n", av_err2str(ret));
     return ret;
@@ -839,7 +838,7 @@ int process_video(char *process_job_id, const char *batch_id)
     goto update_status;
   }
 
-  if ((ret = processing_context_init(proc_ctx, process_job_id)) < 0) {
+  if ((ret = processing_context_init(proc_ctx)) < 0) {
     fprintf(stderr, "Failed to initialize processing context.\n");
     goto update_status;
   }

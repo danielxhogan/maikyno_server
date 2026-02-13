@@ -245,7 +245,7 @@ int inject_hdr_metadta(HdrMetadataContext *hdr_ctx,
 {
   int ret;
 
-  if (hdr_ctx->mdm && hdr_ctx->cll)
+  if (hdr_ctx->mdm)
   {
     if (!av_packet_side_data_add(&enc_ctx->coded_side_data,
       &enc_ctx->nb_coded_side_data, AV_PKT_DATA_MASTERING_DISPLAY_METADATA,
@@ -256,13 +256,15 @@ int inject_hdr_metadta(HdrMetadataContext *hdr_ctx,
       return AVERROR_UNKNOWN;
     }
 
-    if (!av_packet_side_data_add(&enc_ctx->coded_side_data,
-      &enc_ctx->nb_coded_side_data, AV_PKT_DATA_CONTENT_LIGHT_LEVEL,
-      (uint8_t *) hdr_ctx->cll, sizeof(AVContentLightMetadata), 0))
-    {
-      fprintf(stderr,
-        "Failed to add content light level metadata to encoder context.\n");
-      return AVERROR_UNKNOWN;
+    if (hdr_ctx->cll) {
+      if (!av_packet_side_data_add(&enc_ctx->coded_side_data,
+        &enc_ctx->nb_coded_side_data, AV_PKT_DATA_CONTENT_LIGHT_LEVEL,
+        (uint8_t *) hdr_ctx->cll, sizeof(AVContentLightMetadata), 0))
+      {
+        fprintf(stderr,
+          "Failed to add content light level metadata to encoder context.\n");
+        return AVERROR_UNKNOWN;
+      }
     }
 
     if (*params_str) { free(*params_str); }

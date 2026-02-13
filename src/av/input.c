@@ -114,7 +114,7 @@ static int open_decoder(ProcessingContext *proc_ctx,
   }
 
   if (
-    proc_ctx->hwaccel &&
+    proc_ctx->hw_ctx &&
     (unsigned int) stream_ctx->in_stream_idx == proc_ctx->v_stream_idx) {
     if ((ret = init_hw_dec_ctx(proc_ctx, dec)) < 0) {
       fprintf(stderr, "Failed to initialize hardware decoder.\n");
@@ -143,9 +143,10 @@ static int open_decoder(ProcessingContext *proc_ctx,
         "context and hardware device context.\n");
       return AVERROR(ENOMEM);
     }
+
+    stream_ctx->dec_ctx->get_format = get_hw_fmt;
   }
 
-  stream_ctx->dec_ctx->get_format = get_hw_fmt;
 
   if ((ret = avcodec_open2(stream_ctx->dec_ctx, dec, NULL)) < 0) {
     fprintf(stderr, "Failed to open decoder for stream_idx: %d.\n",

@@ -62,78 +62,104 @@ static int get_len_params_str(char *hdr_params_str, char *additional_params_str)
   return len_hdr_params_str + len_additional_params_str;
 }
 
-static int open_video_encoder(AVCodecContext **enc_ctx,
-  ProcessingContext *proc_ctx, StreamContext *stream_ctx,
-  char *in_filename, int rendition)
+int find_video_encoder(ProcessingContext *proc_ctx,
+  const AVCodec **enc, char **enc_name, enum AVCodecID codec, int *hw_enc)
+{
+  int ret = 0;
+
+  if (!(*enc_name = calloc(16, sizeof(char)))) {
+    fprintf(stderr, "Failed to allocation encoder name for first rendition.\n");
+    return AVERROR(ENOMEM);
+  }
+
+  if (!proc_ctx->hw_ctx) goto sw_dec;
+
+  if (proc_ctx->hw_type == AV_HWDEVICE_TYPE_CUDA) {
+    if (codec == AV_CODEC_ID_HEVC) {
+      snprintf(*enc_name, 16, "hevc_nvenc");
+    }
+    else if (codec == AV_CODEC_ID_H264) {
+      snprintf(*enc_name, 16, "h264_nvenc");
+    }
+  } else {
+    goto sw_dec;
+  }
+
+  if (!(*enc = avcodec_find_encoder_by_name(*enc_name))) {
+    fprintf(stderr, "Failed to find hardware encoder.\n");
+    goto sw_dec;
+  }
+
+  *hw_enc = 1;
+
+  return 0;
+
+sw_dec:
+  if (codec == AV_CODEC_ID_HEVC) {
+    snprintf(*enc_name, 16, "libx265");
+  }
+  else if (codec == AV_CODEC_ID_H264) {
+    snprintf(*enc_name, 16, "libx264");
+  }
+
+  if (!(*enc = avcodec_find_encoder_by_name(*enc_name))) {
+    fprintf(stderr, "Failed to find software encoder.\n");
+    ret = AVERROR_UNKNOWN;
+    return ret;
+  }
+
+  return 0;
+}
+
+int get_video_fmt(ProcessingContext *proc_ctx, enum AVCodecID codec,
+  int hw_enc, enum AVPixelFormat *pix_fmt, int *hdr)
+{
+
+  if (codec == AV_CODEC_ID_HEVC) {
+    if (hw_enc) { *pix_fmt = AV_PIX_FMT_P010LE; }
+    else { *pix_fmt = AV_PIX_FMT_YUV420P10LE; }
+    if (proc_ctx->hdr) { *hdr = 1; }
+  }
+  else if (codec == AV_CODEC_ID_H264) {
+    if (hw_enc) { *pix_fmt = AV_PIX_FMT_NV12; }
+    else { *pix_fmt = AV_PIX_FMT_YUV420P; }
+  }
+
+  return 0;
+}
+
+int init_hw_enc_ctx(ProcessingContext *proc_ctx,
+  AVCodecContext *enc_ctx, enum AVPixelFormat pix_fmt)
+{
+  int ret = 0;
+  AVHWFramesContext *frames_ctx = NULL;
+
+  if (!(enc_ctx->hw_frames_ctx = av_hwframe_ctx_alloc(proc_ctx->hw_ctx))) {
+    fprintf(stderr, "Failed to allocate hw frame context.\n");
+    return AVERROR(ENOMEM);
+  }
+
+  frames_ctx = (AVHWFramesContext *) enc_ctx->hw_frames_ctx->data;
+  frames_ctx->format = proc_ctx->hw_pix_fmt;
+  frames_ctx->sw_format = pix_fmt;
+  frames_ctx->width = enc_ctx->width;
+  frames_ctx->height = enc_ctx->height;
+  frames_ctx->initial_pool_size = 20;
+
+  if ((ret = av_hwframe_ctx_init(enc_ctx->hw_frames_ctx)) < 0) {
+    fprintf(stderr, "Failed to initialize hw frame context.\n"
+      "Libav Error: %s.\n", av_err2str(ret));
+    return ret;
+  }
+
+  return 0;
+}
+
+int configure_libx265(AVCodecContext *enc_ctx,
+  StreamContext *stream_ctx, char *hdr_params_str)
 {
   int len_params_str, cores, pools, ret = 0;
-  const AVCodec *enc;
-  HdrMetadataContext *hdr_ctx = NULL;
-  AVStream *in_stream = stream_ctx->in_stream;
-  char *params_str = NULL, *hdr_params_str = NULL, additional_params_str[128];
-
-  if (!(enc = avcodec_find_encoder_by_name("libx265"))) {
-    fprintf(stderr, "Failed to find encoder.\n");
-    ret = AVERROR_UNKNOWN;
-    goto end;
-  }
-
-  if (!(*enc_ctx = avcodec_alloc_context3(enc))) {
-    fprintf(stderr, "Failed to allocate encoder context.\n");
-    ret = AVERROR(ENOMEM);
-    goto end;
-  }
-
-  if (!(hdr_ctx = hdr_ctx_alloc())) {
-    fprintf(stderr, "Failed to allocate hdr metadata.\n");
-    ret = -ENOMEM;
-    goto end;
-  }
-
-  if ((ret = extract_hdr_metadata(hdr_ctx, in_filename)) < 0) {
-    fprintf(stderr, "Failed to extract hdr metadata.\n");
-    goto end;
-  }
-
-  if (hdr_ctx->mdm && hdr_ctx->cll) {
-    proc_ctx->hdr = 1;
-
-    if (!rendition) {
-      if ((ret = inject_hdr_metadta(hdr_ctx, *enc_ctx, &hdr_params_str)) < 0) {
-        fprintf(stderr, "Failed to inject hdr metadata.\n");
-        goto end;
-      }
-    }
-  }
-
-  (*enc_ctx)->time_base = in_stream->time_base;
-  (*enc_ctx)->framerate = in_stream->avg_frame_rate;
-
-  if (rendition) {
-    (*enc_ctx)->width = in_stream->codecpar->width / 2;
-    (*enc_ctx)->height = in_stream->codecpar->height / 2;
-  } else {
-    (*enc_ctx)->width = in_stream->codecpar->width;
-    (*enc_ctx)->height = in_stream->codecpar->height;
-  }
-
-  if (rendition && proc_ctx->tonemap && proc_ctx->hdr) {
-    (*enc_ctx)->pix_fmt = AV_PIX_FMT_YUV420P10LE;
-    (*enc_ctx)->color_primaries = AVCOL_PRI_BT709;
-    (*enc_ctx)->color_trc = AVCOL_TRC_BT709;
-    (*enc_ctx)->colorspace = AVCOL_SPC_BT709;
-    (*enc_ctx)->color_range = AVCOL_RANGE_MPEG;
-    (*enc_ctx)->chroma_sample_location = AVCHROMA_LOC_LEFT;
-  } else {
-    (*enc_ctx)->pix_fmt = in_stream->codecpar->format;
-    (*enc_ctx)->color_range = in_stream->codecpar->color_range;
-    (*enc_ctx)->color_primaries = in_stream->codecpar->color_primaries;
-    (*enc_ctx)->color_trc = in_stream->codecpar->color_trc;
-    (*enc_ctx)->colorspace = in_stream->codecpar->color_space;
-    (*enc_ctx)->chroma_sample_location = in_stream->codecpar->chroma_location;
-  }
-
-  (*enc_ctx)->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+  char *params_str = NULL, additional_params_str[128];
 
   cores = get_core_count();
   if (cores <= 0) { cores = 4; }
@@ -149,11 +175,10 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
 
   len_params_str = get_len_params_str(hdr_params_str, additional_params_str);
 
-  if (!(params_str = calloc(len_params_str + 1, sizeof(char))))
-  {
-    fprintf(stderr, "Failed to allocate params_str\n");
+  if (!(params_str = calloc(len_params_str + 1, sizeof(char)))) {
+    fprintf(stderr, "Failed to allocate params_str.\n");
     ret = AVERROR(ENOMEM);
-    goto end;
+    return ret;
   }
 
   if (hdr_params_str) { strcat(params_str, hdr_params_str); }
@@ -161,29 +186,193 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
 
   printf("params_str: %s\n", params_str);
 
-  if ((ret = av_opt_set((*enc_ctx)->priv_data,
+  if ((ret = av_opt_set(enc_ctx->priv_data,
     "x265-params", params_str, 0)) < 0)
   {
-    fprintf(stderr, "Failed to set x265-params.\n");
+    fprintf(stderr, "Failed to set x265-params.\nLibav Error: %s.\n",
+      av_err2str(ret));
     goto end;
   }
 
-  if ((ret = av_opt_set((*enc_ctx)->priv_data, "crf", "20", 0)) < 0) {
-    fprintf(stderr, "Failed to set crf on video encoder for video: %s\n",
-      in_filename);
+  if ((ret = av_opt_set(enc_ctx->priv_data, "crf", "20", 0)) < 0) {
+    fprintf(stderr, "Failed to set crf on libx265.\n"
+      "LibavError: %s.", av_err2str(ret));
     goto end;
   }
 
-  if ((ret = av_opt_set((*enc_ctx)->priv_data, "preset", "ultrafast", 0)) < 0) {
-    fprintf(stderr, "Failed to set preset on video encoder for video: %s\n",
-      in_filename);
+  if ((ret = av_opt_set(enc_ctx->priv_data, "preset", "ultrafast", 0)) < 0) {
+    fprintf(stderr, "Failed to set preset on libx265.\n"
+      "Libav Error: %s.", av_err2str(ret));
     goto end;
   }
 
-  if ((ret = av_opt_set((*enc_ctx)->priv_data, "tune", "grain", 0)) < 0) {
-    fprintf(stderr, "Failed to set tune on video encoder for video: %s\n",
-      in_filename);
+  if ((ret = av_opt_set(enc_ctx->priv_data, "tune", "grain", 0)) < 0) {
+    fprintf(stderr, "Failed to set tune on libx265.\n"
+      "Libav Error: %s.", av_err2str(ret));
       goto end;
+  }
+
+end:
+  free(params_str);
+  if (ret < 0) { return ret; }
+  return 0;
+}
+
+int init_hw_frame(AVFrame **frame, AVCodecContext *enc_ctx)
+{
+  int ret = 0;
+
+  if (!(*frame = av_frame_alloc())) {
+    fprintf(stderr, "Failed to allocate hw frame.\n");
+    ret = AVERROR(ENOMEM);
+    return ret;
+  }
+
+  if ((ret = av_hwframe_get_buffer(enc_ctx->hw_frames_ctx, *frame, 0)) < 0) {
+    fprintf(stderr, "Failed to get buffer for hardware frame."
+      "\nLibav Error: %s.\n", av_err2str(ret));
+    return ret;
+  }
+
+  return 0;
+}
+
+static int open_video_encoder(AVCodecContext **enc_ctx,
+  ProcessingContext *proc_ctx, StreamContext *stream_ctx,
+  char *in_filename, int rendition)
+{
+  int *hw_enc, *hdr, ret = 0;
+  const AVCodec *enc;
+  char **enc_name;
+  enum AVCodecID codec;
+  enum AVPixelFormat *pix_fmt;
+  HdrMetadataContext *hdr_ctx = NULL;
+  AVStream *in_stream = stream_ctx->in_stream;
+  char *hdr_params_str = NULL;
+  AVFrame **frame;
+
+  if (!rendition) {
+    enc_name = &proc_ctx->rend0_enc_name;
+    codec = proc_ctx->rend0_codec;
+    hw_enc = &proc_ctx->rend0_hw_enc;
+    pix_fmt = &proc_ctx->rend0_pix_fmt;
+    hdr = &proc_ctx->rend0_hdr;
+    frame = &proc_ctx->rend0_hw_frame;
+  } else {
+    enc_name = &proc_ctx->rend1_enc_name;
+    codec = proc_ctx->rend1_codec;
+    hw_enc = &proc_ctx->rend1_hw_enc;
+    pix_fmt = &proc_ctx->rend1_pix_fmt;
+    hdr = NULL;
+    frame = &proc_ctx->rend1_hw_frame;
+  }
+
+  if ((ret = find_video_encoder(proc_ctx, &enc, enc_name, codec, hw_enc)) < 0) {
+    fprintf(stderr, "Failed to find video encoder.\n");
+    goto end;
+  }
+
+  if (!(*enc_ctx = avcodec_alloc_context3(enc))) {
+    fprintf(stderr, "Failed to allocate encoder context.\n");
+    ret = AVERROR(ENOMEM);
+    goto end;
+  }
+
+  if (!(hdr_ctx = hdr_ctx_alloc())) {
+    fprintf(stderr, "Failed to allocate hdr metadata.\n");
+    ret = -ENOMEM;
+    goto end;
+  }
+
+  if (!rendition && proc_ctx->rend0_codec == AV_CODEC_ID_HEVC) {
+    if ((ret = extract_hdr_metadata(hdr_ctx, in_filename)) < 0) {
+      fprintf(stderr, "Failed to extract hdr metadata.\n");
+      goto end;
+    }
+
+    if (hdr_ctx->mdm) {
+      proc_ctx->hdr = 1;
+
+      if ((ret = inject_hdr_metadta(hdr_ctx, *enc_ctx, &hdr_params_str)) < 0) {
+        fprintf(stderr, "Failed to inject hdr metadata.\n");
+        goto end;
+      }
+    }
+  }
+
+  if ((ret = get_video_fmt(proc_ctx, codec, *hw_enc, pix_fmt, hdr)) < 0) {
+    fprintf(stderr, "Failed to get output video format.\n");
+  }
+
+  (*enc_ctx)->time_base = in_stream->time_base;
+  (*enc_ctx)->framerate = in_stream->avg_frame_rate;
+
+  if (!rendition) {
+    (*enc_ctx)->width = in_stream->codecpar->width;
+    (*enc_ctx)->height = in_stream->codecpar->height;
+
+    if (proc_ctx->rend0_hw_enc) {
+      (*enc_ctx)->pix_fmt = proc_ctx->hw_pix_fmt;
+    } else {
+      (*enc_ctx)->pix_fmt = proc_ctx->rend0_pix_fmt;
+    }
+
+    if (proc_ctx->rend0_hdr) {
+      (*enc_ctx)->color_primaries = AVCOL_PRI_BT2020;
+      (*enc_ctx)->color_trc = AVCOL_TRC_SMPTE2084;
+      (*enc_ctx)->colorspace = AVCOL_SPC_BT2020_NCL;
+      (*enc_ctx)->chroma_sample_location = AVCHROMA_LOC_TOPLEFT;
+    } else {
+      (*enc_ctx)->color_primaries = AVCOL_PRI_BT709;
+      (*enc_ctx)->color_trc = AVCOL_TRC_BT709;
+      (*enc_ctx)->colorspace = AVCOL_SPC_BT709;
+      (*enc_ctx)->chroma_sample_location = AVCHROMA_LOC_LEFT;
+    }
+  }
+  else {
+    (*enc_ctx)->width = in_stream->codecpar->width / 2;
+    (*enc_ctx)->height = in_stream->codecpar->height / 2;
+
+    if (proc_ctx->rend1_hw_enc) {
+      (*enc_ctx)->pix_fmt = proc_ctx->hw_pix_fmt;
+    } else {
+      (*enc_ctx)->pix_fmt = proc_ctx->rend0_pix_fmt;
+    }
+
+    (*enc_ctx)->color_primaries = AVCOL_PRI_BT709;
+    (*enc_ctx)->color_trc = AVCOL_TRC_BT709;
+    (*enc_ctx)->colorspace = AVCOL_SPC_BT709;
+    (*enc_ctx)->chroma_sample_location = AVCHROMA_LOC_LEFT;
+  }
+
+  if (
+    in_stream->codecpar->field_order == AV_FIELD_PROGRESSIVE ||
+    in_stream->codecpar->field_order == AV_FIELD_UNKNOWN ||
+    proc_ctx->deint
+  ) {
+    (*enc_ctx)->field_order = AV_FIELD_PROGRESSIVE;
+  } else {
+    (*enc_ctx)->field_order = in_stream->codecpar->field_order;
+  }
+
+  (*enc_ctx)->color_range = AVCOL_RANGE_MPEG;
+
+  (*enc_ctx)->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+
+  if (hw_enc) {
+    if ((ret = init_hw_enc_ctx(proc_ctx, *enc_ctx, *pix_fmt)) < 0) {
+      fprintf(stderr, "Failed to initialize hardware encoder context "
+        "for stream '%d'.\n", stream_ctx->in_stream_idx);
+      goto end;
+    }
+  }
+
+  if (!strcmp(*enc_name, "libx265")) {
+    if ((ret = configure_libx265(*enc_ctx, stream_ctx, hdr_params_str)) < 0) {
+      fprintf(stderr, "Failed to configure libx265 for stream '%d'.\n",
+        stream_ctx->in_stream_idx);
+      goto end;
+    }
   }
 
   if ((ret = avcodec_open2(*enc_ctx, enc, NULL)) < 0) {
@@ -191,10 +380,15 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
     goto end;
   }
 
+  if ((ret = init_hw_frame(frame, *enc_ctx)) < 0) {
+    fprintf(stderr, "Failed to initialize hw frame for stream '%d'.\n",
+      stream_ctx->in_stream_idx);
+    goto end;
+  }
+
 end:
   hdr_ctx_free(hdr_ctx);
   free(hdr_params_str);
-  free(params_str);
 
   if (ret < 0) { return ret; }
   return 0;
@@ -509,8 +703,7 @@ static int open_encoder(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
   int rendition = 0, ret = 0;
 
   if (stream_ctx->codec_type == AVMEDIA_TYPE_VIDEO) {
-    if ((ret =
-      open_video_encoder(&stream_ctx->rend0_enc_ctx,
+    if ((ret = open_video_encoder(&stream_ctx->rend0_enc_ctx,
         proc_ctx, stream_ctx, in_filename, 0)) < 0)
     {
       fprintf(stderr, "Failed to open video encoder for output stream.\n");

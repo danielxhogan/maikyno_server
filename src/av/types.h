@@ -93,7 +93,8 @@ typedef struct ProcessingContext {
 
   StreamContext **stream_ctx_arr;
 
-  enum AVCodecID codec;
+  enum AVCodecID rend0_codec;
+  enum AVCodecID rend1_codec;
 
   int hwaccel;
   enum AVHWDeviceType hw_type;
@@ -101,6 +102,10 @@ typedef struct ProcessingContext {
   enum AVPixelFormat hw_pix_fmt;
 
   int hw_dec;
+  char *rend0_enc_name;
+  int rend0_hw_enc;
+  char *rend1_enc_name;
+  int rend1_hw_enc;
 
   enum AVPixelFormat formatted_pix_fmt;
   int formatted_hdr;
@@ -126,6 +131,7 @@ typedef struct ProcessingContext {
   AVFrame *frame;
   AVFrame *frame_cpy;
   AVFrame *sw_frame;
-  AVFrame *hw_frame;
+  AVFrame *rend0_hw_frame;
+  AVFrame *rend1_hw_frame;
   AVSubtitle *sub;
 } ProcessingContext;

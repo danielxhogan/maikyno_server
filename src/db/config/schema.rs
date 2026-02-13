@@ -103,6 +103,7 @@ diesel::table! {
         codec -> Integer,
         hwaccel -> Bool,
         create_renditions -> Bool,
+        codec2 -> Integer,
         title2 -> Nullable<Text>,
         tonemap -> Bool,
         deinterlace -> Bool,

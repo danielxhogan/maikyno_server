@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS process_job_video_streams (
   codec INT NOT NULL,
   hwaccel BOOL NOT NULL,
   create_renditions BOOL NOT NULL,
+  codec2 INT NOT NULL,
   title2 VARCHAR,
   tonemap BOOL NOT NULL,
   deinterlace BOOL NOT NULL,
