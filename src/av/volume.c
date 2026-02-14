@@ -137,7 +137,10 @@ end:
   avfilter_inout_free(&inputs);
   avfilter_inout_free(&outputs);
 
-  if (ret < 0) { return NULL; }
+  if (ret < 0) {
+    volume_filter_context_free(&vol_ctx);
+    return NULL;
+  }
   return vol_ctx;
 }
 

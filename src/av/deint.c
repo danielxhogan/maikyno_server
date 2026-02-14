@@ -6,7 +6,8 @@
 #include <libavutil/pixdesc.h>
 #include <libavutil/opt.h>
 
-DeinterlaceFilterContext *deint_filter_context_init(StreamContext *stream_ctx)
+DeinterlaceFilterContext *deint_filter_context_init(
+  ProcessingContext *proc_ctx, StreamContext *stream_ctx)
 {
   int ret = 0;
   char args[512], *flt_str = "yadif";
@@ -52,7 +53,7 @@ DeinterlaceFilterContext *deint_filter_context_init(StreamContext *stream_ctx)
 
   snprintf(args, sizeof(args),
     "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=%d/%d",
-    dec_ctx->width, dec_ctx->height, dec_ctx->pix_fmt,
+    dec_ctx->width, dec_ctx->height, proc_ctx->formatted_pix_fmt,
     in_stream->time_base.num, in_stream->time_base.den,
     dec_ctx->sample_aspect_ratio.num,
     dec_ctx->sample_aspect_ratio.den);
@@ -72,7 +73,7 @@ DeinterlaceFilterContext *deint_filter_context_init(StreamContext *stream_ctx)
     goto end;
   }
 
-  pix_fmt = av_get_pix_fmt_name(in_stream->codecpar->format);
+  pix_fmt = av_get_pix_fmt_name(proc_ctx->formatted_pix_fmt);
 
   if ((ret = av_opt_set(deint_ctx->buffersink_ctx, "pixel_formats",
     pix_fmt, AV_OPT_SEARCH_CHILDREN)))
@@ -118,7 +119,10 @@ end:
   avfilter_inout_free(&inputs);
   avfilter_inout_free(&outputs);
 
-  if (ret < 0) { return NULL; }
+  if (ret < 0) {
+    deint_filter_context_free(&proc_ctx->deint_ctx);
+    return NULL;
+  }
   return deint_ctx;
 }
 

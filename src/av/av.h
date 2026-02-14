@@ -8,6 +8,7 @@
 #include "hdr.h"
 #include "swr.h"
 #include "fsc.h"
+#include "fmt.h"
 #include "deint.h"
 #include "burn_in.h"
 #include "rendition.h"

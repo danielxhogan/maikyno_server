@@ -72,7 +72,7 @@ int find_video_encoder(ProcessingContext *proc_ctx,
     return AVERROR(ENOMEM);
   }
 
-  if (!proc_ctx->hw_ctx) goto sw_dec;
+  if (!proc_ctx->hw_ctx) { goto sw_dec; }
 
   if (proc_ctx->hw_type == AV_HWDEVICE_TYPE_CUDA) {
     if (codec == AV_CODEC_ID_HEVC) {

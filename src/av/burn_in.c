@@ -258,7 +258,7 @@ BurnInFilterContext *burn_in_filter_context_init(ProcessingContext *proc_ctx)
 
   snprintf(v_args, sizeof(v_args),
     "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=%d/%d",
-    v_dec_ctx->width, v_dec_ctx->height, v_dec_ctx->pix_fmt,
+    v_dec_ctx->width, v_dec_ctx->height, proc_ctx->formatted_pix_fmt,
     v_stream->time_base.num, v_stream->time_base.den,
     v_dec_ctx->sample_aspect_ratio.num,
     v_dec_ctx->sample_aspect_ratio.den);
@@ -294,7 +294,7 @@ BurnInFilterContext *burn_in_filter_context_init(ProcessingContext *proc_ctx)
     goto end;
   }
 
-  pix_fmt = av_get_pix_fmt_name(v_stream->codecpar->format);
+  pix_fmt = av_get_pix_fmt_name(proc_ctx->formatted_pix_fmt);
 
   if ((ret = av_opt_set(burn_in_ctx->buffersink_ctx, "pixel_formats",
     pix_fmt, AV_OPT_SEARCH_CHILDREN)))
@@ -370,7 +370,6 @@ end:
     burn_in_filter_context_free(&burn_in_ctx);
     return NULL;
   }
-
   return burn_in_ctx;
 }
 

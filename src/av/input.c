@@ -115,7 +115,8 @@ static int open_decoder(ProcessingContext *proc_ctx,
 
   if (
     proc_ctx->hw_ctx &&
-    (unsigned int) stream_ctx->in_stream_idx == proc_ctx->v_stream_idx) {
+    (unsigned int) stream_ctx->in_stream_idx == proc_ctx->v_stream_idx
+  ) {
     if ((ret = init_hw_dec_ctx(proc_ctx, dec)) < 0) {
       fprintf(stderr, "Failed to initialize hardware decoder.\n");
     }

@@ -95,7 +95,7 @@ RenditionFilterContext *rendition_filter_context_init(
 
   snprintf(args, sizeof(args),
     "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=%d/%d",
-    dec_ctx->width, dec_ctx->height, dec_ctx->pix_fmt,
+    dec_ctx->width, dec_ctx->height, proc_ctx->formatted_pix_fmt,
     in_stream->time_base.num, in_stream->time_base.den,
     dec_ctx->sample_aspect_ratio.num,
     dec_ctx->sample_aspect_ratio.den);
@@ -164,7 +164,10 @@ end:
   avfilter_inout_free(&inputs);
   avfilter_inout_free(&outputs);
 
-  if (ret < 0) { return NULL; }
+  if (ret < 0) {
+    rendition_filter_context_free(&proc_ctx->rend_ctx);
+    return NULL;
+  }
   return v_rend_ctx;
 }
 

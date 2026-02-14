@@ -1,7 +1,8 @@
 #include "proc.h"
-#include "rendition.h"
-#include "burn_in.h"
+#include "fmt.h"
 #include "deint.h"
+#include "burn_in.h"
+#include "rendition.h"
 #include "volume.h"
 #include "input.h"
 
@@ -184,6 +185,7 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   proc_ctx->rend0_hdr = 0;
   proc_ctx->rend1_pix_fmt = AV_PIX_FMT_NONE;
   proc_ctx->rend1_hdr = 0;
+  proc_ctx->fmt_ctx = NULL;
 
   proc_ctx->deint = 0;
   proc_ctx->deint_ctx = NULL;
@@ -294,6 +296,7 @@ void processing_context_free(ProcessingContext **proc_ctx)
 
   free((*proc_ctx)->rend0_enc_name);
   free((*proc_ctx)->rend1_enc_name);
+  format_filter_context_free(&(*proc_ctx)->fmt_ctx);
 
   deint_filter_context_free(&(*proc_ctx)->deint_ctx);
   burn_in_filter_context_free(&(*proc_ctx)->burn_in_ctx);
@@ -752,6 +755,56 @@ int audio_context_init(StreamContext *stream_ctx, int rendition)
   return 0;
 }
 
+int video_format_init(ProcessingContext *proc_ctx, StreamContext *stream_ctx)
+{
+  enum AVPixelFormat in_pix_fmt;
+  int no_conversion = 0;
+
+  if (proc_ctx->hw_dec) {
+    if (stream_ctx->dec_ctx->pix_fmt == AV_PIX_FMT_YUV420P) {
+      in_pix_fmt = AV_PIX_FMT_NV12;
+    } else if (stream_ctx->dec_ctx->pix_fmt == AV_PIX_FMT_YUV420P10LE) {
+      in_pix_fmt = AV_PIX_FMT_P010LE;
+    } else {
+      fprintf(stderr, "Can't determine input pixel format.\n");
+      return -1;
+    }
+  } else {
+    in_pix_fmt = stream_ctx->dec_ctx->pix_fmt;
+  }
+
+  if (!stream_ctx->renditions) {
+    proc_ctx->formatted_pix_fmt = proc_ctx->rend0_pix_fmt;
+    proc_ctx->formatted_hdr = proc_ctx->rend0_hdr;
+  } else {
+    if (proc_ctx->rend0_pix_fmt == proc_ctx->rend1_pix_fmt) {
+      proc_ctx->formatted_pix_fmt = proc_ctx->rend0_pix_fmt;
+    } else {
+      proc_ctx->formatted_pix_fmt = in_pix_fmt;
+    }
+
+    if (proc_ctx->rend0_hdr == proc_ctx->rend1_hdr) {
+      proc_ctx->formatted_hdr = proc_ctx->rend0_hdr;
+    } else {
+      proc_ctx->formatted_hdr = proc_ctx->hdr;
+    }
+  }
+
+
+  if (!(proc_ctx->fmt_ctx = format_filter_context_init(proc_ctx,
+    stream_ctx, in_pix_fmt, &no_conversion)))
+  {
+    if (no_conversion == NO_CONVERSION) {
+      printf("No conversion needed. Format filter not initialized.\n");
+    } else {
+      fprintf(stderr, "Failed to initialize format filter.\n");
+      return -1;
+    }
+  }
+
+  return 0;
+}
+
 int processing_context_init(ProcessingContext *proc_ctx)
 {
   int in_stream_idx, ctx_idx, ret = 0;
@@ -779,9 +832,14 @@ int processing_context_init(ProcessingContext *proc_ctx)
   ctx_idx = proc_ctx->ctx_map[in_stream_idx];
   stream_ctx = proc_ctx->stream_ctx_arr[ctx_idx];
 
+  if ((ret = video_format_init(proc_ctx, stream_ctx)) < 0) {
+    fprintf(stderr, "Failed to initialize video format.\n");
+    return -1;
+  }
+
   if (proc_ctx->deint) {
     if (!(proc_ctx->deint_ctx =
-      deint_filter_context_init(stream_ctx)))
+      deint_filter_context_init(proc_ctx, stream_ctx)))
     {
       fprintf(stderr, "Failed to allocate deinterlace filter context.\n");
       return -1;

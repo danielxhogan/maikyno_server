@@ -23,6 +23,8 @@ fn main()
   println!("cargo::rerun-if-changed=src/av/swr.h");
   println!("cargo::rerun-if-changed=src/av/fsc.c");
   println!("cargo::rerun-if-changed=src/av/fsc.h");
+  println!("cargo::rerun-if-changed=src/av/fmt.c");
+  println!("cargo::rerun-if-changed=src/av/fmt.h");
   println!("cargo::rerun-if-changed=src/av/deint.c");
   println!("cargo::rerun-if-changed=src/av/deint.h");
   println!("cargo::rerun-if-changed=src/av/burn_in.c");
@@ -73,6 +75,7 @@ fn main()
   cc_builder.file("src/av/hdr.c");
   cc_builder.file("src/av/swr.c");
   cc_builder.file("src/av/fsc.c");
+  cc_builder.file("src/av/fmt.c");
   cc_builder.file("src/av/deint.c");
   cc_builder.file("src/av/burn_in.c");
   cc_builder.file("src/av/rendition.c");
