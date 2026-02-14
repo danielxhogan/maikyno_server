@@ -63,7 +63,8 @@ static int get_len_params_str(char *hdr_params_str, char *additional_params_str)
 }
 
 int find_video_encoder(ProcessingContext *proc_ctx,
-  const AVCodec **enc, char **enc_name, enum AVCodecID codec, int *hw_enc)
+  const AVCodec **enc, int hwaccel, enum AVCodecID codec,
+  char **enc_name, int *hw_enc)
 {
   int ret = 0;
 
@@ -72,7 +73,7 @@ int find_video_encoder(ProcessingContext *proc_ctx,
     return AVERROR(ENOMEM);
   }
 
-  if (!proc_ctx->hw_ctx) { goto sw_dec; }
+  if (!proc_ctx->hw_ctx || !hwaccel) { goto sw_dec; }
 
   if (proc_ctx->hw_type == AV_HWDEVICE_TYPE_CUDA) {
     if (codec == AV_CODEC_ID_HEVC) {
@@ -241,7 +242,7 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
   ProcessingContext *proc_ctx, StreamContext *stream_ctx,
   char *in_filename, int rendition)
 {
-  int *hw_enc, *hdr, ret = 0;
+  int hwaccel, *hw_enc, *hdr, ret = 0;
   const AVCodec *enc;
   char **enc_name;
   enum AVCodecID codec;
@@ -252,22 +253,26 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
   AVFrame **frame;
 
   if (!rendition) {
-    enc_name = &proc_ctx->rend0_enc_name;
+    hwaccel = proc_ctx->rend0_hwaccel;
     codec = proc_ctx->rend0_codec;
+    enc_name = &proc_ctx->rend0_enc_name;
     hw_enc = &proc_ctx->rend0_hw_enc;
     pix_fmt = &proc_ctx->rend0_pix_fmt;
     hdr = &proc_ctx->rend0_hdr;
     frame = &proc_ctx->rend0_hw_frame;
   } else {
-    enc_name = &proc_ctx->rend1_enc_name;
+    hwaccel = proc_ctx->rend1_hwaccel;
     codec = proc_ctx->rend1_codec;
+    enc_name = &proc_ctx->rend1_enc_name;
     hw_enc = &proc_ctx->rend1_hw_enc;
     pix_fmt = &proc_ctx->rend1_pix_fmt;
     hdr = NULL;
     frame = &proc_ctx->rend1_hw_frame;
   }
 
-  if ((ret = find_video_encoder(proc_ctx, &enc, enc_name, codec, hw_enc)) < 0) {
+  if ((ret = find_video_encoder(proc_ctx, &enc,
+    hwaccel, codec, enc_name, hw_enc)) < 0)
+  {
     fprintf(stderr, "Failed to find video encoder.\n");
     goto end;
   }

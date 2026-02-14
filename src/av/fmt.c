@@ -106,6 +106,8 @@ FormatFilterContext *format_filter_context_init(ProcessingContext *proc_ctx,
     return NULL;
   }
 
+  printf("flt_str: %s\n", flt_str);
+
   if (ret == NO_CONVERSION) {
     *no_conversion = NO_CONVERSION;
     return NULL;

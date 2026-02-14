@@ -304,11 +304,12 @@ pub struct  ProcessJobVideoStream {
   pub passthrough: bool,
   pub codec: i32,
   pub hwaccel: bool,
-  pub create_renditions: bool,
-  pub codec2: i32,
-  pub title2: Option<String>,
-  pub tonemap: bool,
   pub deinterlace: bool,
+  pub create_renditions: bool,
+  pub title2: Option<String>,
+  pub codec2: i32,
+  pub hwaccel2: bool,
+  pub tonemap: bool,
   pub stream_id: String,
   pub process_job_id: String
 }

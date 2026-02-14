@@ -102,8 +102,9 @@ typedef struct ProcessingContext {
 
   enum AVCodecID rend0_codec;
   enum AVCodecID rend1_codec;
+  int rend0_hwaccel;
+  int rend1_hwaccel;
 
-  int hwaccel;
   enum AVHWDeviceType hw_type;
   AVBufferRef *hw_ctx;
   enum AVPixelFormat hw_pix_fmt;

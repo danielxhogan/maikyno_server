@@ -30,7 +30,7 @@ int encode_video_frame(ProcessingContext *proc_ctx, int rendition, AVFrame *fram
   if (frame && enc_ctx->hw_frames_ctx) {
     if ((ret = av_hwframe_transfer_data(hw_frame, frame, 0)) < 0) {
       fprintf(stderr, "Failed to transfer software frame to hardware.\n"
-        "Libav Error", av_err2str(ret));
+        "Libav Error: %s.\n", av_err2str(ret));
       return ret;
     }
     hw_frame->pts = frame->pts;
@@ -925,7 +925,7 @@ int process_video(char *process_job_id, const char *batch_id)
     goto update_status;
   }
 
-  if (proc_ctx->hwaccel) {
+  if (proc_ctx->rend0_hwaccel || proc_ctx->rend1_hwaccel) {
     if ((ret = hw_ctx_init(proc_ctx)) < 0) {
       fprintf(stderr, "Failed to initialize hardware context.\n");
     }
