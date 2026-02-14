@@ -16,7 +16,7 @@ VolumeFilterContext *volume_filter_context_init(
     gain_boost = stream_ctx->rend1_gain_boost;
   }
 
-  snprintf(flt_str, sizeof(flt_str), "volume=%ddB", gain_boost);
+  snprintf(flt_str, sizeof(flt_str), "volume=%d", gain_boost);
 
   const AVFilter *buffersrc = avfilter_get_by_name("abuffer");
   const AVFilter *buffersink = avfilter_get_by_name("abuffersink");

@@ -155,6 +155,25 @@ int init_hw_enc_ctx(ProcessingContext *proc_ctx,
   return 0;
 }
 
+int init_hw_frame(AVFrame **frame, AVCodecContext *enc_ctx)
+{
+  int ret = 0;
+
+  if (!(*frame = av_frame_alloc())) {
+    fprintf(stderr, "Failed to allocate hw frame.\n");
+    ret = AVERROR(ENOMEM);
+    return ret;
+  }
+
+  if ((ret = av_hwframe_get_buffer(enc_ctx->hw_frames_ctx, *frame, 0)) < 0) {
+    fprintf(stderr, "Failed to get buffer for hardware frame."
+      "\nLibav Error: %s.\n", av_err2str(ret));
+    return ret;
+  }
+
+  return 0;
+}
+
 int configure_libx265(AVCodecContext *enc_ctx,
   StreamContext *stream_ctx, char *hdr_params_str)
 {
@@ -215,25 +234,6 @@ int configure_libx265(AVCodecContext *enc_ctx,
 end:
   free(params_str);
   if (ret < 0) { return ret; }
-  return 0;
-}
-
-int init_hw_frame(AVFrame **frame, AVCodecContext *enc_ctx)
-{
-  int ret = 0;
-
-  if (!(*frame = av_frame_alloc())) {
-    fprintf(stderr, "Failed to allocate hw frame.\n");
-    ret = AVERROR(ENOMEM);
-    return ret;
-  }
-
-  if ((ret = av_hwframe_get_buffer(enc_ctx->hw_frames_ctx, *frame, 0)) < 0) {
-    fprintf(stderr, "Failed to get buffer for hardware frame."
-      "\nLibav Error: %s.\n", av_err2str(ret));
-    return ret;
-  }
-
   return 0;
 }
 
@@ -359,10 +359,16 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
 
   (*enc_ctx)->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
-  if (hw_enc) {
+  if (*hw_enc) {
     if ((ret = init_hw_enc_ctx(proc_ctx, *enc_ctx, *pix_fmt)) < 0) {
       fprintf(stderr, "Failed to initialize hardware encoder context "
         "for stream '%d'.\n", stream_ctx->in_stream_idx);
+      goto end;
+    }
+
+    if ((ret = init_hw_frame(frame, *enc_ctx)) < 0) {
+      fprintf(stderr, "Failed to initialize hw frame for stream '%d'.\n",
+        stream_ctx->in_stream_idx);
       goto end;
     }
   }
@@ -377,12 +383,6 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
 
   if ((ret = avcodec_open2(*enc_ctx, enc, NULL)) < 0) {
     fprintf(stderr, "Failed to open encoder.\n");
-    goto end;
-  }
-
-  if ((ret = init_hw_frame(frame, *enc_ctx)) < 0) {
-    fprintf(stderr, "Failed to initialize hw frame for stream '%d'.\n",
-      stream_ctx->in_stream_idx);
     goto end;
   }
 
@@ -721,7 +721,6 @@ static int open_encoder(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
       }
     }
   }
-
   else if (stream_ctx->codec_type == AVMEDIA_TYPE_AUDIO)
   {
     if (stream_ctx->renditions) {

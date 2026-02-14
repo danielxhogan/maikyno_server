@@ -203,6 +203,7 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   proc_ctx->pkt_cpy = NULL;
   proc_ctx->frame = NULL;
   proc_ctx->frame_cpy = NULL;
+  proc_ctx->sw_frame = NULL;
   proc_ctx->rend0_hw_frame = NULL;
   proc_ctx->rend1_hw_frame = NULL;
   proc_ctx->sub = NULL;
@@ -252,6 +253,12 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   }
 
   if (!(proc_ctx->frame = av_frame_alloc())) {
+    fprintf(stderr, "Failed to allocate AVFrame.\n");
+    ret = AVERROR(ENOMEM);
+    goto end;
+  }
+
+  if (!(proc_ctx->sw_frame = av_frame_alloc())) {
     fprintf(stderr, "Failed to allocate AVFrame.\n");
     ret = AVERROR(ENOMEM);
     goto end;
@@ -310,6 +317,8 @@ void processing_context_free(ProcessingContext **proc_ctx)
   av_frame_free(&(*proc_ctx)->frame);
   av_frame_unref((*proc_ctx)->frame_cpy);
   av_frame_free(&(*proc_ctx)->frame_cpy);
+  av_frame_unref((*proc_ctx)->sw_frame);
+  av_frame_free(&(*proc_ctx)->sw_frame);
   av_frame_unref((*proc_ctx)->rend0_hw_frame);
   av_frame_free(&(*proc_ctx)->rend0_hw_frame);
   av_frame_unref((*proc_ctx)->rend1_hw_frame);

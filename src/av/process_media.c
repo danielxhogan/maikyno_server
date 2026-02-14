@@ -12,16 +12,29 @@ int encode_video_frame(ProcessingContext *proc_ctx, int rendition, AVFrame *fram
   StreamContext *stream_ctx = proc_ctx->stream_ctx_arr[0];
   AVCodecContext *enc_ctx;
   AVStream *out_stream;
+  AVFrame *hw_frame;
 
   if (!rendition) {
     enc_ctx = stream_ctx->rend0_enc_ctx;
     out_stream = stream_ctx->rend0_out_stream;
     out_stream_idx = stream_ctx->rend0_out_stream_idx;
+    hw_frame = proc_ctx->rend0_hw_frame;
   }
   else {
     enc_ctx = stream_ctx->rend1_enc_ctx;
     out_stream = stream_ctx->rend1_out_stream;
     out_stream_idx = stream_ctx->rend1_out_stream_idx;
+    hw_frame = proc_ctx->rend1_hw_frame;
+  }
+
+  if (frame && enc_ctx->hw_frames_ctx) {
+    if ((ret = av_hwframe_transfer_data(hw_frame, frame, 0)) < 0) {
+      fprintf(stderr, "Failed to transfer software frame to hardware.\n"
+        "Libav Error", av_err2str(ret));
+      return ret;
+    }
+    hw_frame->pts = frame->pts;
+    frame = hw_frame;
   }
 
   if ((ret = avcodec_send_frame(enc_ctx, frame)) < 0) {
@@ -224,6 +237,75 @@ int deinterlace_video_frame(ProcessingContext *proc_ctx,
 
   if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
     fprintf(stderr, "Failed to get video frame from deinterlace buffer sink.\n"
+      "Libav Error: %s.\n", av_err2str(ret));
+    return ret;
+  }
+
+  return 0;
+}
+
+int format_video_frame(ProcessingContext *proc_ctx,
+  StreamContext *stream_ctx, AVFrame *frame)
+{
+  int ret = 0;
+
+  if ((ret = av_buffersrc_add_frame_flags(proc_ctx->fmt_ctx->buffersrc_ctx,
+    frame, AV_BUFFERSRC_FLAG_KEEP_REF)) < 0)
+  {
+    fprintf(stderr, "Failed to add video frame to format buffer source.\n"
+      "Libav Error: %s.\n", av_err2str(ret));
+    return ret;
+  }
+
+  while ((ret = av_buffersink_get_frame(proc_ctx->fmt_ctx->buffersink_ctx,
+    proc_ctx->fmt_ctx->filtered_frame)) >= 0)
+  {
+    if (proc_ctx->deint_ctx) {
+      if ((ret = deinterlace_video_frame(proc_ctx,
+        stream_ctx, proc_ctx->fmt_ctx->filtered_frame)) < 0)
+      {
+        fprintf(stderr, "Failed to deinterlace formatted video frame.\n");
+        return ret;
+      }
+    }
+    else if (proc_ctx->burn_in_ctx && proc_ctx->first_sub)
+    {
+      if (proc_ctx->frame->pts > proc_ctx->last_sub_pts + 5000) {
+        push_dummy_subtitle(proc_ctx, stream_ctx, proc_ctx->frame->pts);
+        proc_ctx->last_sub_pts = proc_ctx->frame->pts;
+      }
+
+      if ((ret = burn_in_subtitles(proc_ctx,
+        proc_ctx->burn_in_ctx->v_buffersrc_ctx,
+        proc_ctx->fmt_ctx->filtered_frame)) < 0)
+      {
+        fprintf(stderr, "Failed to burn in formatted frame.\n");
+        return ret;
+      }
+    }
+    else if (proc_ctx->rend_ctx)
+    {
+      if ((ret = make_rendtion(proc_ctx,
+        proc_ctx->fmt_ctx->filtered_frame)) < 0)
+      {
+        fprintf(stderr, "Failed to make renditions of formatted frame.\n");
+        return ret;
+      }
+    }
+    else {
+      if ((ret = encode_video_frame(proc_ctx, 0,
+        proc_ctx->fmt_ctx->filtered_frame)) < 0)
+      {
+        fprintf(stderr, "Failed to encode formatted frame.\n");
+        return ret;
+      }
+    }
+
+    av_frame_unref(proc_ctx->fmt_ctx->filtered_frame);
+  }
+
+  if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
+    fprintf(stderr, "Failed to get video frame from format buffer sink.\n"
       "Libav Error: %s.\n", av_err2str(ret));
     return ret;
   }
@@ -459,6 +541,7 @@ int decode_av_packet(ProcessingContext *proc_ctx,
   StreamContext *stream_ctx, AVPacket *pkt)
 {
   int ret = 0;
+  AVFrame *frame;
 
   if ((ret =
     avcodec_send_packet(stream_ctx->dec_ctx, pkt)) < 0)
@@ -468,42 +551,61 @@ int decode_av_packet(ProcessingContext *proc_ctx,
     return ret;
   }
 
-  while ((ret =
-    avcodec_receive_frame(stream_ctx->dec_ctx, proc_ctx->frame)) >= 0)
+  while ((ret = avcodec_receive_frame(stream_ctx->dec_ctx,
+    proc_ctx->frame)) >= 0)
   {
-    proc_ctx->frame->pict_type = AV_PICTURE_TYPE_NONE;
-
     if (stream_ctx->codec_type == AVMEDIA_TYPE_VIDEO)
     {
-      if (proc_ctx->deint) {
+      if (proc_ctx->frame->hw_frames_ctx) {
+        if ((ret = av_hwframe_transfer_data(proc_ctx->sw_frame,
+          proc_ctx->frame, 0)) < 0)
+        {
+          fprintf(stderr, "Failed to transfer hardware frame to software frame.\n"
+            "Libav Error: %s.\n", av_err2str(ret));
+        }
+        proc_ctx->sw_frame->pts = proc_ctx->frame->pts;
+        frame = proc_ctx->sw_frame;
+      } else {
+        frame = proc_ctx->frame;
+      }
+
+      frame->pict_type = AV_PICTURE_TYPE_NONE;
+
+      if (proc_ctx->fmt_ctx) {
+        if ((ret = format_video_frame(proc_ctx, stream_ctx, frame)) < 0) {
+          fprintf(stderr, "Failed to format video frame.\n");
+          return ret;
+        }
+      }
+      else if (proc_ctx->deint) {
         if ((ret = deinterlace_video_frame(proc_ctx,
-          stream_ctx, proc_ctx->frame)) < 0)
+          stream_ctx, frame)) < 0)
         {
           fprintf(stderr, "Failed to deinterlace video frame.\n");
           return ret;
         }
       }
       else if (proc_ctx->burn_in_ctx && proc_ctx->first_sub) {
-        if (proc_ctx->frame->pts > proc_ctx->last_sub_pts + 5000) {
-          push_dummy_subtitle(proc_ctx, stream_ctx, proc_ctx->frame->pts);
+        if (frame->pts > proc_ctx->last_sub_pts + 5000) {
+          push_dummy_subtitle(proc_ctx, stream_ctx, frame->pts);
           proc_ctx->last_sub_pts = proc_ctx->frame->pts;
         }
 
         if ((ret = burn_in_subtitles(proc_ctx,
-          proc_ctx->burn_in_ctx->v_buffersrc_ctx, proc_ctx->frame)) < 0)
+          proc_ctx->burn_in_ctx->v_buffersrc_ctx, frame)) < 0)
         {
           fprintf(stderr, "Failed to burn in video frame.\n");
           return ret;
         }
       }
       else if (proc_ctx->rend_ctx) {
-        if ((ret = make_rendtion(proc_ctx, proc_ctx->frame)) < 0) {
+        if ((ret = make_rendtion(proc_ctx, frame)) < 0) {
           fprintf(stderr, "Failed to make video renditions.\n");
           return ret;
         }
       }
       else {
-        if ((ret = encode_video_frame(proc_ctx, 0, proc_ctx->frame)) < 0) {
+        if ((ret = encode_video_frame(proc_ctx, 0, frame)) < 0) {
           fprintf(stderr, "Failed to encode video frame.\n");
           return ret;
         }
@@ -547,7 +649,8 @@ int decode_av_packet(ProcessingContext *proc_ctx,
   return 0;
 }
 
-int decode_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx, AVPacket *pkt)
+int decode_packet(ProcessingContext *proc_ctx,
+  StreamContext *stream_ctx, AVPacket *pkt)
 {
   int ret = 0;
 
