@@ -238,6 +238,69 @@ end:
   return 0;
 }
 
+int configure_hevc_nvenc(AVCodecContext *enc_ctx)
+{
+  int ret = 0;
+
+  if ((ret = av_opt_set(enc_ctx->priv_data, "preset", "p7", 0)) < 0) {
+    fprintf(stderr, "Failed to set preset on hevc_nvenc.\n"
+      "LibavError: %s.\n", av_err2str(ret));
+    return -1;
+  }
+
+  enc_ctx->bit_rate = 0;
+
+  if ((ret = av_opt_set(enc_ctx->priv_data, "rc", "vbr", 0)) < 0) {
+    fprintf(stderr, "Failed to set rate control mode on hevc_nvenc.\n"
+      "LibavError: %s.\n", av_err2str(ret));
+    return -1;
+  }
+
+  if ((ret = av_opt_set(enc_ctx->priv_data, "cq", "25", 0)) < 0) {
+    fprintf(stderr, "Failed to set cq on hevc_nvenc.\n"
+      "LibavError: %s.\n", av_err2str(ret));
+    return -1;
+  }
+
+  enc_ctx->rc_max_rate = 100000000;
+  enc_ctx->rc_buffer_size = 200000000;
+
+  if ((ret = av_opt_set(enc_ctx->priv_data, "tune", "hq", 0)) < 0) {
+    fprintf(stderr, "Failed to set tune on hevc_nvenc.\n"
+      "LibavError: %s.\n", av_err2str(ret));
+    return -1;
+  }
+
+  if ((ret = av_opt_set(enc_ctx->priv_data, "spatial-aq", "1", 0)) < 0) {
+    fprintf(stderr, "Failed to set spatial-aq on hevc_nvenc.\n"
+      "LibavError: %s.\n", av_err2str(ret));
+    return -1;
+  }
+
+  if ((ret = av_opt_set(enc_ctx->priv_data, "rc-lookahead", "20", 0)) < 0) {
+    fprintf(stderr, "Failed to set rc-lookahead on hevc_nvenc.\n"
+      "LibavError: %s.\n", av_err2str(ret));
+    return -1;
+  }
+
+  enc_ctx->gop_size = 120;
+  enc_ctx->keyint_min = 120;
+
+  if ((ret = av_opt_set(enc_ctx->priv_data, "no-scenecut", "1", 0)) < 0) {
+    fprintf(stderr, "Failed to set no-scenecut on hevc_nvenc.\n"
+      "LibavError: %s.\n", av_err2str(ret));
+    return -1;
+  }
+
+  if ((ret = av_opt_set(enc_ctx->priv_data, "forced-idr", "1", 0)) < 0) {
+    fprintf(stderr, "Failed to set forced-idr on hevc_nvenc.\n"
+      "LibavError: %s.\n", av_err2str(ret));
+    return -1;
+  }
+
+  return 0;
+}
+
 static int open_video_encoder(AVCodecContext **enc_ctx,
   ProcessingContext *proc_ctx, StreamContext *stream_ctx,
   char *in_filename, int rendition)
@@ -341,7 +404,7 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
     if (proc_ctx->rend1_hw_enc) {
       (*enc_ctx)->pix_fmt = proc_ctx->hw_pix_fmt;
     } else {
-      (*enc_ctx)->pix_fmt = proc_ctx->rend0_pix_fmt;
+      (*enc_ctx)->pix_fmt = proc_ctx->rend1_pix_fmt;
     }
 
     (*enc_ctx)->color_primaries = AVCOL_PRI_BT709;
@@ -381,6 +444,12 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
   if (!strcmp(*enc_name, "libx265")) {
     if ((ret = configure_libx265(*enc_ctx, stream_ctx, hdr_params_str)) < 0) {
       fprintf(stderr, "Failed to configure libx265 for stream '%d'.\n",
+        stream_ctx->in_stream_idx);
+      goto end;
+    }
+  } else if (!strcmp(*enc_name, "hevc_nvenc")) {
+    if ((ret = configure_hevc_nvenc(*enc_ctx)) < 0) {
+      fprintf(stderr, "Failed to configure hevc_nvenc for stream '%d'.\n",
         stream_ctx->in_stream_idx);
       goto end;
     }
