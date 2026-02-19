@@ -455,10 +455,22 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
     }
   }
 
-  if ((ret = avcodec_open2(*enc_ctx, enc, NULL)) < 0) {
+  AVDictionary *opts = NULL;
+  av_dict_set(&opts, "chroma_sample_location", "topleft", 0);
+  av_dict_set(&opts, "chroma_loc_info", "topleft", 0);
+
+  if ((ret = avcodec_open2(*enc_ctx, enc, &opts)) < 0) {
     fprintf(stderr, "Failed to open encoder.\n");
     goto end;
   }
+
+
+  // if (*hdr) {
+  //   if ((ret = initialize_bsf(proc_ctx, *enc_ctx)) < 0) {
+  //     fprintf(stderr, "Failed to initialize bitstream filter.\n");
+  //     goto end;
+  //   }
+  // }
 
 end:
   hdr_ctx_free(hdr_ctx);
@@ -780,7 +792,8 @@ static int open_encoder(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
     if ((ret = open_video_encoder(&stream_ctx->rend0_enc_ctx,
         proc_ctx, stream_ctx, in_filename, 0)) < 0)
     {
-      fprintf(stderr, "Failed to open video encoder for output stream.\n");
+      fprintf(stderr, "Failed to open video encoder for "
+        "first rendition, output stream '%d'.\n", out_stream_idx);
       return ret;
     }
 
@@ -790,7 +803,8 @@ static int open_encoder(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
       if ((ret = open_video_encoder(&stream_ctx->rend1_enc_ctx,
         proc_ctx, stream_ctx, in_filename, 1)) < 0)
       {
-        fprintf(stderr, "Failed to open video encoder for output stream.\n");
+      fprintf(stderr, "Failed to open video encoder for "
+        "second rendition, output stream '%d'.\n", out_stream_idx);
         return ret;
       }
     }
@@ -807,7 +821,7 @@ static int open_encoder(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
         }
       }
 
-      out_stream_idx = stream_ctx->rend1_out_stream_idx;
+      out_stream_idx += 1;
       rendition = 1;
     }
 
@@ -920,10 +934,8 @@ int get_file_data(char **name, int *extra, char **media_dir_path, char **title,
   for (end = tmp_name; *end; end++);
   len_name = end - tmp_name;
 
-  if (!(*name = calloc(len_name, sizeof(char *))))
-  {
-    fprintf(stderr, "Failed to allocate name of file for process job: %s.\n",
-      process_job_id);
+  if (!(*name = calloc(len_name, sizeof(char *)))) {
+    fprintf(stderr, "Failed to allocate name of file.\n");
     goto end;
   }
 
@@ -932,10 +944,8 @@ int get_file_data(char **name, int *extra, char **media_dir_path, char **title,
   for (end = tmp_media_dir_path; *end; end++);
   len_media_dir_path = end - tmp_media_dir_path;
 
-  if (!(*media_dir_path = calloc(len_media_dir_path, sizeof(char *))))
-  {
-    fprintf(stderr, "Failed to allocate media dir path of file for process job: %s.\n",
-      process_job_id);
+  if (!(*media_dir_path = calloc(len_media_dir_path, sizeof(char *)))) {
+    fprintf(stderr, "Failed to allocate media dir path of file.\n");
     goto end;
   }
 
@@ -944,10 +954,8 @@ int get_file_data(char **name, int *extra, char **media_dir_path, char **title,
   for (end = tmp_title; *end; end++);
   len_title = end - tmp_title;
 
-  if (!(*title = calloc(len_title, sizeof(char *))))
-  {
-    fprintf(stderr, "Failed to allocate title of file for process job: %s.\n",
-      process_job_id);
+  if (!(*title = calloc(len_title, sizeof(char *)))) {
+    fprintf(stderr, "Failed to allocate title of file.\n");
     goto end;
   }
 
@@ -982,11 +990,11 @@ int make_output_filename_string(char **out_filename,
   len_media_dir_path = end - media_dir_path;
 
   if (extra) {
-    if (!(*out_filename =
-      calloc(len_media_dir_path + len_name + 14, sizeof(char))))
+    if (!(*out_filename = calloc(len_media_dir_path + len_name + 14,
+      sizeof(char))))
     {
-      fprintf(stderr, "Failed to allocate output filename for video: %s \
-        for process job: %s.\n", name, process_job_id);
+      fprintf(stderr, "Failed to allocate "
+        "output filename for video: %s.\n", name);
       return -ENOMEM;
     }
 
@@ -1026,9 +1034,8 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx, char *process_job_id)
       if ((ret = open_encoder(proc_ctx, stream_ctx, out_stream_idx,
         proc_ctx->in_fmt_ctx->url)) < 0)
       {
-        fprintf(stderr, "Failed to open encoder for output stream: %d.\n\
-          process job: %s.\n",
-          out_stream_idx, process_job_id);
+        fprintf(stderr, "Failed to open encoder for input stream '%d'.\n",
+          stream_ctx->in_stream_idx);
         return ret;
       }
     }
@@ -1052,7 +1059,7 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx, char *process_job_id)
       {
         fprintf(stderr, "Failed to initialize stream for output stream: %d.\n\
           process_job: %s.\nLibav Error: %s.\n",
-          out_stream_idx, process_job_id, av_err2str(ret));
+          out_stream_idx + 1, process_job_id, av_err2str(ret));
         return ret;
       }
 
@@ -1073,16 +1080,14 @@ int open_output(ProcessingContext *proc_ctx, char *process_job_id, sqlite3 *db)
   if ((ret = get_file_data(&name, &extra, &media_dir_path, &title,
     db, process_job_id)) < 0)
   {
-    fprintf(stderr, "Failed to get file data for process job: %s.\n",
-      process_job_id);
+    fprintf(stderr, "Failed to get file data.\n");
     goto end;
   }
 
   if ((ret = make_output_filename_string(&out_filename,
     name, media_dir_path, extra, process_job_id)) < 0)
   {
-    fprintf(stderr, "Failed to get output filename for process job: %s.\n",
-      process_job_id);
+    fprintf(stderr, "Failed to get output filename.\n");
     goto end;
   }
 
@@ -1091,53 +1096,52 @@ int open_output(ProcessingContext *proc_ctx, char *process_job_id, sqlite3 *db)
   if ((ret = avformat_alloc_output_context2(
     &proc_ctx->out_fmt_ctx, NULL, NULL, out_filename)))
   {
-    fprintf(stderr, "Failed to allocate output format context:\n video: %s\n\
-      process job:%s\nLivav Error: %s\n", name, process_job_id, av_err2str(ret));
+    fprintf(stderr, "Failed to allocate output format context.\n"
+      "Libav Error: %s.\n", av_err2str(ret));
     goto end;
   }
 
   if ((ret = av_dict_copy(&proc_ctx->out_fmt_ctx->metadata,
     proc_ctx->in_fmt_ctx->metadata, AV_DICT_DONT_OVERWRITE)) < 0)
   {
-    fprintf(stderr, "Failed to copy file metadata:\nvideo: %s\nprocess job: %s\n\
-      Libav Error: %s\n", name, process_job_id, av_err2str(ret));
+    fprintf(stderr, "Failed to copy file metadata.\n"
+      "Libav Error: %s.\n", av_err2str(ret));
     goto end;
   }
 
   if (title) {
-    if ((ret = av_dict_set(&proc_ctx->out_fmt_ctx->metadata, "title", title, 0)) < 0) {
-      fprintf(stderr, "Failed to set title for output format context.\n\
-        Libav Error: %s\n", av_err2str(ret));
+    if ((ret = av_dict_set(&proc_ctx->out_fmt_ctx->metadata,
+      "title", title, 0)) < 0)
+    {
+      fprintf(stderr, "Failed to set title for output format context.\n"
+        "Libav Error: %s.\n", av_err2str(ret));
       goto end;
     }
   }
 
-  if ((ret = copy_chapters(proc_ctx->out_fmt_ctx, proc_ctx->in_fmt_ctx)) < 0)
-  {
-    fprintf(stderr, "Failed to copy chapters:\n\
-      video: %s\nprocess job: %s\n", name, process_job_id);
+  if ((ret = copy_chapters(proc_ctx->out_fmt_ctx, proc_ctx->in_fmt_ctx)) < 0) {
+    fprintf(stderr, "Failed to copy chapters.\n");
     goto end;
   }
 
   if ((ret = open_encoders_and_streams(proc_ctx, process_job_id)) < 0) {
-    fprintf(stderr, "Failed to open encoders and streams for process job: %s.\n",
-      process_job_id);
+    fprintf(stderr, "Failed to open encoders and streams.\n");
     goto end;
   }
 
   if (!(proc_ctx->out_fmt_ctx->oformat->flags & AVFMT_NOFILE)) {
-    if ((ret =
-      avio_open(&proc_ctx->out_fmt_ctx->pb, out_filename, AVIO_FLAG_WRITE)) < 0)
+    if ((ret = avio_open(&proc_ctx->out_fmt_ctx->pb,
+      out_filename, AVIO_FLAG_WRITE)) < 0)
     {
-      fprintf(stderr, "Failed to open output file.\n");
-      fprintf(stderr, "Libav Error: %s.\n", av_err2str(ret));
+      fprintf(stderr, "Failed to open output file.\n"
+        "Libav Error: %s.\n", av_err2str(ret));
       goto end;
     }
   }
 
   if ((ret = avformat_write_header(proc_ctx->out_fmt_ctx, NULL)) < 0) {
-    fprintf(stderr, "Failed to write header for output file.\n");
-    fprintf(stderr, "Libav Error: %s.\n", av_err2str(ret));
+    fprintf(stderr, "Failed to write header for output file.\n"
+      "Libav Error: %s.\n", av_err2str(ret));
     goto end;
   }
 

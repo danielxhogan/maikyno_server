@@ -53,7 +53,7 @@ DeinterlaceFilterContext *deint_filter_context_init(
 
   snprintf(args, sizeof(args),
     "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=%d/%d",
-    dec_ctx->width, dec_ctx->height, proc_ctx->formatted_pix_fmt,
+    dec_ctx->width, dec_ctx->height, proc_ctx->fmt_pix_fmt,
     in_stream->time_base.num, in_stream->time_base.den,
     dec_ctx->sample_aspect_ratio.num,
     dec_ctx->sample_aspect_ratio.den);
@@ -73,7 +73,7 @@ DeinterlaceFilterContext *deint_filter_context_init(
     goto end;
   }
 
-  pix_fmt = av_get_pix_fmt_name(proc_ctx->formatted_pix_fmt);
+  pix_fmt = av_get_pix_fmt_name(proc_ctx->fmt_pix_fmt);
 
   if ((ret = av_opt_set(deint_ctx->buffersink_ctx, "pixel_formats",
     pix_fmt, AV_OPT_SEARCH_CHILDREN)))

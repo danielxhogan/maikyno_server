@@ -5,6 +5,7 @@
 
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
+#include <libavcodec/bsf.h>
 #include <libavfilter/avfilter.h>
 
 typedef struct FormatFilterContext {
@@ -112,11 +113,12 @@ typedef struct ProcessingContext {
   int hw_dec;
   char *rend0_enc_name;
   int rend0_hw_enc;
+  // AVBSFContext *bsf_ctx;
   char *rend1_enc_name;
   int rend1_hw_enc;
 
-  enum AVPixelFormat formatted_pix_fmt;
-  int formatted_hdr;
+  enum AVPixelFormat fmt_pix_fmt;
+  int fmt_hdr;
   enum AVPixelFormat rend0_pix_fmt;
   int rend0_hdr;
   enum AVPixelFormat rend1_pix_fmt;
@@ -137,6 +139,7 @@ typedef struct ProcessingContext {
 
   AVPacket *pkt;
   AVPacket *pkt_cpy;
+  // AVPacket *bsf_pkt;
   AVFrame *frame;
   AVFrame *frame_cpy;
   AVFrame *sw_frame;

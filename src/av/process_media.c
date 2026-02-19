@@ -13,18 +13,21 @@ int encode_video_frame(ProcessingContext *proc_ctx, int rendition, AVFrame *fram
   AVCodecContext *enc_ctx;
   AVStream *out_stream;
   AVFrame *hw_frame;
+  // AVBSFContext *bsf_ctx;
 
   if (!rendition) {
     enc_ctx = stream_ctx->rend0_enc_ctx;
     out_stream = stream_ctx->rend0_out_stream;
     out_stream_idx = stream_ctx->rend0_out_stream_idx;
     hw_frame = proc_ctx->rend0_hw_frame;
+    // bsf_ctx = proc_ctx->bsf_ctx;
   }
   else {
     enc_ctx = stream_ctx->rend1_enc_ctx;
     out_stream = stream_ctx->rend1_out_stream;
     out_stream_idx = stream_ctx->rend1_out_stream_idx;
     hw_frame = proc_ctx->rend1_hw_frame;
+    // bsf_ctx = NULL;
   }
 
   if (frame && enc_ctx->hw_frames_ctx) {
@@ -33,7 +36,13 @@ int encode_video_frame(ProcessingContext *proc_ctx, int rendition, AVFrame *fram
         "Libav Error: %s.\n", av_err2str(ret));
       return ret;
     }
+
     hw_frame->pts = frame->pts;
+    hw_frame->color_primaries = frame->color_primaries;
+    hw_frame->color_trc = frame->color_trc;
+    hw_frame->colorspace = frame->colorspace;
+    hw_frame->chroma_location = frame->chroma_location;
+    hw_frame->color_range = frame->color_range;
     frame = hw_frame;
   }
 
@@ -45,6 +54,63 @@ int encode_video_frame(ProcessingContext *proc_ctx, int rendition, AVFrame *fram
 
   while ((ret = avcodec_receive_packet(enc_ctx, proc_ctx->pkt)) >= 0)
   {
+    // if (
+    //   !proc_ctx->bsf_ctx &&
+    //   !rendition &&
+    //   enc_ctx->hw_frames_ctx &&
+    //   proc_ctx->rend0_hdr &&
+    //   stream_ctx->rend0_enc_ctx->extradata_size > 0
+    // ) {
+    //   if ((ret = initialize_bsf(proc_ctx, stream_ctx->rend0_enc_ctx,
+    //     stream_ctx->rend0_out_stream)) < 0)
+    //   {
+    //     fprintf(stderr, "Failed to initialize bitstream filter.\n");
+    //     return ret;
+    //   }
+    // }
+
+    // if (!rendition && bsf_ctx) {
+    //   if ((ret = av_bsf_send_packet(bsf_ctx, proc_ctx->pkt)) < 0) {
+    //     fprintf(stderr, "Failed to send packet to bit stream filter.\n"
+    //       "Libav Error: %s.\n", av_err2str(ret));
+    //     return ret;
+    //   }
+
+    //   while ((ret = av_bsf_receive_packet(bsf_ctx, proc_ctx->bsf_pkt)) >= 0)
+    //   {
+    //     proc_ctx->bsf_pkt->stream_index = out_stream_idx;
+
+    //     av_packet_rescale_ts(proc_ctx->bsf_pkt,
+    //       stream_ctx->in_stream->time_base,
+    //       out_stream->time_base);
+
+    //     if (proc_ctx->deint) {
+    //       proc_ctx->bsf_pkt->pts = proc_ctx->bsf_pkt->pts / 2;
+    //       proc_ctx->bsf_pkt->dts = proc_ctx->bsf_pkt->dts / 2;
+    //     }
+
+    //     if ((ret = av_interleaved_write_frame(proc_ctx->out_fmt_ctx,
+    //       proc_ctx->bsf_pkt)) < 0)
+    //     {
+    //       fprintf(stderr, "Failed to write video packet.\n"
+    //         "Libav Error: %s.\n", av_err2str(ret));
+    //       return ret;
+    //     }
+
+    //     if (proc_ctx->bsf_pkt) { av_packet_unref(proc_ctx->bsf_pkt); }
+    //   }
+
+    //   if (proc_ctx->pkt) { av_packet_unref(proc_ctx->pkt); }
+
+    //   if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
+    //     fprintf(stderr, "Failed to receive video packet from bitstream filter.\n"
+    //       "Libav Error: %s.\n", av_err2str(ret));
+    //     return ret;
+    //   }
+
+    //   continue;
+    // }
+
     proc_ctx->pkt->stream_index = out_stream_idx;
 
     av_packet_rescale_ts(proc_ctx->pkt,
@@ -260,6 +326,13 @@ int format_video_frame(ProcessingContext *proc_ctx,
   while ((ret = av_buffersink_get_frame(proc_ctx->fmt_ctx->buffersink_ctx,
     proc_ctx->fmt_ctx->filtered_frame)) >= 0)
   {
+    proc_ctx->fmt_ctx->filtered_frame->pts = frame->pts;
+    proc_ctx->fmt_ctx->filtered_frame->color_primaries = frame->color_primaries;
+    proc_ctx->fmt_ctx->filtered_frame->color_trc = frame->color_trc;
+    proc_ctx->fmt_ctx->filtered_frame->colorspace = frame->colorspace;
+    proc_ctx->fmt_ctx->filtered_frame->chroma_location = frame->chroma_location;
+    proc_ctx->fmt_ctx->filtered_frame->color_range = frame->color_range;
+
     if (proc_ctx->deint_ctx) {
       if ((ret = deinterlace_video_frame(proc_ctx,
         stream_ctx, proc_ctx->fmt_ctx->filtered_frame)) < 0)
@@ -501,7 +574,7 @@ int decode_sub_packet(ProcessingContext *proc_ctx, StreamContext *stream_ctx)
 
   if (proc_ctx->first_sub == 0) {
     proc_ctx->first_sub = 1;
-    printf("Found first subtitle\n");
+    printf("Found first subtitle.\n");
   }
 
   if ((ret = avcodec_decode_subtitle2(stream_ctx->dec_ctx, proc_ctx->sub,
@@ -556,6 +629,13 @@ int decode_av_packet(ProcessingContext *proc_ctx,
   {
     if (stream_ctx->codec_type == AVMEDIA_TYPE_VIDEO)
     {
+        // if (proc_ctx->rend0_hdr && !proc_ctx->bsf_ctx && stream_ctx->rend0_enc_ctx->extradata_size > 0) {
+        //   if ((ret = initialize_bsf(proc_ctx, stream_ctx->rend0_enc_ctx)) < 0) {
+        //     fprintf(stderr, "Failed to initialize bitstream filter.\n");
+        //     return ret;
+        //   }
+        // }
+
       if (proc_ctx->frame->hw_frames_ctx) {
         if ((ret = av_hwframe_transfer_data(proc_ctx->sw_frame,
           proc_ctx->frame, 0)) < 0)
@@ -563,7 +643,14 @@ int decode_av_packet(ProcessingContext *proc_ctx,
           fprintf(stderr, "Failed to transfer hardware frame to software frame.\n"
             "Libav Error: %s.\n", av_err2str(ret));
         }
+
         proc_ctx->sw_frame->pts = proc_ctx->frame->pts;
+        proc_ctx->sw_frame->color_primaries = proc_ctx->frame->color_primaries;
+        proc_ctx->sw_frame->color_trc = proc_ctx->frame->color_trc;
+        proc_ctx->sw_frame->colorspace = proc_ctx->frame->colorspace;
+        proc_ctx->sw_frame->chroma_location = proc_ctx->frame->chroma_location;
+        proc_ctx->sw_frame->color_range = proc_ctx->frame->color_range;
+
         frame = proc_ctx->sw_frame;
       } else {
         frame = proc_ctx->frame;
@@ -641,8 +728,8 @@ int decode_av_packet(ProcessingContext *proc_ctx,
   }
 
   if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
-    fprintf(stderr, "Failed to receive frame from input stream '%d' from decoder."
-      "\nLibav Error: %s.\n", proc_ctx->pkt->stream_index, av_err2str(ret));
+    fprintf(stderr, "Failed to receive frame from decoder."
+      "\nLibav Error: %s.\n", av_err2str(ret));
     return ret;
   }
 
@@ -926,7 +1013,7 @@ int process_video(char *process_job_id, const char *batch_id)
   }
 
   if (proc_ctx->rend0_hwaccel || proc_ctx->rend1_hwaccel) {
-    if ((ret = hw_ctx_init(proc_ctx)) < 0) {
+    if ((ret = hw_context_init(proc_ctx)) < 0) {
       fprintf(stderr, "Failed to initialize hardware context.\n");
     }
   }

@@ -177,11 +177,12 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
   proc_ctx->hw_dec = 0;
   proc_ctx->rend0_enc_name = NULL;
   proc_ctx->rend0_hw_enc = 0;
+  // proc_ctx->bsf_ctx = NULL;
   proc_ctx->rend1_enc_name = NULL;
   proc_ctx->rend1_hw_enc = 0;
 
-  proc_ctx->formatted_pix_fmt = AV_PIX_FMT_NONE;
-  proc_ctx->formatted_hdr = 0;
+  proc_ctx->fmt_pix_fmt = AV_PIX_FMT_NONE;
+  proc_ctx->fmt_hdr = 0;
   proc_ctx->rend0_pix_fmt = AV_PIX_FMT_NONE;
   proc_ctx->rend0_hdr = 0;
   proc_ctx->rend1_pix_fmt = AV_PIX_FMT_NONE;
@@ -202,6 +203,7 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
 
   proc_ctx->pkt = NULL;
   proc_ctx->pkt_cpy = NULL;
+  // proc_ctx->bsf_pkt = NULL;
   proc_ctx->frame = NULL;
   proc_ctx->frame_cpy = NULL;
   proc_ctx->sw_frame = NULL;
@@ -253,6 +255,12 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
     goto end;
   }
 
+  // if (!(proc_ctx->bsf_pkt = av_packet_alloc())) {
+  //   fprintf(stderr, "Failed to allocate bsf AVPacket.\n");
+  //   ret = AVERROR(ENOMEM);
+  //   goto end;
+  // }
+
   if (!(proc_ctx->frame = av_frame_alloc())) {
     fprintf(stderr, "Failed to allocate AVFrame.\n");
     ret = AVERROR(ENOMEM);
@@ -294,6 +302,7 @@ void processing_context_free(ProcessingContext **proc_ctx)
   avformat_free_context((*proc_ctx)->out_fmt_ctx);
   avformat_close_input(&(*proc_ctx)->in_fmt_ctx);
   av_buffer_unref(&(*proc_ctx)->hw_ctx);
+  // av_bsf_free(&(*proc_ctx)->bsf_ctx);
 
   if ((*proc_ctx)->stream_ctx_arr) {
     for (i = 0; i < (*proc_ctx)->nb_selected_streams; i++) {
@@ -314,6 +323,8 @@ void processing_context_free(ProcessingContext **proc_ctx)
   av_packet_free(&(*proc_ctx)->pkt);
   if ((*proc_ctx)->pkt_cpy) { av_packet_unref((*proc_ctx)->pkt_cpy); }
   av_packet_free(&(*proc_ctx)->pkt_cpy);
+  // if ((*proc_ctx)->bsf_pkt) { av_packet_unref((*proc_ctx)->bsf_pkt); }
+  // av_packet_free(&(*proc_ctx)->bsf_pkt);
   av_frame_unref((*proc_ctx)->frame);
   av_frame_free(&(*proc_ctx)->frame);
   av_frame_unref((*proc_ctx)->frame_cpy);
@@ -425,8 +436,8 @@ int get_video_processing_info(ProcessingContext *proc_ctx,
   }
 
   proc_ctx->rend1_codec = sqlite3_column_int(select_video_info_stmt, 8);
-  proc_ctx->rend1_hwaccel = sqlite3_column_int(select_video_info_stmt, 4);
-  proc_ctx->tonemap = sqlite3_column_int(select_video_info_stmt, 9);
+  proc_ctx->rend1_hwaccel = sqlite3_column_int(select_video_info_stmt, 9);
+  proc_ctx->tonemap = sqlite3_column_int(select_video_info_stmt, 10);
 
   if (stream_ctx->passthrough) {
     stream_ctx->renditions = 0;
@@ -697,7 +708,7 @@ int get_processing_info(ProcessingContext *proc_ctx,
   return 0;
 }
 
-int hw_ctx_init(ProcessingContext *proc_ctx)
+int hw_context_init(ProcessingContext *proc_ctx)
 {
   int ret = 0;
   enum AVHWDeviceType hw_type = AV_HWDEVICE_TYPE_CUDA;
@@ -786,19 +797,19 @@ int video_format_init(ProcessingContext *proc_ctx, StreamContext *stream_ctx)
   }
 
   if (!stream_ctx->renditions) {
-    proc_ctx->formatted_pix_fmt = proc_ctx->rend0_pix_fmt;
-    proc_ctx->formatted_hdr = proc_ctx->rend0_hdr;
+    proc_ctx->fmt_pix_fmt = proc_ctx->rend0_pix_fmt;
+    proc_ctx->fmt_hdr = proc_ctx->rend0_hdr;
   } else {
     if (proc_ctx->rend0_pix_fmt == proc_ctx->rend1_pix_fmt) {
-      proc_ctx->formatted_pix_fmt = proc_ctx->rend0_pix_fmt;
+      proc_ctx->fmt_pix_fmt = proc_ctx->rend0_pix_fmt;
     } else {
-      proc_ctx->formatted_pix_fmt = in_pix_fmt;
+      proc_ctx->fmt_pix_fmt = in_pix_fmt;
     }
 
     if (proc_ctx->rend0_hdr == proc_ctx->rend1_hdr) {
-      proc_ctx->formatted_hdr = proc_ctx->rend0_hdr;
+      proc_ctx->fmt_hdr = proc_ctx->rend0_hdr;
     } else {
-      proc_ctx->formatted_hdr = proc_ctx->hdr;
+      proc_ctx->fmt_hdr = proc_ctx->hdr;
     }
   }
 
