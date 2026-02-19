@@ -86,9 +86,10 @@ int get_filter_string(char *flt_str, ProcessingContext *proc_ctx,
     if (convert_chroma_loc) {
       if (prev_flt) { strcat(flt_str, ","); }
       prev_flt = 1;
-      if (!strcmp(proc_ctx->rend0_enc_name, "libx265")) {
+
+      if (!proc_ctx->hw_ctx && !strcmp(proc_ctx->rend0_enc_name, "libx265")) {
         strcat(flt_str, "zscale=p=2020:t=smpte2084:m=2020_ncl:c=topleft");
-      } else if (!strcmp(proc_ctx->rend0_enc_name, "hevc_nvenc")) {
+      } else {
         strcat(flt_str, "zscale=c=topleft");
       }
     }
