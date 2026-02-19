@@ -455,11 +455,7 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
     }
   }
 
-  AVDictionary *opts = NULL;
-  av_dict_set(&opts, "chroma_sample_location", "topleft", 0);
-  av_dict_set(&opts, "chroma_loc_info", "topleft", 0);
-
-  if ((ret = avcodec_open2(*enc_ctx, enc, &opts)) < 0) {
+  if ((ret = avcodec_open2(*enc_ctx, enc, NULL)) < 0) {
     fprintf(stderr, "Failed to open encoder.\n");
     goto end;
   }
