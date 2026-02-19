@@ -358,6 +358,8 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
       goto end;
     }
 
+    if (hdr_ctx->dovi) { proc_ctx->dovi = 1; }
+
     if (hdr_ctx->mdm) {
       proc_ctx->hdr = 1;
 

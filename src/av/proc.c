@@ -199,6 +199,7 @@ ProcessingContext *processing_context_alloc(char *process_job_id, sqlite3 *db)
 
   proc_ctx->tonemap = 0;
   proc_ctx->hdr = 0;
+  proc_ctx->dovi = 0;
   proc_ctx->rend_ctx = NULL;
 
   proc_ctx->pkt = NULL;

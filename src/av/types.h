@@ -135,6 +135,7 @@ typedef struct ProcessingContext {
 
   int tonemap;
   int hdr;
+  int dovi;
   RenditionFilterContext *rend_ctx;
 
   AVPacket *pkt;
