@@ -8,13 +8,14 @@ int get_filter_string(char *flt_str, ProcessingContext *proc_ctx,
   int libplacebo = 0, convert_pix_fmt = 0, convert_colorspace = 0, tonemap = 0,
     convert_chroma_loc = 0, convert_range = 0, prev_flt = 0;
 
-  if (proc_ctx->fmt_hdr) {
+  if (proc_ctx->dovi && proc_ctx->fmt_hdr && !proc_ctx->rend0_hw_enc) {
     if (
       stream_ctx->dec_ctx->color_primaries == AVCOL_PRI_UNSPECIFIED ||
       stream_ctx->dec_ctx->color_trc == AVCOL_TRC_UNSPECIFIED ||
       stream_ctx->dec_ctx->colorspace == AVCOL_SPC_UNSPECIFIED
     ) {
-      fprintf(stderr, "Failed to initialize format filter. Unspecified colorspace.\n");
+      fprintf(stderr, "Failed to initialize format filter. "
+        "Unspecified colorspace.\n");
       return -1; 
     }
   } else {
@@ -22,6 +23,20 @@ int get_filter_string(char *flt_str, ProcessingContext *proc_ctx,
   }
 
   if (in_pix_fmt != proc_ctx->fmt_pix_fmt) { convert_pix_fmt = 1; }
+
+  if (proc_ctx->fmt_hdr) {
+    if (
+      stream_ctx->dec_ctx->color_primaries != AVCOL_PRI_BT2020 ||
+      stream_ctx->dec_ctx->color_trc != AVCOL_TRC_SMPTE2084 ||
+      stream_ctx->dec_ctx->colorspace != AVCOL_SPC_BT2020_NCL
+    ) {
+      convert_colorspace = 1;
+    }
+
+    if (stream_ctx->dec_ctx->chroma_sample_location != AVCHROMA_LOC_TOPLEFT) {
+      convert_chroma_loc = 1;
+    }
+  }
 
   if (!proc_ctx->fmt_hdr) {
     if (
@@ -38,8 +53,6 @@ int get_filter_string(char *flt_str, ProcessingContext *proc_ctx,
       convert_chroma_loc = 1;
     }
   }
-
-  if (proc_ctx->hdr) { convert_chroma_loc = 1; }
 
   if (stream_ctx->dec_ctx->color_range != AVCOL_RANGE_MPEG) {
     convert_range = 1;
@@ -62,13 +75,21 @@ int get_filter_string(char *flt_str, ProcessingContext *proc_ctx,
       if (prev_flt) { strcat(flt_str, ":"); }
       prev_flt = 1;
       if (tonemap) { strcat(flt_str, "tonemapping=hable:"); }
-      strcat(flt_str, "color_primaries=bt709:color_trc=bt709:colorspace=bt709");
+      if (proc_ctx->fmt_hdr) {
+        strcat(flt_str, "color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc");
+      } else {
+        strcat(flt_str, "color_primaries=bt709:color_trc=bt709:colorspace=bt709");
+      }
     }
 
     if (convert_chroma_loc) {
       if (prev_flt) { strcat(flt_str, ":"); }
       prev_flt = 1;
-      strcat(flt_str, "chroma_location=left");
+      if (proc_ctx->fmt_hdr) {
+        strcat(flt_str, "chroma_location=topleft");
+      } else {
+        strcat(flt_str, "chroma_location=left");
+      }
     }
 
     if (convert_range) {

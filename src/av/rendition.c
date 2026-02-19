@@ -6,18 +6,23 @@
 int get_rendition_filter_string(char *flt_str, ProcessingContext *proc_ctx)
 {
   StreamContext *stream_ctx = proc_ctx->stream_ctx_arr[0];
-  char rend0_flt_str[32], rend1_flt_str[256];
+  char rend0_flt_str[64], rend1_flt_str[256];
 
   int rend0_convert_pix_fmt = 0;
 
   if (proc_ctx->fmt_pix_fmt != proc_ctx->rend0_pix_fmt) {
     rend0_convert_pix_fmt = 1;
 
-    snprintf(rend0_flt_str, 32, "format=%s",
-      av_get_pix_fmt_name(proc_ctx->rend0_pix_fmt));
-
-    printf("rend0_flt_str: %s\n", rend0_flt_str);
+    if (proc_ctx->dovi && proc_ctx->rend0_hdr && !proc_ctx->rend0_hw_enc) {
+      snprintf(rend0_flt_str, 64, "format=%s",
+        av_get_pix_fmt_name(proc_ctx->rend0_pix_fmt));
+    } else {
+      snprintf(rend0_flt_str, 64, "libplacebo=format=%s",
+        av_get_pix_fmt_name(proc_ctx->rend0_pix_fmt));
+    }
   }
+
+  printf("rend0_flt_str: %s\n", rend0_flt_str);
 
   snprintf(rend1_flt_str, 256,
     "libplacebo=w=%d:h=%d:downscaler=ewa_lanczos",
