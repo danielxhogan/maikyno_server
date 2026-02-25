@@ -241,7 +241,7 @@ end:
 }
 
 int inject_hdr_metadta(HdrMetadataContext *hdr_ctx,
-  AVCodecContext *enc_ctx, char **params_str)
+  AVCodecContext *enc_ctx, char **params_str, int hw_enc)
 {
   int ret;
 
@@ -280,9 +280,11 @@ int inject_hdr_metadta(HdrMetadataContext *hdr_ctx,
         return AVERROR_UNKNOWN;
       }
 
-      if ((ret = av_opt_set(enc_ctx->priv_data, "dolbyvision", "true", 0)) < 0) {
-        fprintf(stderr, "Failed to set dolbyvision opt.\n");
-        return ret;
+      if (!hw_enc) {
+        if ((ret = av_opt_set(enc_ctx->priv_data, "dolbyvision", "true", 0)) < 0) {
+          fprintf(stderr, "Failed to set dolbyvision opt.\n");
+          return ret;
+        }
       }
 
       if (!(*params_str = calloc(DOVI_PARAMS_STR_LEN + 1, sizeof(char))))

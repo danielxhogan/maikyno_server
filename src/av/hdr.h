@@ -17,5 +17,5 @@ typedef struct HdrMetadataContext {
 HdrMetadataContext *hdr_ctx_alloc();
 int extract_hdr_metadata(HdrMetadataContext *hdr_ctx, const char *filename);
 int inject_hdr_metadta(HdrMetadataContext *hdr_ctx,
-  AVCodecContext *enc_ctx, char **params_str);
+  AVCodecContext *enc_ctx, char **params_str, int hw_enc);
 void hdr_ctx_free(HdrMetadataContext *hdr_ctx);

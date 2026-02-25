@@ -363,7 +363,7 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
     if (hdr_ctx->mdm) {
       proc_ctx->hdr = 1;
 
-      if ((ret = inject_hdr_metadta(hdr_ctx, *enc_ctx, &hdr_params_str)) < 0) {
+      if ((ret = inject_hdr_metadta(hdr_ctx, *enc_ctx, &hdr_params_str, *hw_enc)) < 0) {
         fprintf(stderr, "Failed to inject hdr metadata.\n");
         goto end;
       }
