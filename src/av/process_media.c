@@ -6,6 +6,9 @@
 #include "burn_in.h"
 #include "utils.h"
 
+#include <stdio.h>
+#include <time.h>
+
 int encode_video_frame(ProcessingContext *proc_ctx, int rendition, AVFrame *frame)
 {
   int out_stream_idx, ret = 0;
@@ -766,7 +769,7 @@ int transcode(ProcessingContext *proc_ctx,
   const char *batch_id, char *process_job_id)
 {
   StreamContext *stream_ctx;
-  int in_stream_idx, ctx_idx, frame_count, check_again = 0,
+  int in_stream_idx, ctx_idx, frame_count = 0, check_again = 0,
     out_stream_idx, ret = 0;
   enum AVMediaType codec_type;
 
@@ -1185,8 +1188,8 @@ int process_media(const char *batch_id)
     if (!(process_job_id =
       (char *) sqlite3_column_text(select_batch_process_jobs_stmt, 0)))
     {
-      fprintf(stderr, "Failed to get process job id column text for batch id: \
-        %s\nError: %s\n", batch_id, sqlite3_errmsg(db));
+      fprintf(stderr, "Failed to get process job id column text.\n"
+        "Sqlite Error: %s\n", sqlite3_errmsg(db));
       goto end;
     }
 
@@ -1195,8 +1198,8 @@ int process_media(const char *batch_id)
   }
 
   if (ret != SQLITE_DONE) {
-    fprintf(stderr, "Failed to step through select_batch_process_jobs_stmt \
-      for batch_id: %s\nError: %s.\n", batch_id, sqlite3_errmsg(db));
+    fprintf(stderr, "Failed to step through select_batch_process_jobs_stmt.\n"
+      "Sqlite Error: %s.\n", sqlite3_errmsg(db));
     ret = -ret;
     goto end;
   }
@@ -1206,7 +1209,16 @@ int process_media(const char *batch_id)
   sqlite3_close(db);
   db = NULL;
 
+  time_t start, end;
+  struct tm *start_lt, *end_lt;
+  int min, sec;
+
   for (i = 0; i < batch_size; i++) {
+
+    time(&start);
+    start_lt = localtime(&start);
+    printf("start time: %d:%02d\n", start_lt->tm_min, start_lt->tm_sec);
+
     if ((ret = process_video(process_job_ids[i], batch_id)) < 0) {
       if (ret != ABORTED) {
         fprintf(stderr, "Failed to process video for process job \"%s\".\n",
@@ -1214,6 +1226,15 @@ int process_media(const char *batch_id)
         goto end;
       }
     }
+
+    time(&end);
+    end_lt = localtime(&end);
+    printf("end time: %d:%02d\n", end_lt->tm_min, end_lt->tm_sec);
+
+    min = end_lt->tm_min - start_lt->tm_min;
+    sec = end_lt->tm_sec - start_lt->tm_sec;
+
+    printf("elapsed: %d:%02d\n", min, sec);
   }
   
 end:
