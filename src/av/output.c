@@ -115,11 +115,10 @@ sw_dec:
 int get_video_fmt(ProcessingContext *proc_ctx, enum AVCodecID codec,
   int hw_enc, enum AVPixelFormat *pix_fmt, int *hdr)
 {
-
   if (codec == AV_CODEC_ID_HEVC) {
     if (hw_enc) { *pix_fmt = AV_PIX_FMT_P010LE; }
     else { *pix_fmt = AV_PIX_FMT_YUV420P10LE; }
-    if (proc_ctx->hdr) { *hdr = 1; }
+    if (proc_ctx->hdr && hdr) { *hdr = 1; }
   }
   else if (codec == AV_CODEC_ID_H264) {
     if (hw_enc) { *pix_fmt = AV_PIX_FMT_NV12; }
@@ -801,8 +800,8 @@ static int open_encoder(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
       if ((ret = open_video_encoder(&stream_ctx->rend1_enc_ctx,
         proc_ctx, stream_ctx, in_filename, 1)) < 0)
       {
-      fprintf(stderr, "Failed to open video encoder for "
-        "second rendition, output stream '%d'.\n", out_stream_idx);
+        fprintf(stderr, "Failed to open video encoder for "
+          "second rendition, output stream '%d'.\n", out_stream_idx);
         return ret;
       }
     }
@@ -861,8 +860,8 @@ static int init_stream(AVFormatContext *fmt_ctx,
   }
 
   if (enc_ctx) {
-    if ((ret =
-      avcodec_parameters_from_context(out_stream->codecpar, enc_ctx)) < 0)
+    if ((ret = avcodec_parameters_from_context(out_stream->codecpar,
+      enc_ctx)) < 0)
     {
       fprintf(stderr,
         "Failed to copy codec parameters from encoder context to stream.\n");
@@ -873,11 +872,11 @@ static int init_stream(AVFormatContext *fmt_ctx,
     out_stream->avg_frame_rate = in_stream->avg_frame_rate;
   }
   else {
-    if ((ret =
-      avcodec_parameters_copy(out_stream->codecpar, in_stream->codecpar)) < 0)
+    if ((ret = avcodec_parameters_copy(out_stream->codecpar,
+      in_stream->codecpar)) < 0)
     {
       fprintf(stderr,
-        "Failed to copy codec paramets from input stream to output stream.\n");
+        "Failed to copy codec parameters from input stream to output stream.\n");
       return ret;
     }
   }
@@ -1041,9 +1040,8 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx, char *process_job_id)
     if ((ret = init_stream(proc_ctx->out_fmt_ctx, stream_ctx->rend0_enc_ctx,
       stream_ctx->in_stream, stream_ctx->rend0_title)) < 0)
     {
-      fprintf(stderr, "Failed to initialize stream for output stream: %d.\n\
-        process_job: %s.\nLibav Error: %s.\n",
-        out_stream_idx, process_job_id, av_err2str(ret));
+      fprintf(stderr, "Failed to initialize stream for output stream: %d.\n"
+        "Libav Error: %s.\n", out_stream_idx, av_err2str(ret));
       return ret;
     }
 
@@ -1055,9 +1053,8 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx, char *process_job_id)
       if ((ret = init_stream(proc_ctx->out_fmt_ctx, stream_ctx->rend1_enc_ctx,
         stream_ctx->in_stream, stream_ctx->rend1_title)) < 0)
       {
-        fprintf(stderr, "Failed to initialize stream for output stream: %d.\n\
-          process_job: %s.\nLibav Error: %s.\n",
-          out_stream_idx + 1, process_job_id, av_err2str(ret));
+      fprintf(stderr, "Failed to initialize stream for output stream: %d.\n"
+        "Libav Error: %s.\n", out_stream_idx, av_err2str(ret));
         return ret;
       }
 
@@ -1075,8 +1072,8 @@ int open_output(ProcessingContext *proc_ctx, char *process_job_id, sqlite3 *db)
   int extra, ret = 0;
   char *name = NULL, *media_dir_path = NULL, *title = NULL, *out_filename = NULL;
 
-  if ((ret = get_file_data(&name, &extra, &media_dir_path, &title,
-    db, process_job_id)) < 0)
+  if ((ret = get_file_data(&name, &extra,
+    &media_dir_path, &title, db, process_job_id)) < 0)
   {
     fprintf(stderr, "Failed to get file data.\n");
     goto end;
