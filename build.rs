@@ -7,6 +7,13 @@ use dotenvy::dotenv;
 
 fn main()
 {
+  let profile = std::env::var("PROFILE").unwrap();
+  if profile == "release" {
+      println!("cargo:warning=Building C code in RELEASE mode");
+  } else {
+      println!("cargo:warning=Building C code in DEBUG mode");
+  }
+
   println!("cargo::rerun-if-changed=src/av/scan_media_streams.c");
   println!("cargo::rerun-if-changed=src/av/scan_media_streams.h");
   println!("cargo::rerun-if-changed=src/av/process_media.c");
