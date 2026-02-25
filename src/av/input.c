@@ -14,8 +14,8 @@ int get_input_file(char **input_file, char *process_job_id, sqlite3 *db)
   if ((ret = sqlite3_prepare_v2(db, select_video_path_query, -1,
     &select_video_path_stmt, 0)) != SQLITE_OK)
   {
-    fprintf(stderr, "Failed to prepare select video path statement.\nError%s\n",
-      sqlite3_errmsg(db));
+    fprintf(stderr, "Failed to prepare select video path statement.\n"
+      "Sqlite Error: %s\n", sqlite3_errmsg(db));
     ret = -ret;
     goto end;
   }
@@ -30,8 +30,8 @@ int get_input_file(char **input_file, char *process_job_id, sqlite3 *db)
   }
 
   if (!(input_file_tmp = sqlite3_column_text(select_video_path_stmt, 0))) {
-    fprintf(stderr, "Failed to get column text for select video path query \
-      for process_job: %s\nError: %s\n", process_job_id, sqlite3_errmsg(db));
+    fprintf(stderr, "Failed to get column text for select video path query.\n"
+      "Sqlite Error: %s\n", sqlite3_errmsg(db));
     ret = -1;
     goto end;
   }
@@ -41,7 +41,7 @@ int get_input_file(char **input_file, char *process_job_id, sqlite3 *db)
 
   if (!(*input_file = calloc(len_input_file + 1, sizeof(char))))
   {
-    fprintf(stderr, "Failed to allocate input_file\n");
+    fprintf(stderr, "Failed to allocate input_file.\n");
     ret = AVERROR(ENOMEM);
     goto end;
   }
@@ -113,14 +113,14 @@ static int open_decoder(ProcessingContext *proc_ctx,
     return ret;
   }
 
-  if (
-    proc_ctx->hw_ctx &&
-    (unsigned int) stream_ctx->in_stream_idx == proc_ctx->v_stream_idx
-  ) {
-    if ((ret = init_hw_dec_ctx(proc_ctx, dec)) < 0) {
-      fprintf(stderr, "Failed to initialize hardware decoder.\n");
-    }
-  }
+  // if (
+  //   proc_ctx->hw_ctx &&
+  //   (unsigned int) stream_ctx->in_stream_idx == proc_ctx->v_stream_idx
+  // ) {
+  //   if ((ret = init_hw_dec_ctx(proc_ctx, dec)) < 0) {
+  //     fprintf(stderr, "Failed to initialize hardware decoder.\n");
+  //   }
+  // }
 
   if (!(stream_ctx->dec_ctx = avcodec_alloc_context3(dec))) {
     fprintf(stderr, "Failed to allocate decoder context "
