@@ -711,20 +711,48 @@ int get_processing_info(ProcessingContext *proc_ctx,
 
 int hw_context_init(ProcessingContext *proc_ctx)
 {
-  int ret = 0;
-  enum AVHWDeviceType hw_type = AV_HWDEVICE_TYPE_CUDA;
+  int i = 0, ret = 0;
 
-  if ((ret = av_hwdevice_ctx_create(&proc_ctx->hw_ctx,
-    hw_type, NULL, NULL, 0)) < 0)
-  {
-    fprintf(stderr, "Failed to create hardware device context.\n"
-      "Libav Error: %s.\n", av_err2str(ret));
-    return ret;
+  enum AVHWDeviceType hw_types[] = {
+    AV_HWDEVICE_TYPE_CUDA,
+    AV_HWDEVICE_TYPE_QSV,
+    AV_HWDEVICE_TYPE_VIDEOTOOLBOX,
+    AV_HWDEVICE_TYPE_AMF,
+    AV_HWDEVICE_TYPE_VAAPI,
+    AV_HWDEVICE_TYPE_NONE
+  };
+
+  enum AVPixelFormat hw_pix_fmts[] = {
+    AV_PIX_FMT_CUDA,
+    AV_PIX_FMT_QSV,
+    AV_PIX_FMT_VIDEOTOOLBOX,
+    AV_PIX_FMT_AMF_SURFACE,
+    AV_PIX_FMT_VAAPI
+  };
+
+  enum AVHWDeviceType *hw_type = hw_types;
+
+  while (*hw_type != AV_HWDEVICE_TYPE_NONE) {
+    if ((ret = av_hwdevice_ctx_create(&proc_ctx->hw_ctx,
+      *hw_type, NULL, NULL, 0)) < 0)
+    {
+      fprintf(stderr, "Failed to create hardware device context "
+        "for hardware device type '%s'.\nLibav Error: %s.\n",
+        av_hwdevice_get_type_name(*hw_type), av_err2str(ret));
+      hw_type++;
+      i++;
+      continue;
+    }
+
+    printf("Created hardware context for hardware device type '%s'.\n",
+      av_hwdevice_get_type_name(*hw_type));
+
+    proc_ctx->hw_pix_fmt = hw_pix_fmts[i];
+    proc_ctx->hw_type = *hw_type;
+    return 0;
   }
 
-  proc_ctx->hw_pix_fmt = AV_PIX_FMT_CUDA;
-  proc_ctx->hw_type = hw_type;
-
+  fprintf(stderr, "Failed to find a valid hardware device.\n");
   return 0;
 }
 
@@ -755,14 +783,14 @@ int audio_context_init(StreamContext *stream_ctx, int rendition)
   if (!(*swr_out_ctx =
     swr_output_context_alloc(stream_ctx->dec_ctx, enc_ctx)))
   {
-    fprintf(stderr, "Failed to allocate swr output context.");
-    fprintf(stderr, "output stream '%d'.\n", out_stream_idx);
+    fprintf(stderr, "Failed to allocate swr output context for "
+      "output stream '%d'.\n", out_stream_idx);
     return -1;
   }
 
   if (!(*fsc_ctx = fsc_ctx_alloc(enc_ctx))) {
-    fprintf(stderr, "Failed to allocate fsc output context.");
-    fprintf(stderr, "output stream '%d'.\n", out_stream_idx);
+    fprintf(stderr, "Failed to allocate fsc output context for "
+      "output stream '%d'.\n", out_stream_idx);
     return -1;
   }
 
@@ -770,8 +798,8 @@ int audio_context_init(StreamContext *stream_ctx, int rendition)
     if (!(*vol_ctx = volume_filter_context_init(stream_ctx,
       enc_ctx, rendition)))
     {
-      fprintf(stderr, "Failed to allocate volume filter context.\n");
-      fprintf(stderr, "output stream: '%d'.\n", out_stream_idx);
+      fprintf(stderr, "Failed to allocate volume filter context for "
+        "output stream: '%d'.\n", out_stream_idx);
       return -1;
     }
   }

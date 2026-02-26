@@ -82,7 +82,40 @@ int find_video_encoder(ProcessingContext *proc_ctx,
     else if (codec == AV_CODEC_ID_H264) {
       snprintf(*enc_name, 16, "h264_nvenc");
     }
-  } else {
+  }
+  else if (proc_ctx->hw_type == AV_HWDEVICE_TYPE_QSV) {
+    if (codec == AV_CODEC_ID_HEVC) {
+      snprintf(*enc_name, 16, "hevc_qsv");
+    }
+    else if (codec == AV_CODEC_ID_H264) {
+      snprintf(*enc_name, 16, "h264_qsv");
+    }
+  }
+  else if (proc_ctx->hw_type == AV_HWDEVICE_TYPE_VIDEOTOOLBOX) {
+    if (codec == AV_CODEC_ID_HEVC) {
+      snprintf(*enc_name, 16, "hevc_videotoolbox");
+    }
+    else if (codec == AV_CODEC_ID_H264) {
+      snprintf(*enc_name, 16, "h264_videotoolbox");
+    }
+  }
+  else if (proc_ctx->hw_type == AV_HWDEVICE_TYPE_AMF) {
+    if (codec == AV_CODEC_ID_HEVC) {
+      snprintf(*enc_name, 16, "hevc_amf");
+    }
+    else if (codec == AV_CODEC_ID_H264) {
+      snprintf(*enc_name, 16, "h264_amf");
+    }
+  }
+  else if (proc_ctx->hw_type == AV_HWDEVICE_TYPE_VAAPI) {
+    if (codec == AV_CODEC_ID_HEVC) {
+      snprintf(*enc_name, 16, "hevc_vaapi");
+    }
+    else if (codec == AV_CODEC_ID_H264) {
+      snprintf(*enc_name, 16, "h264_vaapi");
+    }
+  }
+  else {
     goto sw_dec;
   }
 
@@ -430,28 +463,24 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
 
   if (*hw_enc) {
     if ((ret = init_hw_enc_ctx(proc_ctx, *enc_ctx, *pix_fmt)) < 0) {
-      fprintf(stderr, "Failed to initialize hardware encoder context "
-        "for stream '%d'.\n", stream_ctx->in_stream_idx);
+      fprintf(stderr, "Failed to initialize hardware encoder context.\n");
       goto end;
     }
 
     if ((ret = init_hw_frame(frame, *enc_ctx)) < 0) {
-      fprintf(stderr, "Failed to initialize hw frame for stream '%d'.\n",
-        stream_ctx->in_stream_idx);
+      fprintf(stderr, "Failed to initialize hw frame.\n");
       goto end;
     }
   }
 
   if (!strcmp(*enc_name, "libx265")) {
     if ((ret = configure_libx265(*enc_ctx, stream_ctx, hdr_params_str)) < 0) {
-      fprintf(stderr, "Failed to configure libx265 for stream '%d'.\n",
-        stream_ctx->in_stream_idx);
+      fprintf(stderr, "Failed to configure libx265.\n");
       goto end;
     }
   } else if (!strcmp(*enc_name, "hevc_nvenc")) {
     if ((ret = configure_hevc_nvenc(*enc_ctx)) < 0) {
-      fprintf(stderr, "Failed to configure hevc_nvenc for stream '%d'.\n",
-        stream_ctx->in_stream_idx);
+      fprintf(stderr, "Failed to configure hevc_nvenc.\n");
       goto end;
     }
   }
