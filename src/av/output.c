@@ -66,9 +66,9 @@ int find_video_encoder(ProcessingContext *proc_ctx,
   const AVCodec **enc, int hwaccel, enum AVCodecID codec,
   char **enc_name, int *hw_enc)
 {
-  int ret = 0;
+  int enc_name_lenght = 32, ret = 0;
 
-  if (!(*enc_name = calloc(16, sizeof(char)))) {
+  if (!(*enc_name = calloc(enc_name_lenght, sizeof(char)))) {
     fprintf(stderr, "Failed to allocation encoder name for first rendition.\n");
     return AVERROR(ENOMEM);
   }
@@ -77,42 +77,42 @@ int find_video_encoder(ProcessingContext *proc_ctx,
 
   if (proc_ctx->hw_type == AV_HWDEVICE_TYPE_CUDA) {
     if (codec == AV_CODEC_ID_HEVC) {
-      snprintf(*enc_name, 16, "hevc_nvenc");
+      snprintf(*enc_name, enc_name_lenght, "hevc_nvenc");
     }
     else if (codec == AV_CODEC_ID_H264) {
-      snprintf(*enc_name, 16, "h264_nvenc");
+      snprintf(*enc_name, enc_name_lenght, "h264_nvenc");
     }
   }
   else if (proc_ctx->hw_type == AV_HWDEVICE_TYPE_QSV) {
     if (codec == AV_CODEC_ID_HEVC) {
-      snprintf(*enc_name, 16, "hevc_qsv");
+      snprintf(*enc_name, enc_name_lenght, "hevc_qsv");
     }
     else if (codec == AV_CODEC_ID_H264) {
-      snprintf(*enc_name, 16, "h264_qsv");
+      snprintf(*enc_name, enc_name_lenght, "h264_qsv");
     }
   }
   else if (proc_ctx->hw_type == AV_HWDEVICE_TYPE_VIDEOTOOLBOX) {
     if (codec == AV_CODEC_ID_HEVC) {
-      snprintf(*enc_name, 16, "hevc_videotoolbox");
+      snprintf(*enc_name, enc_name_lenght, "hevc_videotoolbox");
     }
     else if (codec == AV_CODEC_ID_H264) {
-      snprintf(*enc_name, 16, "h264_videotoolbox");
+      snprintf(*enc_name, enc_name_lenght, "h264_videotoolbox");
     }
   }
   else if (proc_ctx->hw_type == AV_HWDEVICE_TYPE_AMF) {
     if (codec == AV_CODEC_ID_HEVC) {
-      snprintf(*enc_name, 16, "hevc_amf");
+      snprintf(*enc_name, enc_name_lenght, "hevc_amf");
     }
     else if (codec == AV_CODEC_ID_H264) {
-      snprintf(*enc_name, 16, "h264_amf");
+      snprintf(*enc_name, enc_name_lenght, "h264_amf");
     }
   }
   else if (proc_ctx->hw_type == AV_HWDEVICE_TYPE_VAAPI) {
     if (codec == AV_CODEC_ID_HEVC) {
-      snprintf(*enc_name, 16, "hevc_vaapi");
+      snprintf(*enc_name, enc_name_lenght, "hevc_vaapi");
     }
     else if (codec == AV_CODEC_ID_H264) {
-      snprintf(*enc_name, 16, "h264_vaapi");
+      snprintf(*enc_name, enc_name_lenght, "h264_vaapi");
     }
   }
   else {
@@ -130,10 +130,10 @@ int find_video_encoder(ProcessingContext *proc_ctx,
 
 sw_dec:
   if (codec == AV_CODEC_ID_HEVC) {
-    snprintf(*enc_name, 16, "libx265");
+    snprintf(*enc_name, enc_name_lenght, "libx265");
   }
   else if (codec == AV_CODEC_ID_H264) {
-    snprintf(*enc_name, 16, "libx264");
+    snprintf(*enc_name, enc_name_lenght, "libx264");
   }
 
   if (!(*enc = avcodec_find_encoder_by_name(*enc_name))) {
@@ -1045,7 +1045,7 @@ int make_output_filename_string(char **out_filename,
   return 0;
 }
 
-int open_encoders_and_streams(ProcessingContext *proc_ctx, char *process_job_id)
+int open_encoders_and_streams(ProcessingContext *proc_ctx)
 {
   int out_stream_idx, ret = 0;
   StreamContext *stream_ctx;
@@ -1148,7 +1148,7 @@ int open_output(ProcessingContext *proc_ctx, char *process_job_id, sqlite3 *db)
     goto end;
   }
 
-  if ((ret = open_encoders_and_streams(proc_ctx, process_job_id)) < 0) {
+  if ((ret = open_encoders_and_streams(proc_ctx)) < 0) {
     fprintf(stderr, "Failed to open encoders and streams.\n");
     goto end;
   }
