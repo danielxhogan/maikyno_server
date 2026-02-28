@@ -1209,15 +1209,18 @@ int process_media(const char *batch_id)
   sqlite3_close(db);
   db = NULL;
 
-  time_t start, end;
-  struct tm *start_lt, *end_lt;
-  int min, sec;
+  time_t timer;
+  struct tm *lt;
+  int hour, min, sec, start_hour, start_min, start_sec, end_hour, end_min, end_sec;
 
   for (i = 0; i < batch_size; i++) {
 
-    time(&start);
-    start_lt = localtime(&start);
-    printf("start time: %d:%02d\n", start_lt->tm_min, start_lt->tm_sec);
+    time(&timer);
+    lt = localtime(&timer);
+    start_hour = lt->tm_hour;
+    start_min = lt->tm_min;
+    start_sec = lt->tm_sec;
+    printf("start time: %d:%02d:%02d\n", start_hour, start_min, start_sec);
 
     if ((ret = process_video(process_job_ids[i], batch_id)) < 0) {
       if (ret != ABORTED) {
@@ -1227,14 +1230,35 @@ int process_media(const char *batch_id)
       }
     }
 
-    time(&end);
-    end_lt = localtime(&end);
-    printf("end time: %d:%02d\n", end_lt->tm_min, end_lt->tm_sec);
+    time(&timer);
+    lt = localtime(&timer);
+    end_hour = lt->tm_hour;
+    end_min = lt->tm_min;
+    end_sec = lt->tm_sec;
+    printf("end time: %d:%02d:%02d\n", end_hour, end_min, end_sec);
 
-    min = end_lt->tm_min - start_lt->tm_min;
-    sec = end_lt->tm_sec - start_lt->tm_sec;
+    hour = end_hour - start_hour;
+    if (hour < 0) {
+      hour = hour + 12;
+    }
 
-    printf("elapsed: %d:%02d\n", min, sec);
+    min = end_min - start_min;
+    if (min < 0) {
+      min = min + 60;
+      hour = hour - 1;
+    }
+
+    sec = end_sec - start_sec;
+    if (sec < 0) {
+      sec = sec + 60;
+      min = min - 1;
+      if (min < 0) {
+        min = min + 60;
+        hour = hour - 1;
+      }
+    }
+
+    printf("elapsed: %02d:%02d:%02d\n", hour, min, sec);
   }
   
 end:
