@@ -333,6 +333,44 @@ int configure_hevc_nvenc(AVCodecContext *enc_ctx)
   return 0;
 }
 
+// int initialize_bsf(ProcessingContext *proc_ctx, AVCodecContext *enc_ctx, AVStream *out_stream)
+// {
+//   int ret;
+//   const AVBitStreamFilter *bsf = NULL;
+
+//   if (!(bsf = av_bsf_get_by_name("hevc_metadata"))) {
+//     fprintf(stderr, "Failed to get bitstream filter.\n");
+//     return AVERROR_BSF_NOT_FOUND;
+//   }
+
+//   if ((ret = av_bsf_alloc(bsf, &proc_ctx->bsf_ctx)) < 0) {
+//     fprintf(stderr, "Failed to allocate bitstream filter context.\n");
+//     return AVERROR(ENOMEM);
+//   }
+
+//   if ((ret = av_opt_set(proc_ctx->bsf_ctx, "chroma_sample_loc", 2, 0)) < 0) {
+//     fprintf(stderr, "Failed to set chroma_sample_loc on bitstream filter context.\n"
+//       "Libav Error: %s.\n", av_err2str(ret));
+//     return ret;
+//   }
+
+//   if ((ret = avcodec_parameters_to_context(proc_ctx->bsf_ctx->par_in,
+//     enc_ctx)) < 0)
+//   {
+//     fprintf(stderr, "Failed to copy parameters from encoder to bitstream filter.\n"
+//       "Libav Error: %s.\n", av_err2str(ret));
+//     return ret
+//   }
+
+//   if ((ret = av_bsf_init(proc_ctx->bsf_ctx)) < 0) {
+//     fprintf(stderr, "Failed to initialize bitstream filter.\n"
+//       "Libav Error: %s.\n", av_err2str(ret));
+//     return ret;
+//   }
+
+//   return 0;
+// }
+
 static int open_video_encoder(AVCodecContext **enc_ctx,
   ProcessingContext *proc_ctx, StreamContext *stream_ctx,
   char *in_filename, int rendition)
