@@ -1,5 +1,8 @@
-# PKG_CONFIG_PATH=/home/hugexjackedman/ffmpeg/ffmpeg_build/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig cargo run
+#!/bin/zsh
+source ~/.zshrc
 
-PKG_CONFIG_PATH=/home/hugexjackedman/ffmpeg/ffmpeg_build/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig cargo run --release
+# cargo run
 
-# PKG_CONFIG_PATH=/home/hugexjackedman/ffmpeg/ffmpeg_build/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig cargo build
+cargo run --release
+
+# cargo build
