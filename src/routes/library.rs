@@ -7,7 +7,7 @@ use crate::db::{
     }
   },
   library::{
-    create_library, MediaType
+    MediaType, create_library, select_library, create_library_dirs
   },
 };
 
@@ -36,8 +36,14 @@ struct NewLibraryInfo {
   media_type: String
 }
 
-fn create_library_dirs(new_paths: Vec<String>, root_library_dir: &String,
-  new_library_name: &String) -> Result< Vec<NewLibraryDir>, MKError>
+#[derive(Deserialize)]
+struct NewLibraryDirInfo {
+  library_id: String,
+  paths: Vec<String>,
+}
+
+fn create_new_library_dirs(new_paths: Vec<String>, root_library_dir: &String,
+  library_name: &String) -> Result< Vec<NewLibraryDir>, MKError>
 {
   let err_msg: String;
   let mut new_library_path: PathBuf;
@@ -159,7 +165,7 @@ fn create_library_dirs(new_paths: Vec<String>, root_library_dir: &String,
       root_library_dir, new_library_dir_name.to_string_lossy());
 
     static_path = format!("{}/{}",
-      new_library_name, &new_library_dir_name.to_string_lossy());
+      library_name, &new_library_dir_name.to_string_lossy());
 
     new_library_dir = NewLibraryDir {
       name: new_library_dir_name.to_string_lossy().to_string(),
@@ -216,7 +222,7 @@ pub async fn new_library(new_library_info: web::Json<NewLibraryInfo>,
 
   let mut new_library_dirs: Vec<NewLibraryDir> = vec![];
 
-  new_library_dirs = match create_library_dirs(new_library_info.paths.clone(),
+  new_library_dirs = match create_new_library_dirs(new_library_info.paths.clone(),
     &root_library_dir, &new_library_info.name)
   {
     Ok(new_library_dirs) => {new_library_dirs},
@@ -313,4 +319,84 @@ pub async fn new_library(new_library_info: web::Json<NewLibraryInfo>,
       return Err(MKError::new(MKErrorType::SerializeError, err_msg).into());
     }
   }
+}
+
+#[post("/add_library_dirs")]
+pub async fn add_library_dirs(new_library_dir_info: web::Json<NewLibraryDirInfo>,
+  pool: web::Data<DBPool>, app_state: web::Data<AppState>)
+  -> actix_web::Result<String>
+{
+  let pool_clone = pool.clone();
+  let library_id_clone = new_library_dir_info.library_id.clone();
+  let block_thread_result = web::block(|| {
+    return select_library(pool_clone, library_id_clone);
+  }).await;
+
+  let library = match block_thread_result
+  {
+    Ok(library_result) => {
+      match library_result
+      {
+        Ok(library) => { library },
+        Err(err) => {
+          return Err(err.into());
+        }
+      }
+    },
+    Err(err) => {
+      return Err(blocking_error(err).into());
+    }
+  };
+
+  let root_library_dir = format!("{}/{}",
+    app_state.root_media_dir_string, library.name);
+
+  let new_library_dirs =
+    match create_new_library_dirs(new_library_dir_info.paths.clone(),
+      &root_library_dir, &library.name)
+    {
+      Ok(new_library_dirs) => { new_library_dirs },
+      Err(err) => {
+        return Err(err.into());
+      }
+    };
+
+  let new_library_dirs_clone = new_library_dirs.clone();
+  let block_thread_result = web::block(|| {
+    return create_library_dirs(pool, new_library_dirs_clone, library.id);
+  }).await;
+
+  match block_thread_result {
+    Ok(create_library_dirs_result) => {
+      match create_library_dirs_result {
+        Ok(_) => {},
+        Err(err) => {
+          return Err(err.into());
+        }
+      }
+    },
+    Err(err) => {
+      return Err(blocking_error(err).into());
+    }
+  }
+
+  for new_library_dir in new_library_dirs
+  {
+    #[cfg(target_family = "unix")]
+    match std::os::unix::fs::symlink(&new_library_dir.real_path,
+      &new_library_dir.symlink_path)
+    {
+      Ok(_) => {},
+      Err(err) => {
+        let err_msg = format!("{:?}: {:?}\nPath: {:?}\nError: {:?}",
+          MKErrorType::LibrarySymlinkError.to_string(),
+          new_library_dir.symlink_path, &new_library_dir.real_path, err);
+        eprintln!("{err_msg:?}");
+        return Err(MKError::new(
+          MKErrorType::LibrarySymlinkError, err_msg).into());
+      }
+    }
+  }
+
+  return Ok("hi".to_string());
 }

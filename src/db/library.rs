@@ -56,10 +56,10 @@ pub fn create_library(pool: web::Data<DBPool>, new_library: NewLibrary,
           let library_dir_result = diesel::insert_into(library_dirs::table)
             .values(&library_dir).get_result::<LibraryDir>(db);
 
-            match library_dir_result {
-              Ok(_) => {},
-              Err(err) => { return Err(err); }
-            }
+          match library_dir_result {
+            Ok(_) => {},
+            Err(err) => { return Err(err); }
+          }
         }
 
         return Ok(library);
@@ -72,8 +72,7 @@ pub fn create_library(pool: web::Data<DBPool>, new_library: NewLibrary,
     Ok(library) => { Ok(library) },
     Err(err) => {
       let err_msg = format!("Failed to create new library:
-      {:?}\nError: {:?}", &new_library.name, err);
-
+        {:?}\nError: {:?}", &new_library.name, err);
       eprintln!("{err_msg:?}");
       return Err(MKError::new(MKErrorType::DBError, err_msg));
     }
@@ -120,6 +119,52 @@ pub fn select_library_dirs(pool: web::Data<DBPool>, library: Library)
     });
 
   return library_dirs_result;
+}
+
+pub fn create_library_dirs(pool: web::Data<DBPool>,
+  new_library_dirs: Vec<NewLibraryDir>, library_id: String)
+  -> Result<String, MKError>
+{
+  let mut db = match get_db_conn(pool) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
+
+  let create_library_dirs_result = db.transaction(|db| {
+    let mut library_dir: LibraryDir;
+
+    for new_library_dir in new_library_dirs {
+      library_dir = LibraryDir {
+        id: Uuid::new_v4().to_string(),
+        name: new_library_dir.name,
+        real_path: new_library_dir.real_path,
+        symlink_path: new_library_dir.symlink_path,
+        static_path: new_library_dir.static_path,
+        ino: new_library_dir.ino,
+        device_id: new_library_dir.device_id,
+        library_id: library_id.clone()
+      };
+
+      let library_dir_result = diesel::insert_into(library_dirs::table)
+        .values(&library_dir).get_result::<LibraryDir>(db);
+
+      match library_dir_result {
+        Ok(_) => {},
+        Err(err) => { return Err(err); }
+      }
+    }
+
+    return Ok("Created all new library dirs.".to_string());
+  });
+
+  match create_library_dirs_result {
+    Ok(success) => { Ok(success) },
+    Err(err) => {
+      let err_msg = format!("Failed to create new library dirs
+        \nError: {:?}", err);
+      eprintln!("{err_msg:?}");
+      return Err(MKError::new(MKErrorType::DBError, err_msg));
+    }
+  }
 }
 
 // pub fn delete_library(pool: web::Data<DBPool>, library: Library)

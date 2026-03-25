@@ -19,6 +19,8 @@ use actix_files as af;
 
 use std::{fs, env, path::PathBuf};
 
+use crate::routes::library::add_library_dirs;
+
 #[derive(Debug, Clone)]
 pub struct AppState {
   root_media_dir_pathbuf: PathBuf,
@@ -49,6 +51,7 @@ async fn main() -> std::io::Result<()>
       .app_data(web::Data::new(pool.clone()))
       .app_data(web::Data::new(app_state.clone()))
       .service(new_library)
+      .service(add_library_dirs)
       .service(scan_library)
       .service(rename_extras)
       .service(scan_media_streams)
