@@ -36,6 +36,146 @@ struct NewLibraryInfo {
   media_type: String
 }
 
+fn create_library_dirs(new_paths: Vec<String>, root_library_dir: &String,
+  new_library_name: &String) -> Result< Vec<NewLibraryDir>, MKError>
+{
+  let err_msg: String;
+  let mut new_library_path: PathBuf;
+  let mut new_library_parent: &Path;
+  let mut new_library_parent_dirs: ReadDir;
+  let mut dir_entry: DirEntry;
+  let mut new_library_dir_name: &OsStr;
+  let mut ino_opt: Option<String>;
+  let mut ino: String;
+  let mut device_id_metadata: Metadata;
+  let mut device_id_opt: Option<String>;
+  let mut device_id: String;
+  let mut symlink_path: String;
+  let mut static_path: String;
+  let mut new_library_dir: NewLibraryDir;
+  let mut new_library_dirs: Vec<NewLibraryDir> = vec![];
+
+  for new_path in new_paths.clone() {
+    ino_opt = None;
+    device_id_opt = None;
+    new_library_path = PathBuf::from(&new_path);
+
+    if !new_library_path.exists() {
+      err_msg = format!("{:?}: {:?}",
+        MKErrorType::LibraryPathNotFoundError.to_string(), &new_library_path);
+      eprintln!("{err_msg:?}");
+      return Err(MKError::new(
+        MKErrorType::LibraryPathNotFoundError, err_msg).into());
+    }
+
+    new_library_parent = match new_library_path.parent()
+    {
+      Some(new_library_parent) => { new_library_parent },
+      None => {
+        err_msg = format!("{:?}: {:?}",
+          MKErrorType::ParentDirError.to_string(), &new_library_path);
+        println!("{err_msg}");
+        return Err(MKError::new(MKErrorType::ParentDirError, err_msg).into());
+      }
+    };
+
+    new_library_parent_dirs =
+      match mk_read_dir(&new_library_parent.to_path_buf())
+      {
+        Ok(new_library_parent_dirs) => { new_library_parent_dirs },
+        Err(err) => {
+          err_msg = format!("{:?}", err.message);
+          eprintln!("{err_msg}");
+          return Err(err.into()); }
+      };
+
+    new_library_dir_name = match &new_library_path.file_name()
+    {
+      Some(new_library_dir_name) => { new_library_dir_name },
+      None => {
+        err_msg = format!("{:?}: {:?}",
+          MKErrorType::FileNameError.to_string(), &new_library_path);
+        eprintln!("{err_msg}");
+        return Err(MKError::new(MKErrorType::FileNameError, err_msg).into());
+      }
+    };
+
+    for dir_entry_result in new_library_parent_dirs
+    {
+      dir_entry = match dir_entry_result {
+        Ok(dir_entry) => { dir_entry },
+        Err(err) => {
+          eprintln!("Error: {:?}", err);
+          continue;
+        }
+      };
+
+      if dir_entry.file_name() == new_library_dir_name.to_os_string() {
+        ino_opt = Some(dir_entry.ino().to_string());
+
+        device_id_metadata = match dir_entry.metadata()
+        {
+          Ok(device_id_metadata) => { device_id_metadata },
+          Err(err) => {
+            err_msg = format!("{:?}: {:?}\nError: {:?}",
+              MKErrorType::DirEntryMetadataError.to_string(),
+              dir_entry.path(), err);
+            eprintln!("{err_msg}");
+            return Err(MKError::new(
+              MKErrorType::DirEntryMetadataError, err_msg).into());
+          }
+        };
+
+        device_id_opt = Some(device_id_metadata.dev().to_string());
+        break;
+      }
+    }
+
+    ino = match ino_opt
+    {
+      Some(ino) => { ino },
+      None => {
+        err_msg = format!("{:?}: {:?}",
+          MKErrorType::LibraryPathNotFoundError.to_string(), &new_library_path);
+        eprintln!("{err_msg:?}");
+        return Err(MKError::new(
+          MKErrorType::LibraryPathNotFoundError, err_msg).into());
+      }
+    };
+
+    device_id = match device_id_opt
+    {
+      Some(device_id) => { device_id },
+      None => {
+        err_msg = format!("{:?}: {:?}",
+          MKErrorType::LibraryPathNotFoundError.to_string(), &new_library_path);
+        eprintln!("{err_msg:?}");
+        return Err(MKError::new(
+          MKErrorType::LibraryPathNotFoundError, err_msg).into());
+      }
+    };
+
+    symlink_path = format!("{}/{}",
+      root_library_dir, new_library_dir_name.to_string_lossy());
+
+    static_path = format!("{}/{}",
+      new_library_name, &new_library_dir_name.to_string_lossy());
+
+    new_library_dir = NewLibraryDir {
+      name: new_library_dir_name.to_string_lossy().to_string(),
+      real_path: new_path.clone(),
+      symlink_path: symlink_path.clone(),
+      static_path: static_path.clone(),
+      ino: ino,
+      device_id: device_id,
+    };
+
+    new_library_dirs.push(new_library_dir);
+  }
+
+  return Ok(new_library_dirs);
+}
+
 #[post("/new_library")]
 pub async fn new_library(new_library_info: web::Json<NewLibraryInfo>,
   pool: web::Data<DBPool>, app_state: web::Data<AppState>)
@@ -74,29 +214,14 @@ pub async fn new_library(new_library_info: web::Json<NewLibraryInfo>,
     Err(err) => { return Err(err.into()); }
   };
 
-  let mut new_library_path: PathBuf;
-  let mut new_library_parent: &Path;
-  let mut new_library_parent_dirs: ReadDir;
-  let mut dir_entry: DirEntry;
-  let mut new_library_dir_name: &OsStr;
-  let mut ino_opt: Option<String>;
-  let mut ino: String;
-  let mut device_id_metadata: Metadata;
-  let mut device_id_opt: Option<String>;
-  let mut device_id: String;
-  let mut symlink_path: String;
-  let mut static_path: String;
-  let mut new_library_dir: NewLibraryDir;
   let mut new_library_dirs: Vec<NewLibraryDir> = vec![];
 
-  for new_library_info_path in new_library_info.paths.clone() {
-    ino_opt = None;
-    device_id_opt = None;
-    new_library_path = PathBuf::from(&new_library_info_path);
-
-    if !new_library_path.exists() {
-      err_msg = format!("{:?}: {:?}",
-        MKErrorType::LibraryPathNotFoundError.to_string(), &new_library_path);
+  new_library_dirs = match create_library_dirs(new_library_info.paths.clone(),
+    &root_library_dir, &new_library_info.name)
+  {
+    Ok(new_library_dirs) => {new_library_dirs},
+    Err(err) => {
+      err_msg = err.message;
 
       match mk_remove_dir_all(&root_library_dir) {
         Ok(_) => {},
@@ -109,162 +234,19 @@ pub async fn new_library(new_library_info: web::Json<NewLibraryInfo>,
       return Err(MKError::new(
         MKErrorType::LibraryPathNotFoundError, err_msg).into());
     }
+  };
 
-    new_library_parent = match new_library_path.parent()
-    {
-      Some(new_library_parent) => { new_library_parent },
-      None => {
-        err_msg = format!("{:?}: {:?}",
-          MKErrorType::ParentDirError.to_string(), &new_library_path);
-
-        match mk_remove_dir_all(&root_library_dir) {
-          Ok(_) => {},
-          Err(err) => {
-            err_msg = format!("{:?}\n{:?}", err_msg, err.message);
-          }
-        }
-
-        println!("{err_msg}");
-        return Err(MKError::new(MKErrorType::ParentDirError, err_msg).into());
-      }
-    };
-
-    new_library_parent_dirs =
-      match mk_read_dir(&new_library_parent.to_path_buf())
-      {
-        Ok(new_library_parent_dirs) => { new_library_parent_dirs },
-        Err(err) => {
-          match mk_remove_dir_all(&root_library_dir)
-          {
-            Ok(_) => {},
-            Err(rm_dir_err) => {
-              err_msg = format!("{:?}\n{:?}", err.message, rm_dir_err.message);
-              eprintln!("{err_msg}");
-              return Err(MKError::new(err.err_type, err_msg).into());
-            }
-          }
-
-          return Err(err.into()); }
-      };
-
-    new_library_dir_name = match &new_library_path.file_name() {
-      Some(new_library_dir_name) => { new_library_dir_name },
-      None => {
-        err_msg = format!("{:?}: {:?}",
-          MKErrorType::FileNameError.to_string(), &new_library_path);
-
-        match mk_remove_dir_all(&root_library_dir) {
-          Ok(_) => {},
-          Err(err) => {
-            err_msg = format!("{:?}\n{:?}", err_msg, err.message);
-          }
-        }
-
-        eprintln!("{err_msg}");
-        return Err(MKError::new(MKErrorType::FileNameError, err_msg).into());
-      }
-    };
-
-    for dir_entry_result in new_library_parent_dirs
-    {
-      dir_entry = match dir_entry_result {
-        Ok(dir_entry) => { dir_entry },
-        Err(err) => {
-          eprintln!("Error: {:?}", err);
-          continue;
-        }
-      };
-
-      if dir_entry.file_name() == new_library_dir_name.to_os_string() {
-        ino_opt = Some(dir_entry.ino().to_string());
-
-        device_id_metadata = match dir_entry.metadata() {
-          Ok(device_id_metadata) => { device_id_metadata },
-          Err(err) => {
-            err_msg = format!("{:?}: {:?}\nError: {:?}",
-              MKErrorType::DirEntryMetadataError.to_string(),
-              dir_entry.path(), err);
-
-            match mk_remove_dir_all(&root_library_dir) {
-              Ok(_) => {},
-              Err(err) => {
-                err_msg = format!("{:?}\n{:?}", err_msg, err.message);
-              }
-            }
-
-            eprintln!("{err_msg}");
-            return Err(MKError::new(
-              MKErrorType::DirEntryMetadataError, err_msg).into());
-          }
-        };
-
-        device_id_opt = Some(device_id_metadata.dev().to_string());
-        break;
-      }
-    }
-
-    ino = match ino_opt {
-      Some(ino) => { ino },
-      None => {
-        err_msg = format!("{:?}: {:?}",
-          MKErrorType::LibraryPathNotFoundError.to_string(), &new_library_path);
-
-        match mk_remove_dir_all(&root_library_dir) {
-          Ok(_) => {},
-          Err(err) => {
-            err_msg = format!("{:?}\n{:?}", err_msg, err.message);
-          }
-        }
-
-        eprintln!("{err_msg:?}");
-        return Err(MKError::new(
-          MKErrorType::LibraryPathNotFoundError, err_msg).into());
-      }
-    };
-
-    device_id = match device_id_opt {
-      Some(device_id) => { device_id },
-      None => {
-        err_msg = format!("{:?}: {:?}",
-          MKErrorType::LibraryPathNotFoundError.to_string(), &new_library_path);
-
-        match mk_remove_dir_all(&root_library_dir) {
-          Ok(_) => {},
-          Err(err) => {
-            err_msg = format!("{:?}\n{:?}", err_msg, err.message);
-          }
-        }
-
-        eprintln!("{err_msg:?}");
-        return Err(MKError::new(
-          MKErrorType::LibraryPathNotFoundError, err_msg).into());
-      }
-    };
-
-    symlink_path = format!("{}/{}",
-      root_library_dir, new_library_dir_name.to_string_lossy());
-
-    static_path = format!("{}/{}",
-      new_library_info.name, &new_library_dir_name.to_string_lossy());
-
-    new_library_dir = NewLibraryDir {
-      name: new_library_dir_name.to_string_lossy().to_string(),
-      real_path: new_library_info_path.clone(),
-      symlink_path: symlink_path.clone(),
-      static_path: static_path.clone(),
-      ino: ino,
-      device_id: device_id,
-    };
-
-    new_library_dirs.push(new_library_dir);
-
+  for new_library_dir in new_library_dirs.clone()
+  {
     #[cfg(target_family = "unix")]
-    match std::os::unix::fs::symlink(&new_library_info_path, &symlink_path) {
+    match std::os::unix::fs::symlink(&new_library_dir.real_path,
+      &new_library_dir.symlink_path)
+    {
       Ok(_) => {},
       Err(err) => {
         err_msg = format!("{:?}: {:?}\nPath: {:?}\nError: {:?}",
           MKErrorType::LibrarySymlinkError.to_string(),
-          symlink_path, &new_library_info_path, err);
+          new_library_dir.symlink_path, &new_library_dir.real_path, err);
 
         match mk_remove_dir_all(&root_library_dir) {
           Ok(_) => {},
@@ -277,7 +259,7 @@ pub async fn new_library(new_library_info: web::Json<NewLibraryInfo>,
         return Err(MKError::new(
           MKErrorType::LibrarySymlinkError, err_msg).into());
       }
-    };
+    }
   }
 
   let new_library = NewLibrary {
@@ -286,7 +268,6 @@ pub async fn new_library(new_library_info: web::Json<NewLibraryInfo>,
   };
 
   let pool_clone = pool.clone();
-
   let block_thread_result = web::block(|| {
     return create_library(pool_clone, new_library, new_library_dirs);
   }).await;
@@ -306,7 +287,6 @@ pub async fn new_library(new_library_info: web::Json<NewLibraryInfo>,
               return Err(MKError::new(err.err_type, err_msg).into());
             }
           }
-
           return Err(err.into());
         }
       }
@@ -320,7 +300,6 @@ pub async fn new_library(new_library_info: web::Json<NewLibraryInfo>,
           return Err(blocking_error(err).into());
         }
       }
-
       return Err(blocking_error(err).into());
     }
   };
@@ -330,7 +309,6 @@ pub async fn new_library(new_library_info: web::Json<NewLibraryInfo>,
     Err(err) => {
       err_msg = format!("{:?}: {:?}\nSuccessfully created library: {:?}",
         MKErrorType::SerializeError.to_string(), err, library.name);
-
       eprintln!("{err_msg}");
       return Err(MKError::new(MKErrorType::SerializeError, err_msg).into());
     }

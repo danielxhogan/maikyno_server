@@ -45,6 +45,7 @@ pub struct LibraryDir {
   pub library_id: String
 }
 
+#[derive(Debug, Clone)]
 pub struct NewLibraryDir {
   pub ino: String,
   pub device_id: String,
