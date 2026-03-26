@@ -92,12 +92,28 @@ pub fn select_library(pool: web::Data<DBPool>, library_id: String)
     .map_err(|err| {
       let err_msg = format!("Failed to get library: {:?}\nError: {:?}",
         library_id, err);
-
       eprintln!("{err_msg:?}");
       return MKError::new(MKErrorType::DBError, err_msg);
     });
 
   return library_result;
+}
+
+pub fn select_libraries(pool: web::Data<DBPool>) -> Result<Vec<Library>, MKError>
+{
+  let mut db = match get_db_conn(pool) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
+
+  let libraries_result = libraries::table
+    .get_results(&mut db)
+    .map_err(|err| {
+      let err_msg = format!("Failed to get libraries\nError: {:?}", err);
+      eprintln!("{err_msg:?}");
+      return MKError::new(MKErrorType::DBError, err_msg);
+    });
+
+    return libraries_result;
 }
 
 pub fn select_library_dirs(pool: web::Data<DBPool>, library: Library)

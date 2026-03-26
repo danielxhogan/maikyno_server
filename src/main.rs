@@ -9,7 +9,7 @@ mod av;
 use db::config::db_connect::db_pool_init;
 
 use routes::{
-  library::new_library,
+  library::{new_library, add_library_dirs, get_libraries},
   scan_library::scan_library,
   proc::{rename_extras, scan_media_streams, process_media, abort_batch}
 };
@@ -18,8 +18,6 @@ use actix_web::{web, App, HttpServer};
 use actix_files as af;
 
 use std::{fs, env, path::PathBuf};
-
-use crate::routes::library::add_library_dirs;
 
 #[derive(Debug, Clone)]
 pub struct AppState {
@@ -52,6 +50,7 @@ async fn main() -> std::io::Result<()>
       .app_data(web::Data::new(app_state.clone()))
       .service(new_library)
       .service(add_library_dirs)
+      .service(get_libraries)
       .service(scan_library)
       .service(rename_extras)
       .service(scan_media_streams)

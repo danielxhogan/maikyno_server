@@ -2,12 +2,15 @@ use crate::db::{
   config::{
     db_connect::DBPool,
     models::{
-      NewLibrary,
-      NewLibraryDir
+      Library, NewLibrary, NewLibraryDir
     }
   },
   library::{
-    MediaType, create_library, select_library, create_library_dirs
+    MediaType,
+    create_library,
+    create_library_dirs,
+    select_library,
+    select_libraries
   },
 };
 
@@ -18,7 +21,7 @@ use crate::utils::{
   mk_fs::{mk_create_dir_all, mk_remove_dir_all, mk_read_dir}
 };
 
-use actix_web::{post, web};
+use actix_web::{Responder, post, web};
 use serde::Deserialize;
 use serde_json;
 
@@ -399,4 +402,29 @@ pub async fn add_library_dirs(new_library_dir_info: web::Json<NewLibraryDirInfo>
   }
 
   return Ok("hi".to_string());
+}
+
+#[post("/get_libraries")]
+pub async fn get_libraries(pool: web::Data<DBPool>)
+  -> impl Responder
+{
+  let block_thread_result = web::block(|| {
+    return select_libraries(pool);
+  }).await;
+
+  let libraries = match block_thread_result
+  {
+    Ok(libraries_result) => {
+      match libraries_result
+      {
+        Ok(libraries) => { libraries },
+        Err(err) => { return Err(err) }
+      }
+    },
+    Err(err) => {
+      return Err(blocking_error(err));
+    }
+  };
+
+  return Ok(web::Json(libraries));
 }
