@@ -106,7 +106,7 @@ pub fn select_libraries(pool: web::Data<DBPool>) -> Result<Vec<Library>, MKError
   };
 
   let libraries_result = libraries::table
-    .get_results(&mut db)
+    .get_results::<Library>(&mut db)
     .map_err(|err| {
       let err_msg = format!("Failed to get libraries\nError: {:?}", err);
       eprintln!("{err_msg:?}");

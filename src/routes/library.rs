@@ -1,9 +1,7 @@
 use crate::db::{
   config::{
     db_connect::DBPool,
-    models::{
-      Library, NewLibrary, NewLibraryDir
-    }
+    models::{NewLibrary, NewLibraryDir}
   },
   library::{
     MediaType,
@@ -12,6 +10,7 @@ use crate::db::{
     select_library,
     select_libraries
   },
+  media::{select_movies, select_media_dir, select_videos}
 };
 
 use crate::AppState;
@@ -43,6 +42,16 @@ struct NewLibraryInfo {
 struct NewLibraryDirInfo {
   library_id: String,
   paths: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct GetMoviesInfo {
+  library_id: String,
+}
+
+#[derive(Deserialize)]
+struct GetVideosInfo {
+  media_dir_id: String,
 }
 
 fn create_new_library_dirs(new_paths: Vec<String>, root_library_dir: &String,
@@ -418,7 +427,7 @@ pub async fn get_libraries(pool: web::Data<DBPool>)
       match libraries_result
       {
         Ok(libraries) => { libraries },
-        Err(err) => { return Err(err) }
+        Err(err) => { return Err(err); }
       }
     },
     Err(err) => {
@@ -427,4 +436,94 @@ pub async fn get_libraries(pool: web::Data<DBPool>)
   };
 
   return Ok(web::Json(libraries));
+}
+
+#[post("/get_movies")]
+pub async fn get_movies(get_media_dirs_info: web::Json<GetMoviesInfo>,
+  pool: web::Data<DBPool>) -> impl Responder
+{
+  let pool_clone = pool.clone();
+  let library_id_clone = get_media_dirs_info.library_id.clone();
+  let block_thread_result = web::block(|| {
+    return select_library(pool_clone, library_id_clone);
+  }).await;
+
+  let library = match block_thread_result
+  {
+    Ok(library_result) => {
+      match library_result
+      {
+        Ok(library) => { library },
+        Err(err) => { return  Err(err); }
+      }
+    },
+    Err(err) => {
+      return Err(blocking_error(err));
+    }
+  };
+
+  let block_thread_result = web::block(|| {
+    return select_movies(pool, library)
+  }).await;
+
+  let media_dirs = match block_thread_result
+  {
+    Ok(media_dirs_result) => {
+      match media_dirs_result
+      {
+        Ok(media_dirs) => { media_dirs },
+        Err(err) => { return Err(err); }
+      }
+    },
+    Err(err) => {
+      return Err(blocking_error(err));
+    }
+  };
+
+  return Ok(web::Json(media_dirs));
+}
+
+#[post("/get_videos")]
+pub async fn get_videos(get_videos_info: web::Json<GetVideosInfo>,
+  pool: web::Data<DBPool>) -> impl Responder
+{
+  let pool_clone = pool.clone();
+  let media_dir_id_clone = get_videos_info.media_dir_id.clone();
+  let block_thread_result = web::block(|| {
+    return select_media_dir(pool_clone, media_dir_id_clone);
+  }).await;
+
+  let media_dir = match block_thread_result
+  {
+    Ok(media_dir_result) => {
+      match media_dir_result
+      {
+        Ok(media_dir) => { media_dir },
+        Err(err) => { return Err(err); }
+      }
+    },
+    Err(err) => {
+      return Err(blocking_error(err));
+    }
+  };
+
+  let block_thread_result = web::block(|| {
+    return select_videos(pool, media_dir);
+  }).await;
+
+  let videos = match block_thread_result
+  {
+    Ok(videos_result) => {
+      match videos_result
+      {
+        Ok(videos) => { videos },
+        Err(err) => { return Err(err) }
+      }
+    },
+    Err(err) => {
+      return Err(blocking_error(err));
+    }
+  };
+
+  return Ok(web::Json(videos));
 }

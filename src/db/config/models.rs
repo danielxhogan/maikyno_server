@@ -191,7 +191,7 @@ pub struct UpdateShow {
   pub static_path: String,
 }
 
-#[derive(Debug, Insertable, Queryable, Clone, Deserialize)]
+#[derive(Debug, Insertable, Queryable, Clone, Deserialize, Serialize)]
 #[diesel(table_name = media_dirs)]
 pub struct MediaDir {
   pub id: String,
@@ -247,7 +247,7 @@ pub struct UpdateMediaDir {
   pub static_path: String
 }
 
-#[derive(Debug, Insertable, Queryable, Clone, Deserialize)]
+#[derive(Debug, Insertable, Queryable, Clone, Deserialize, Serialize)]
 #[diesel(table_name = videos)]
 pub struct Video {
   pub id: String,

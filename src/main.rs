@@ -9,7 +9,13 @@ mod av;
 use db::config::db_connect::db_pool_init;
 
 use routes::{
-  library::{new_library, add_library_dirs, get_libraries},
+  library::{
+    new_library,
+    add_library_dirs,
+    get_libraries,
+    get_movies,
+    get_videos
+  },
   scan_library::scan_library,
   proc::{rename_extras, scan_media_streams, process_media, abort_batch}
 };
@@ -52,6 +58,8 @@ async fn main() -> std::io::Result<()>
       .service(add_library_dirs)
       .service(get_libraries)
       .service(scan_library)
+      .service(get_movies)
+      .service(get_videos)
       .service(rename_extras)
       .service(scan_media_streams)
       .service(process_media)
