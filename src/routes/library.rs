@@ -1,7 +1,7 @@
 use crate::db::{
   config::{
     db_connect::DBPool,
-    models::{NewLibrary, NewLibraryDir}
+    models::{NewLibrary, NewLibraryDir, UpdateVideo}
   },
   library::{
     MediaType,
@@ -10,7 +10,14 @@ use crate::db::{
     select_library,
     select_libraries
   },
-  media::{select_seasons_by_id, select_movies, select_media_dir, select_videos},
+  media::{
+    select_seasons_by_id,
+    select_movies,
+    select_media_dir,
+    select_video,
+    select_videos,
+    update_video
+  },
   show::{select_shows_by_id}
 };
 
@@ -63,6 +70,16 @@ struct GetSeasonsParams {
 #[derive(Deserialize)]
 struct GetVideosInfo {
   media_dir_id: String,
+}
+
+#[derive(Deserialize)]
+struct UpdateVideoPlaybackStateParams {
+  video_id: String,
+  ts: i32,
+  v_stream: i32,
+  a_stream: i32,
+  s_stream: i32,
+  s_pos: i32
 }
 
 fn create_new_library_dirs(new_paths: Vec<String>, root_library_dir: &String,
@@ -589,4 +606,68 @@ pub async fn get_videos(get_videos_info: web::Json<GetVideosInfo>,
   };
 
   return Ok(web::Json(videos));
+}
+
+#[post("/update_video_playback_state")]
+pub async fn update_video_playback_state(
+  update_video_playback_state_params: web::Json<UpdateVideoPlaybackStateParams>,
+  pool: web::Data<DBPool>) -> actix_web::Result<String>
+{
+  let pool_clone = pool.clone();
+  let video_id_clone = update_video_playback_state_params.video_id.clone();
+  let block_thread_result = web::block(|| {
+    return select_video(pool_clone, video_id_clone);
+  }).await;
+
+  let video = match block_thread_result
+  {
+    Ok(video_result) => {
+      match video_result
+      {
+        Ok(video) => { video },
+        Err(err) => {
+          return Err(err.into());
+        }
+      }
+    },
+    Err(err) => {
+      return Err(blocking_error(err).into());
+    }
+  };
+
+  let update_video_info = UpdateVideo {
+    id: video.id,
+    name: video.name,
+    real_path: Some(video.real_path),
+    static_path: Some(video.static_path),
+    extra: video.extra,
+    processed: video.processed,
+    ts: update_video_playback_state_params.ts,
+    v_stream: update_video_playback_state_params.v_stream,
+    a_stream: update_video_playback_state_params.a_stream,
+    s_stream: update_video_playback_state_params.s_stream,
+    s_pos: update_video_playback_state_params.s_pos
+  };
+
+  let block_thread_result = web::block(|| {
+    return update_video(pool, update_video_info);
+  }).await;
+
+  let updated_video = match block_thread_result
+  {
+    Ok(updated_video_result) => {
+      match updated_video_result
+      {
+        Ok(update_video) => { update_video },
+        Err(err) => {
+          return Err(err.into());
+        }
+      }
+    },
+    Err(err) => {
+      return Err(blocking_error(err).into());
+    }
+  };
+
+  return Ok("hi".to_string());
 }

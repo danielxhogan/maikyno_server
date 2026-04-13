@@ -284,7 +284,12 @@ pub struct UpdateVideo {
   pub real_path: Option<String>,
   pub static_path: Option<String>,
   pub extra: bool,
-  pub processed: bool
+  pub processed: bool,
+  pub ts: i32,
+  pub v_stream: i32,
+  pub a_stream: i32,
+  pub s_stream: i32,
+  pub s_pos: i32,
 }
 
 // proc

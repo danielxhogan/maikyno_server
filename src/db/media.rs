@@ -369,7 +369,12 @@ pub fn update_video(pool: web::Data<DBPool>, update_video: UpdateVideo)
       videos::real_path.eq(real_path),
       videos::static_path.eq(static_path),
       videos::extra.eq(update_video.extra),
-      videos::processed.eq(update_video.processed)
+      videos::processed.eq(update_video.processed),
+      videos::ts.eq(update_video.ts),
+      videos::v_stream.eq(update_video.v_stream),
+      videos::a_stream.eq(update_video.a_stream),
+      videos::s_stream.eq(update_video.s_stream),
+      videos::s_pos.eq(update_video.s_pos),
     ))
     .get_result(&mut db)
     .map_err(|err| {

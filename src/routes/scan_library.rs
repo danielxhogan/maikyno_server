@@ -734,7 +734,12 @@ async fn check_seen_video(video: &DirEntry,
         real_path: real_path,
         static_path: static_path,
         extra: is_extras_dir,
-        processed: video_seen.processed
+        processed: video_seen.processed,
+        ts: video_seen.video.ts.clone(),
+        v_stream: video_seen.video.v_stream.clone(),
+        a_stream: video_seen.video.a_stream.clone(),
+        s_stream: video_seen.video.s_stream.clone(),
+        s_pos: video_seen.video.s_pos.clone()
       };
 
       let pool_clone = pool.clone();
