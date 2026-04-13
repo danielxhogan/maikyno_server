@@ -14,6 +14,7 @@ use routes::{
     add_library_dirs,
     get_libraries,
     get_movies,
+    get_shows,
     get_videos
   },
   scan_library::scan_library,
@@ -59,6 +60,7 @@ async fn main() -> std::io::Result<()>
       .service(get_libraries)
       .service(scan_library)
       .service(get_movies)
+      .service(get_shows)
       .service(get_videos)
       .service(rename_extras)
       .service(scan_media_streams)

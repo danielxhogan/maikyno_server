@@ -158,7 +158,7 @@ pub struct DeleteCollectionMovie {
   pub collection_name: String
 }
 
-#[derive(Debug, Insertable, Queryable, Clone)]
+#[derive(Debug, Insertable, Queryable, Clone, Serialize)]
 #[diesel(table_name = shows)]
 pub struct Show {
   pub id: String,

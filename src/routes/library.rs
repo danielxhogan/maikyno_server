@@ -10,7 +10,8 @@ use crate::db::{
     select_library,
     select_libraries
   },
-  media::{select_movies, select_media_dir, select_videos}
+  media::{select_movies, select_media_dir, select_videos},
+  show::{select_shows_by_id}
 };
 
 use crate::AppState;
@@ -46,6 +47,11 @@ struct NewLibraryDirInfo {
 
 #[derive(Deserialize)]
 struct GetMoviesInfo {
+  library_id: String,
+}
+
+#[derive(Deserialize)]
+struct GetShowsParams {
   library_id: String,
 }
 
@@ -439,11 +445,11 @@ pub async fn get_libraries(pool: web::Data<DBPool>)
 }
 
 #[post("/get_movies")]
-pub async fn get_movies(get_media_dirs_info: web::Json<GetMoviesInfo>,
+pub async fn get_movies(get_movies_info: web::Json<GetMoviesInfo>,
   pool: web::Data<DBPool>) -> impl Responder
 {
   let pool_clone = pool.clone();
-  let library_id_clone = get_media_dirs_info.library_id.clone();
+  let library_id_clone = get_movies_info.library_id.clone();
   let block_thread_result = web::block(|| {
     return select_library(pool_clone, library_id_clone);
   }).await;
@@ -481,6 +487,32 @@ pub async fn get_movies(get_media_dirs_info: web::Json<GetMoviesInfo>,
   };
 
   return Ok(web::Json(media_dirs));
+}
+
+#[post("/get_shows")]
+pub async fn get_shows(get_shows_params: web::Json<GetShowsParams>,
+  pool: web::Data<DBPool>) -> impl Responder
+{
+  let library_id_clone = get_shows_params.library_id.clone();
+  let block_thread_result = web::block(|| {
+    return select_shows_by_id(library_id_clone, pool);
+  }).await;
+
+  let shows = match block_thread_result
+  {
+    Ok(shows_result) => {
+      match shows_result
+      {
+        Ok(shows) => { shows },
+        Err(err) => { return Err(err); }
+      }
+    },
+    Err(err) => {
+      return Err(blocking_error(err));
+    }
+  };
+
+  return Ok(web::Json(shows));
 }
 
 #[post("/get_videos")]

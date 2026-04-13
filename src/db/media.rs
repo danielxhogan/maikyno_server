@@ -397,4 +397,3 @@ pub fn delete_videos(pool: web::Data<DBPool>, media_dir: MediaDir)
 
   return deleted_videos_result;
 }
-

@@ -67,6 +67,28 @@ pub fn select_shows(pool: web::Data<DBPool>, library: Library)
     return shows_result;
 }
 
+pub fn select_shows_by_id(library_id: String, pool: web::Data<DBPool>)
+  ->Result<Vec<Show>, MKError>
+{
+  let mut db = match get_db_conn(pool) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
+
+  let shows_result = shows::table
+    .filter(shows::library_id.eq(&library_id))
+    .get_results::<Show>(&mut db)
+    .map_err(|err| {
+      let err_msg = format!(
+        "Failed to get shows for library_id: {:?}\nError: {:?}",
+        library_id, err);
+
+      eprintln!("{err_msg:?}");
+      return MKError::new(MKErrorType::DBError, err_msg);
+    });
+
+    return shows_result;
+}
+
 pub fn update_show(pool: web::Data<DBPool>, update_show: UpdateShow)
   -> Result<Show, MKError>
 {
