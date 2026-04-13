@@ -6,4 +6,4 @@ file = "src/db/config/schema.rs"
 custom_type_derives = ["diesel::query_builder::QueryId", "Clone"]
 
 [migrations_directory]
-dir = "/home/hugexjackedman/maikyno/app/maikyno_server/migrations"
+dir = "/home/hugexjackedman/maikyno/maikyno_server/migrations"

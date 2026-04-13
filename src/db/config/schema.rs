@@ -166,6 +166,11 @@ diesel::table! {
         extra -> Bool,
         processed -> Bool,
         thumbnail_url -> Nullable<Text>,
+        ts -> Integer,
+        v_stream -> Integer,
+        a_stream -> Integer,
+        s_stream -> Integer,
+        s_pos -> Integer,
         media_dir_id -> Text,
     }
 }

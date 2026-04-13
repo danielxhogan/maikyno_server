@@ -260,6 +260,11 @@ pub struct Video {
   pub extra: bool,
   pub processed: bool,
   pub thumbnail_url: Option<String>,
+  pub ts: i32,
+  pub v_stream: i32,
+  pub a_stream: i32,
+  pub s_stream: i32,
+  pub s_pos: i32,
   pub media_dir_id: String
 }
 

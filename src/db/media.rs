@@ -266,6 +266,11 @@ pub fn create_video(pool: web::Data<DBPool>, new_video: NewVideo)
     extra: new_video.extra,
     processed: new_video.processed,
     thumbnail_url: new_video.thumbnail_url,
+    ts: 0,
+    v_stream: 1,
+    a_stream: 1,
+    s_stream: 1,
+    s_pos: 100,
     media_dir_id: new_video.media_dir_id.clone()
   };
 

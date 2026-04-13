@@ -9,5 +9,11 @@ CREATE TABLE IF NOT EXISTS videos (
   extra BOOL NOT NULL,
   processed BOOL NOT NULL,
   thumbnail_url VARCHAR,
+  ts INT NOT NULL,
+  v_stream INT NOT NULL,
+  a_stream INT NOT NULL,
+  s_stream INT NOT NULL,
+  s_pos INT NOT NULL,
   media_dir_id VARCHAR REFERENCES media_dirs(id) NOT NULL
 );
+
