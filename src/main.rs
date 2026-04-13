@@ -13,12 +13,13 @@ use routes::{
     new_library,
     add_library_dirs,
     get_libraries,
-    get_movies,
     get_shows,
+    get_seasons,
+    get_movies,
     get_videos
   },
   scan_library::scan_library,
-  proc::{rename_extras, scan_media_streams, process_media, abort_batch}
+  proc::{ rename_extras, scan_media_streams, process_media, abort_batch }
 };
 
 use actix_web::{web, App, HttpServer};
@@ -59,8 +60,9 @@ async fn main() -> std::io::Result<()>
       .service(add_library_dirs)
       .service(get_libraries)
       .service(scan_library)
-      .service(get_movies)
       .service(get_shows)
+      .service(get_seasons)
+      .service(get_movies)
       .service(get_videos)
       .service(rename_extras)
       .service(scan_media_streams)

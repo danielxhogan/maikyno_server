@@ -10,7 +10,7 @@ use crate::db::{
     select_library,
     select_libraries
   },
-  media::{select_movies, select_media_dir, select_videos},
+  media::{select_seasons_by_id, select_movies, select_media_dir, select_videos},
   show::{select_shows_by_id}
 };
 
@@ -53,6 +53,11 @@ struct GetMoviesInfo {
 #[derive(Deserialize)]
 struct GetShowsParams {
   library_id: String,
+}
+
+#[derive(Deserialize)]
+struct GetSeasonsParams {
+  show_id: String,
 }
 
 #[derive(Deserialize)]
@@ -444,6 +449,58 @@ pub async fn get_libraries(pool: web::Data<DBPool>)
   return Ok(web::Json(libraries));
 }
 
+#[post("/get_shows")]
+pub async fn get_shows(get_shows_params: web::Json<GetShowsParams>,
+  pool: web::Data<DBPool>) -> impl Responder
+{
+  let library_id_clone = get_shows_params.library_id.clone();
+  let block_thread_result = web::block(|| {
+    return select_shows_by_id(library_id_clone, pool);
+  }).await;
+
+  let shows = match block_thread_result
+  {
+    Ok(shows_result) => {
+      match shows_result
+      {
+        Ok(shows) => { shows },
+        Err(err) => { return Err(err); }
+      }
+    },
+    Err(err) => {
+      return Err(blocking_error(err));
+    }
+  };
+
+  return Ok(web::Json(shows));
+}
+
+#[post("/get_seasons")]
+pub async fn get_seasons(get_seasons_params: web::Json<GetSeasonsParams>,
+  pool: web::Data<DBPool>) -> impl Responder
+{
+  let show_id_clone = get_seasons_params.show_id.clone();
+  let block_thread_result = web::block(|| {
+    return select_seasons_by_id(show_id_clone, pool);
+  }).await;
+
+  let seasons = match block_thread_result
+  {
+    Ok(seasons_result) => {
+      match seasons_result
+      {
+        Ok(seasons) => { seasons },
+        Err(err) => { return Err(err); }
+      }
+    },
+    Err(err) => {
+      return Err(blocking_error(err));
+    }
+  };
+
+  return Ok(web::Json(seasons));
+}
+
 #[post("/get_movies")]
 pub async fn get_movies(get_movies_info: web::Json<GetMoviesInfo>,
   pool: web::Data<DBPool>) -> impl Responder
@@ -487,32 +544,6 @@ pub async fn get_movies(get_movies_info: web::Json<GetMoviesInfo>,
   };
 
   return Ok(web::Json(media_dirs));
-}
-
-#[post("/get_shows")]
-pub async fn get_shows(get_shows_params: web::Json<GetShowsParams>,
-  pool: web::Data<DBPool>) -> impl Responder
-{
-  let library_id_clone = get_shows_params.library_id.clone();
-  let block_thread_result = web::block(|| {
-    return select_shows_by_id(library_id_clone, pool);
-  }).await;
-
-  let shows = match block_thread_result
-  {
-    Ok(shows_result) => {
-      match shows_result
-      {
-        Ok(shows) => { shows },
-        Err(err) => { return Err(err); }
-      }
-    },
-    Err(err) => {
-      return Err(blocking_error(err));
-    }
-  };
-
-  return Ok(web::Json(shows));
 }
 
 #[post("/get_videos")]

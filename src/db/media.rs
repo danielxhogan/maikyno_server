@@ -130,6 +130,28 @@ pub fn select_seasons(pool: web::Data<DBPool>, show: Show)
   return media_result;
 }
 
+pub fn select_seasons_by_id(show_id: String, pool: web::Data<DBPool>)
+  -> Result<Vec<MediaDir>, MKError>
+{
+  let mut db = match get_db_conn(pool) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
+
+  let media_result = media_dirs::table
+    .filter(media_dirs::show_id.eq(&show_id))
+    .get_results::<MediaDir>(&mut db)
+    .map_err(|err| {
+      let err_msg = format!(
+        "Failed to get seasons for show_id: {:?}\nError: {:?}",
+        show_id, err);
+
+      eprintln!("{err_msg:?}");
+      return MKError::new(MKErrorType::DBError, err_msg);
+    });
+
+  return media_result;
+}
+
 pub fn update_media_dir(pool: web::Data<DBPool>,
   update_media_dir: UpdateMediaDir) -> Result<MediaDir, MKError>
 {
