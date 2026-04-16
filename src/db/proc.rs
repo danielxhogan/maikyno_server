@@ -2,6 +2,9 @@ use crate::db::{
   config::{
     db_connect::{get_db_conn, DBPool},
     models::{
+      Stream,
+      VideoStreams,
+      MediaDirStreams,
       ProcessJob,
       ProcessJobVideoStream,
       ProcessJobAudioStream,
@@ -9,6 +12,7 @@ use crate::db::{
       Batch,
     },
     schema::{
+      streams,
       process_jobs,
       process_job_video_streams,
       process_job_audio_streams,
@@ -16,7 +20,7 @@ use crate::db::{
       batches,
     }
   },
-  media::select_video
+  media::{select_video, select_videos_by_id}
 };
 
 use crate::utils::{
@@ -27,6 +31,78 @@ use crate::utils::{
 use actix_web::web;
 use diesel::prelude::*;
 use uuid::Uuid;
+
+pub async fn get_media_dir_streams(media_dir_id: String,
+  pool: web::Data<DBPool>) -> Result<MediaDirStreams, MKError>
+{
+  let pool_clone = pool.clone();
+  let media_dir_id_clone = media_dir_id.clone();
+
+  let videos = match select_videos_by_id(pool_clone, media_dir_id_clone) {
+    Ok(videos) => { videos },
+    Err(err) => { return Err(err); }
+  };
+
+  let mut db = match get_db_conn(pool.clone()) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
+
+  let mut media_dirs_streams: MediaDirStreams = vec![] ;
+
+  for video in videos.clone() {
+    if video.extra { continue; }
+
+    let streams_result = streams::table
+      .filter(streams::video_id.eq(&video.id))
+      .get_results::<Stream>(&mut db)
+      .map_err(|err| {
+        let mut err_msg = format!("Failed to get video with id: '{}'. ",
+          video.id);
+        err_msg = format!("{err_msg}Error: {}.", err);
+        eprintln!("{err_msg:?}");
+      });
+
+    let streams = match streams_result {
+      Ok(streams) => { streams },
+      Err(_err) => { continue; }
+    };
+
+    let video_streams = VideoStreams {
+      video: video,
+      streams: streams
+    };
+
+    media_dirs_streams.push(video_streams);
+  }
+
+  for video in videos {
+    if !video.extra { continue; }
+
+    let streams_result = streams::table
+      .filter(streams::video_id.eq(&video.id))
+      .get_results::<Stream>(&mut db)
+      .map_err(|err| {
+        let mut err_msg = format!("Failed to get video with id: '{}'. ",
+          video.id);
+        err_msg = format!("{err_msg}Error: {}.", err);
+        eprintln!("{err_msg:?}");
+      });
+
+    let streams = match streams_result {
+      Ok(streams) => { streams },
+      Err(_err) => { continue; }
+    };
+
+    let video_streams = VideoStreams {
+      video: video,
+      streams: streams
+    };
+
+    media_dirs_streams.push(video_streams);
+  }
+
+  return Ok(media_dirs_streams);
+}
 
 pub async fn create_batch(process_media_info: ProcessMediaInfo,
   pool: web::Data<DBPool>) -> Result<Batch, MKError>

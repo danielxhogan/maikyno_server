@@ -1,7 +1,11 @@
 use crate::db::{
   config::db_connect::DBPool,
   media::select_media_dir,
-  proc::{create_batch, update_batch_abort}
+  proc::{
+    get_media_dir_streams,
+    create_batch,
+    update_batch_abort
+  }
 };
 
 use crate::utils::{
@@ -12,7 +16,7 @@ use crate::utils::{
 
 use crate::av;
 
-use actix_web::{post, web};
+use actix_web::{Responder, post, web};
 use serde::Deserialize;
 
 use std::{
@@ -138,9 +142,9 @@ pub async fn rename_extras(rename_extras_info: web::Json<RenameExtrasInfo>,
 }
 
 #[post("/scan_media_streams")]
-async fn scan_media_streams(
-  scan_media_dir_streams_info: web::Json<ScanMediaDirStreamsInfo>)
-  -> actix_web::Result<String>
+pub async fn scan_media_streams(
+  scan_media_dir_streams_info: web::Json<ScanMediaDirStreamsInfo>,
+  pool: web::Data<DBPool>) -> impl Responder
 {
   unsafe {
     let media_dir_id_c_str =
@@ -152,7 +156,7 @@ async fn scan_media_streams(
 
           eprintln!("{err_msg}");
           return Err(MKError::new(MKErrorType::RustToCTypeConversionError,
-            err_msg).into());
+            err_msg));
         }
       };
 
@@ -160,7 +164,23 @@ async fn scan_media_streams(
     av::scan_media_streams(media_dir_id_c_char);
   }
 
-  return Ok("hello".to_string());
+  let media_dir_id_clone = scan_media_dir_streams_info.media_dir_id.clone();
+  let block_thread_result = web::block(|| {
+    return get_media_dir_streams(media_dir_id_clone, pool);
+  }).await;
+
+  let media_dir_streams = match block_thread_result
+  {
+    Ok(media_dir_streams_result) => {
+      match media_dir_streams_result.await {
+        Ok(media_dir_streams) => { media_dir_streams },
+        Err(err) => { return Err(err.into()); }
+      }
+    },
+    Err(err) => { return Err(blocking_error(err).into()); }
+  };
+
+  return Ok(web::Json(media_dir_streams));
 }
 
 #[post("/process_media")]

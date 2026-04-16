@@ -16,4 +16,3 @@ CREATE TABLE IF NOT EXISTS videos (
   s_pos INT NOT NULL,
   media_dir_id VARCHAR REFERENCES media_dirs(id) NOT NULL
 );
-

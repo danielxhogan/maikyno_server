@@ -294,6 +294,28 @@ pub struct UpdateVideo {
 
 // proc
 // *****************************************************
+#[derive(Debug, Queryable, Clone, Serialize)]
+#[diesel(table_name = streams)]
+pub struct Stream {
+  id: String,
+  stream_idx: i32,
+  title: Option<String>,
+  stream_type: i32,
+  codec: String,
+  height: Option<i32>,
+  width: Option<i32>,
+  interlaced: Option<bool>,
+  video_id: String
+}
+
+#[derive(Serialize)]
+pub struct VideoStreams {
+  pub video: Video,
+  pub streams: Vec<Stream>
+}
+
+pub type MediaDirStreams = Vec<VideoStreams>;
+
 #[derive(Debug, Insertable, Queryable, Clone)]
 #[diesel(table_name = process_jobs)]
 pub struct ProcessJob {

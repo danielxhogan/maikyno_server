@@ -317,10 +317,33 @@ pub fn select_videos(pool: web::Data<DBPool>, media_dir: MediaDir)
 
   let videos_result = videos::table
     .filter(videos::media_dir_id.eq(&media_dir.id))
+    .order_by(videos::name)
     .get_results::<Video>(&mut db)
     .map_err(|err| {
       let err_msg = format!("Failed to get videos for media dir:
         {:?}, {:?}\nError: {:?}", media_dir.name, media_dir.id, err);
+
+      eprintln!("{err_msg:?}");
+      return MKError::new(MKErrorType::DBError, err_msg);
+    });
+
+  return videos_result;
+}
+
+pub fn select_videos_by_id(pool: web::Data<DBPool>, media_dir_id: String)
+  -> Result<Vec<Video>, MKError>
+{
+  let mut db = match get_db_conn(pool) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
+
+  let videos_result = videos::table
+    .filter(videos::media_dir_id.eq(&media_dir_id))
+    .order_by(videos::name)
+    .get_results::<Video>(&mut db)
+    .map_err(|err| {
+      let err_msg = format!("Failed to get videos for media dir:
+        {:?}\nError: {:?}", media_dir_id, err);
 
       eprintln!("{err_msg:?}");
       return MKError::new(MKErrorType::DBError, err_msg);

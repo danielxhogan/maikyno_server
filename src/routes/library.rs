@@ -653,12 +653,12 @@ pub async fn update_video_playback_state(
     return update_video(pool, update_video_info);
   }).await;
 
-  let updated_video = match block_thread_result
+  match block_thread_result
   {
     Ok(updated_video_result) => {
       match updated_video_result
       {
-        Ok(update_video) => { update_video },
+        Ok(_) => { },
         Err(err) => {
           return Err(err.into());
         }
