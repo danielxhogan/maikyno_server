@@ -709,9 +709,23 @@ int get_processing_info(ProcessingContext *proc_ctx,
   return 0;
 }
 
+typedef struct HWDeviceTypeFormatPair {
+  enum AVHWDeviceType type;
+  enum AVPixelFormat fmt;
+} HWDeviceTypeFormatPair;
+
 int hw_context_init(ProcessingContext *proc_ctx)
 {
   int i = 0, ret = 0;
+
+  HWDeviceTypeFormatPair hw_type_fmt_pairs[] = {
+    {
+      .type = AV_HWDEVICE_TYPE_CUDA,
+      .fmt = AV_PIX_FMT_CUDA
+    },
+    // TODO: fill in the rest of the pairs
+    {0}
+  };
 
   enum AVHWDeviceType hw_types[] = {
     AV_HWDEVICE_TYPE_CUDA,

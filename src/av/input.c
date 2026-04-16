@@ -59,8 +59,7 @@ int init_hw_dec_ctx(ProcessingContext *proc_ctx, const AVCodec *dec)
 {
   const AVCodecHWConfig *config;
 
-  for (int i = 0;; i++)
-  {
+  for (int i = 0;; i++) {
     if(!(config = avcodec_get_hw_config(dec, i))) {
       fprintf(stderr, "Decoder %s does not support device type %s.\n",
         dec->name, av_hwdevice_get_type_name(proc_ctx->hw_type));
@@ -138,6 +137,7 @@ static int open_decoder(ProcessingContext *proc_ctx,
     return ret;
   }
 
+  // TODO: move to init_hw_dec_ctx
   if (proc_ctx->hw_dec) {
     if (!(stream_ctx->dec_ctx->hw_device_ctx = av_buffer_ref(proc_ctx->hw_ctx))) {
       fprintf(stderr, "Failed to create reference between decoder "
