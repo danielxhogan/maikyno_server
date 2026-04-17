@@ -357,6 +357,7 @@ pub struct  ProcessJobAudioStream {
   pub create_renditions: bool,
   pub title2: Option<String>,
   pub gain_boost2: i32,
+  pub ignore: bool,
   pub stream_id: String,
   pub process_job_id: String
 }
@@ -367,6 +368,7 @@ pub struct  ProcessJobSubtitleStream {
   pub id: String,
   pub title: Option<String>,
   pub burn_in: bool,
+  pub ignore: bool,
   pub stream_id: String,
   pub process_job_id: String
 }

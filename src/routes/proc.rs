@@ -245,7 +245,6 @@ pub async fn process_media(process_media_info: web::Json<ProcessMediaInfo>,
   }
 
   tokio::spawn(async move {
-
     let batch_id_c_str =
       match CString::new(batch.id.clone()) {
         Ok(batch_id_c_str) => { batch_id_c_str },

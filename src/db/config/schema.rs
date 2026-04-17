@@ -80,6 +80,7 @@ diesel::table! {
         create_renditions -> Bool,
         title2 -> Nullable<Text>,
         gain_boost2 -> Integer,
+        ignore -> Bool,
         stream_id -> Text,
         process_job_id -> Text,
     }
@@ -90,6 +91,7 @@ diesel::table! {
         id -> Text,
         title -> Nullable<Text>,
         burn_in -> Bool,
+        ignore -> Bool,
         stream_id -> Text,
         process_job_id -> Text,
     }

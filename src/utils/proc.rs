@@ -29,14 +29,16 @@ pub struct ProcessAudioStreamInfo {
   pub gain_boost: i32,
   pub create_renditions: bool,
   pub title2: Option<String>,
-  pub gain_boost2: i32
+  pub gain_boost2: i32,
+  pub ignore: bool
 }
 
 #[derive(Deserialize, Clone)]
 pub struct ProcessSubtitleStreamInfo {
   pub id: String,
   pub title: Option<String>,
-  pub burn_in: bool
+  pub burn_in: bool,
+  pub ignore: bool
 }
 
 #[derive(Deserialize, Clone)]
