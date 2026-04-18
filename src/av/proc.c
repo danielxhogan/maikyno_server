@@ -471,15 +471,14 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
       process_job_audio_streams.create_renditions, \
       process_job_audio_streams.title2, \
       process_job_audio_streams.gain_boost2, \
-      streams.codec, \
-      process_job_audio_streams.ignore \
+      streams.codec \
     FROM process_job_audio_streams \
     JOIN streams ON process_job_audio_streams.stream_id = streams.id \
     WHERE process_job_audio_streams.process_job_id = ?;";
 
   sqlite3_stmt *select_audio_stream_info_stmt = NULL;
   char *title, *title2, *codec, *end;
-  int ignore, in_stream_idx, len_title, len_title2, len_codec, ret = 0;
+  int in_stream_idx, len_title, len_title2, len_codec, ret = 0;
 
   if ((ret = sqlite3_prepare_v2(db, select_audio_stream_info_query, -1,
     &select_audio_stream_info_stmt, 0)) != SQLITE_OK)
@@ -495,10 +494,6 @@ int get_audio_process_info(ProcessingContext *proc_ctx,
 
   while ((ret = sqlite3_step(select_audio_stream_info_stmt)) == SQLITE_ROW)
   {
-    ignore = sqlite3_column_int(select_audio_stream_info_stmt, 8);
-    if (ignore)
-      continue;
-
     in_stream_idx = sqlite3_column_int(select_audio_stream_info_stmt, 0);
     proc_ctx->ctx_map[in_stream_idx] = *ctx_idx;
 
@@ -617,15 +612,14 @@ int get_subtitle_process_info(ProcessingContext *proc_ctx,
   char *select_subtitle_stream_idx_query =
     "SELECT streams.stream_idx, \
       process_job_subtitle_streams.title, \
-      process_job_subtitle_streams.burn_in, \
-      process_job_subtitle_streams.ignore \
+      process_job_subtitle_streams.burn_in \
     FROM process_job_subtitle_streams \
     JOIN streams ON process_job_subtitle_streams.stream_id = streams.id \
     WHERE process_job_subtitle_streams.process_job_id = ?;";
 
   sqlite3_stmt *select_subtitle_stream_idx_stmt = NULL;
   char *title, *end;
-  int ignore, in_stream_idx, len_title, burn_in, ret = 0;
+  int in_stream_idx, len_title, burn_in, ret = 0;
 
   if ((ret = sqlite3_prepare_v2(db, select_subtitle_stream_idx_query, -1,
     &select_subtitle_stream_idx_stmt, 0)) != SQLITE_OK)
@@ -641,10 +635,6 @@ int get_subtitle_process_info(ProcessingContext *proc_ctx,
 
   while ((ret = sqlite3_step(select_subtitle_stream_idx_stmt)) == SQLITE_ROW)
   {
-    ignore = sqlite3_column_int(select_subtitle_stream_idx_stmt, 3);
-    if (ignore)
-      continue;
-
     in_stream_idx = sqlite3_column_int(select_subtitle_stream_idx_stmt, 0);
     proc_ctx->ctx_map[in_stream_idx] = *ctx_idx;
 

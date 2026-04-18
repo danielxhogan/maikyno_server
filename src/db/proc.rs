@@ -252,7 +252,6 @@ pub async fn create_process_job(batch_id: String, video_info: ProcessVideoInfo,
         create_renditions: audio_stream.create_renditions,
         title2: audio_stream.title2,
         gain_boost2: audio_stream.gain_boost2,
-        ignore: audio_stream.ignore,
         stream_id: audio_stream.id,
         process_job_id: process_job.id.clone()
       };
@@ -279,7 +278,6 @@ pub async fn create_process_job(batch_id: String, video_info: ProcessVideoInfo,
         id: Uuid::new_v4().to_string(),
         title: subtitle_stream.title,
         burn_in: subtitle_stream.burn_in,
-        ignore: subtitle_stream.ignore,
         stream_id: subtitle_stream.id,
         process_job_id: process_job.id.clone()
       };

@@ -1137,11 +1137,12 @@ int process_media(const char *batch_id)
   sqlite3 *db = NULL;
 
   char *select_batch_process_jobs_query =
-    "SELECT process_jobs.id, batches.batch_size \
-    FROM process_jobs \
-    JOIN batches \
-    ON process_jobs.batch_id = batches.id \
-    WHERE batch_id = ?;";
+    "SELECT process_jobs.id, \
+      batches.batch_size \
+      FROM process_jobs \
+      JOIN batches \
+      ON process_jobs.batch_id = batches.id \
+      WHERE batch_id = ?;";
   sqlite3_stmt *select_batch_process_jobs_stmt = NULL;
 
   if ((ret = sqlite3_open(DATABASE_URL, &db)) != SQLITE_OK)
