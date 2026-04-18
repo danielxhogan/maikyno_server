@@ -305,6 +305,7 @@ pub struct Stream {
   height: Option<i32>,
   width: Option<i32>,
   interlaced: Option<bool>,
+  nb_channels: Option<i32>,
   video_id: String
 }
 

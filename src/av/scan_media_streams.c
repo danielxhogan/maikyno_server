@@ -160,7 +160,7 @@ int scan_video(char *video_id, char *video_name,
   uuid_t uuid;
   char uuid_str[LEN_UUID_STRING], *title, *suggested_title = NULL;
   const char *codec_name, *profile_name;
-  int stream_id, height, width, interlaced, stream_type, ret = 0;
+  int stream_idx, stream_type, height, width, interlaced, nb_channels, ret = 0;
 
   char *update_video_query =
     "UPDATE videos \
@@ -171,8 +171,8 @@ int scan_video(char *video_id, char *video_name,
   char *insert_video_stream_query =
     "INSERT INTO streams \
     (id, stream_idx, title, stream_type, codec, \
-    height, width, interlaced, video_id) \
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    height, width, interlaced, nb_channels, video_id) \
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
   sqlite3_stmt *insert_video_stream_stmt = NULL;
 
   char *delete_video_streams_query =
@@ -254,7 +254,7 @@ int scan_video(char *video_id, char *video_name,
 
   for (unsigned int i = 0; i < fmt_ctx->nb_streams; i++)
   {
-    stream_id = (int) i;
+    stream_idx = (int) i;
     stream = fmt_ctx->streams[i];
     stream_type = stream->codecpar->codec_type;
 
@@ -293,6 +293,10 @@ int scan_video(char *video_id, char *video_name,
       else { interlaced = 1; }
     }
 
+    if (stream_type == AVMEDIA_TYPE_AUDIO) {
+      nb_channels = stream->codecpar->ch_layout.nb_channels;
+    }
+
   if ((ret = sqlite3_prepare_v2(db, insert_video_stream_query, -1,
     &insert_video_stream_stmt, 0)) != SQLITE_OK)
   {
@@ -303,7 +307,7 @@ int scan_video(char *video_id, char *video_name,
   }
 
     sqlite3_bind_text(insert_video_stream_stmt, 1, uuid_str, -1, SQLITE_STATIC);
-    sqlite3_bind_int(insert_video_stream_stmt, 2, stream_id);
+    sqlite3_bind_int(insert_video_stream_stmt, 2, stream_idx);
 
     if (title) {
       sqlite3_bind_text(insert_video_stream_stmt, 3, title, -1, SQLITE_STATIC);
@@ -325,7 +329,13 @@ int scan_video(char *video_id, char *video_name,
       sqlite3_bind_null(insert_video_stream_stmt, 8);
     }
 
-    sqlite3_bind_text(insert_video_stream_stmt, 9,
+    if (stream_type == AVMEDIA_TYPE_AUDIO) {
+      sqlite3_bind_int(insert_video_stream_stmt, 9, nb_channels);
+    } else {
+      sqlite3_bind_null(insert_video_stream_stmt, 9);
+    }
+
+    sqlite3_bind_text(insert_video_stream_stmt, 10,
       (char *) video_id, -1, SQLITE_STATIC);
 
     if ((ret = sqlite3_step(insert_video_stream_stmt)) != SQLITE_DONE) {

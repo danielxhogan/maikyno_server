@@ -7,5 +7,6 @@ CREATE TABLE IF NOT EXISTS streams (
   height INT,
   width INT,
   interlaced BOOL,
+  nb_channels INT,
   video_id VARCHAR NOT NULL REFERENCES videos(id)
 );

@@ -150,6 +150,7 @@ diesel::table! {
         height -> Nullable<Integer>,
         width -> Nullable<Integer>,
         interlaced -> Nullable<Bool>,
+        nb_channels -> Nullable<Integer>,
         video_id -> Text,
     }
 }
