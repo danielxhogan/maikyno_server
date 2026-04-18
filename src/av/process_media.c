@@ -161,6 +161,9 @@ int make_rendtion(ProcessingContext *proc_ctx, AVFrame *frame)
   while ((ret = av_buffersink_get_frame(rend_ctx->buffersink_ctx1,
     rend_ctx->filtered_frame1)) >= 0)
   {
+    if (proc_ctx->rend0_hw_enc)
+      rend_ctx->filtered_frame1->pts += 834;
+
     if ((ret = encode_video_frame(proc_ctx, 0,
       rend_ctx->filtered_frame1)) < 0)
     {
@@ -180,6 +183,9 @@ int make_rendtion(ProcessingContext *proc_ctx, AVFrame *frame)
   while ((ret = av_buffersink_get_frame(rend_ctx->buffersink_ctx2,
     rend_ctx->filtered_frame2)) >= 0)
   {
+    if (proc_ctx->rend1_hw_enc)
+      rend_ctx->filtered_frame2->pts += 834;
+
     if ((ret = encode_video_frame(proc_ctx, 1,
       rend_ctx->filtered_frame2)) < 0)
     {
@@ -660,6 +666,9 @@ int decode_av_packet(ProcessingContext *proc_ctx,
       }
 
       frame->pict_type = AV_PICTURE_TYPE_NONE;
+
+      if (!proc_ctx->rend_ctx && proc_ctx->rend0_hw_enc)
+        frame->pts += 834;
 
       if (proc_ctx->fmt_ctx) {
         if ((ret = format_video_frame(proc_ctx, stream_ctx, frame)) < 0) {
