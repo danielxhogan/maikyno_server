@@ -17,7 +17,7 @@ use routes::{
     get_seasons,
     get_movies,
     get_videos,
-    update_video_playback_state
+    save_state
   },
   scan_library::scan_library,
   proc::{ rename_extras, scan_media_streams, process_media, abort_batch }
@@ -65,7 +65,7 @@ async fn main() -> std::io::Result<()>
       .service(get_seasons)
       .service(get_movies)
       .service(get_videos)
-      .service(update_video_playback_state)
+      .service(save_state)
       .service(rename_extras)
       .service(scan_media_streams)
       .service(process_media)

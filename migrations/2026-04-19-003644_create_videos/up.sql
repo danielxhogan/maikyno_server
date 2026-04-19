@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS videos (
   processed BOOL NOT NULL,
   thumbnail_url VARCHAR,
   ts INT NOT NULL,
+  pct_watched INT NOT NULL,
+  finished BOOL NOT NULL,
   v_stream INT NOT NULL,
   a_stream INT NOT NULL,
   s_stream INT NOT NULL,

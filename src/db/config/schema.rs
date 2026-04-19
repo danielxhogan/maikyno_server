@@ -168,6 +168,8 @@ diesel::table! {
         processed -> Bool,
         thumbnail_url -> Nullable<Text>,
         ts -> Integer,
+        pct_watched -> Integer,
+        finished -> Bool,
         v_stream -> Integer,
         a_stream -> Integer,
         s_stream -> Integer,

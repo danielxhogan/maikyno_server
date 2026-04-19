@@ -73,9 +73,11 @@ struct GetVideosInfo {
 }
 
 #[derive(Deserialize)]
-struct UpdateVideoPlaybackStateParams {
+struct SaveStateParams {
   video_id: String,
   ts: i32,
+  pct_watched: i32,
+  finished: i32,
   v_stream: i32,
   a_stream: i32,
   s_stream: i32,
@@ -608,13 +610,13 @@ pub async fn get_videos(get_videos_info: web::Json<GetVideosInfo>,
   return Ok(web::Json(videos));
 }
 
-#[post("/update_video_playback_state")]
-pub async fn update_video_playback_state(
-  update_video_playback_state_params: web::Json<UpdateVideoPlaybackStateParams>,
+#[post("/save_state")]
+pub async fn save_state(
+  save_state_params: web::Json<SaveStateParams>,
   pool: web::Data<DBPool>) -> actix_web::Result<String>
 {
   let pool_clone = pool.clone();
-  let video_id_clone = update_video_playback_state_params.video_id.clone();
+  let video_id_clone = save_state_params.video_id.clone();
   let block_thread_result = web::block(|| {
     return select_video(pool_clone, video_id_clone);
   }).await;
@@ -635,6 +637,13 @@ pub async fn update_video_playback_state(
     }
   };
 
+  let finished: bool;
+  if save_state_params.finished == 0 {
+    finished = false;
+  } else {
+    finished = true;
+  }
+
   let update_video_info = UpdateVideo {
     id: video.id,
     name: video.name,
@@ -642,11 +651,13 @@ pub async fn update_video_playback_state(
     static_path: Some(video.static_path),
     extra: video.extra,
     processed: video.processed,
-    ts: update_video_playback_state_params.ts,
-    v_stream: update_video_playback_state_params.v_stream,
-    a_stream: update_video_playback_state_params.a_stream,
-    s_stream: update_video_playback_state_params.s_stream,
-    s_pos: update_video_playback_state_params.s_pos
+    ts: save_state_params.ts,
+    pct_watched: save_state_params.pct_watched,
+    finished: finished,
+    v_stream: save_state_params.v_stream,
+    a_stream: save_state_params.a_stream,
+    s_stream: save_state_params.s_stream,
+    s_pos: save_state_params.s_pos
   };
 
   let block_thread_result = web::block(|| {
