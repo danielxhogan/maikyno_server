@@ -993,7 +993,7 @@ void flush_encoders(ProcessingContext *proc_ctx)
   }
 }
 
-int process_video(char *process_job_id, const char *batch_id)
+int process_video(char *process_job_id, const char *batch_id, char *out_filename)
 {
   int ret = 0;
 
@@ -1040,7 +1040,7 @@ int process_video(char *process_job_id, const char *batch_id)
     goto update_status;
   }
 
-  if ((ret = open_output(proc_ctx, process_job_id, db)) < 0) {
+  if ((ret = open_output(proc_ctx, process_job_id, db, out_filename)) < 0) {
     fprintf(stderr, "Failed to open output.\n");
     goto update_status;
   }
@@ -1228,8 +1228,8 @@ int process_media(const char *batch_id)
   struct tm *lt;
   int hour, min, sec, start_hour, start_min, start_sec, end_hour, end_min, end_sec;
 
-  for (i = 0; i < batch_size; i++) {
-
+  for (i = 0; i < batch_size; i++)
+  {
     time(&timer);
     lt = localtime(&timer);
     start_hour = lt->tm_hour;
@@ -1237,13 +1237,15 @@ int process_media(const char *batch_id)
     start_sec = lt->tm_sec;
     printf("start time: %d:%02d:%02d\n", start_hour, start_min, start_sec);
 
-    if ((ret = process_video(process_job_ids[i], batch_id)) < 0) {
+    char *out_filename = NULL;
+    if ((ret = process_video(process_job_ids[i], batch_id, out_filename)) < 0) {
       if (ret != ABORTED) {
         fprintf(stderr, "Failed to process video for process job \"%s\".\n",
           process_job_ids[i]);
         goto end;
       }
     }
+    free(out_filename);
 
     time(&timer);
     lt = localtime(&timer);

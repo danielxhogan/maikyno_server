@@ -1134,10 +1134,11 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx)
   return 0;
 }
 
-int open_output(ProcessingContext *proc_ctx, char *process_job_id, sqlite3 *db)
+int open_output(ProcessingContext *proc_ctx,
+  char *process_job_id, sqlite3 *db, char *out_filename)
 {
   int extra, ret = 0;
-  char *name = NULL, *media_dir_path = NULL, *title = NULL, *out_filename = NULL;
+  char *name = NULL, *media_dir_path = NULL, *title = NULL;
 
   if ((ret = get_file_data(&name, &extra,
     &media_dir_path, &title, db, process_job_id)) < 0)
@@ -1208,7 +1209,6 @@ int open_output(ProcessingContext *proc_ctx, char *process_job_id, sqlite3 *db)
   }
 
 end:
-  free(out_filename);
   free(name);
   free(media_dir_path);
   free(title);
