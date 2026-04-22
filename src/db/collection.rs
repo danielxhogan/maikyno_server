@@ -375,7 +375,7 @@ pub fn select_collection_movies(pool: web::Data<DBPool>, collection: Collection)
       media_dirs::id,
       media_dirs::ino,
       media_dirs::device_id,
-      // media_dirs::name,
+      media_dirs::name,
       media_dirs::real_path,
       // media_dirs::symlink_path,
       // media_dirs::static_path,
@@ -388,6 +388,48 @@ pub fn select_collection_movies(pool: web::Data<DBPool>, collection: Collection)
     .map_err(|err| {
       let err_msg = format!("Failed to get movies for collection:
         {:?}, {:?}\nError: {:?}", collection.name, collection.id, err);
+
+      eprintln!("{err_msg:?}");
+      return MKError::new(MKErrorType::DBError, err_msg);
+    });
+
+  return collection_movies_result;
+}
+
+pub fn select_collection_movies_by_id(pool: web::Data<DBPool>, collection_id: String)
+-> Result<Vec<CollectionMovieInfo>, MKError>
+{
+  let mut db = match get_db_conn(pool) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
+
+  let collection_movies_result = collection_movies::table
+    .inner_join(media_dirs::table
+      .on(collection_movies::movie_id.eq(media_dirs::id)))
+    .inner_join(collections::table
+      .on(collection_movies::collection_id.eq(collections::id)))
+    .filter(collection_movies::collection_id.eq(&collection_id))
+    .select((
+      collection_movies::id,
+      collections::id,
+      collections::name,
+      // collection_movies::collection_id,
+      media_dirs::id,
+      media_dirs::ino,
+      media_dirs::device_id,
+      media_dirs::name,
+      media_dirs::real_path,
+      // media_dirs::symlink_path,
+      // media_dirs::static_path,
+      // media_dirs::thumbnail_url,
+      // media_dirs::library_id,
+      // media_dirs::library_dir_id,
+      // media_dirs::show_id
+    ))
+    .get_results::<CollectionMovieInfo>(&mut db)
+    .map_err(|err| {
+      let err_msg = format!("Failed to get movies for collection:
+        {:?}\nError: {:?}", collection_id, err);
 
       eprintln!("{err_msg:?}");
       return MKError::new(MKErrorType::DBError, err_msg);

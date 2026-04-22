@@ -674,6 +674,7 @@ async fn check_seen_collection_movie(collection_movie_dir: &DirEntry,
           movie_id: movie.id.clone(),
           ino: ino.clone(),
           device_id: device_id.clone(),
+          name: movie.name.clone(),
           movie_path: movie.real_path.clone()
         };
 

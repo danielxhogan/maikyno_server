@@ -132,7 +132,7 @@ pub struct NewCollectionMovie {
   pub collection_name: String
 }
 
-#[derive(Debug, Queryable, Clone)]
+#[derive(Debug, Queryable, Clone, Serialize)]
 pub struct CollectionMovieInfo {
   pub id: String,
   pub collection_id: String,
@@ -140,7 +140,7 @@ pub struct CollectionMovieInfo {
   pub movie_id: String,
   pub ino: String,
   pub device_id: String,
-  // pub name: String,
+  pub name: String,
   pub movie_path: String,
   // pub symlink_path: String,
   // pub static_path: String,

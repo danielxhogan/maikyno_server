@@ -12,7 +12,8 @@ use crate::db::{
   },
   collection::{
     select_collections_by_id,
-    select_collection_shows_by_id
+    select_collection_shows_by_id,
+    select_collection_movies_by_id
   },
   media::{
     select_seasons_by_id,
@@ -57,11 +58,6 @@ struct NewLibraryDirInfo {
 }
 
 #[derive(Deserialize)]
-struct GetMoviesInfo {
-  library_id: String,
-}
-
-#[derive(Deserialize)]
 struct GetCollectionsParams {
   library_id: String,
 }
@@ -79,6 +75,16 @@ struct GetCollectionShowsParams {
 #[derive(Deserialize)]
 struct GetSeasonsParams {
   show_id: String,
+}
+
+#[derive(Deserialize)]
+struct GetMoviesInfo {
+  library_id: String,
+}
+
+#[derive(Deserialize)]
+struct GetCollectionMoviesParams {
+  collection_id: String,
 }
 
 #[derive(Deserialize)]
@@ -630,6 +636,33 @@ pub async fn get_movies(get_movies_info: web::Json<GetMoviesInfo>,
   };
 
   return Ok(web::Json(media_dirs));
+}
+
+#[post("/get_collection_movies")]
+pub async fn get_collection_movies(
+  get_collection_movies_params: web::Json<GetCollectionMoviesParams>,
+  pool: web::Data<DBPool>) -> impl Responder
+{
+  let collection_id_clone = get_collection_movies_params.collection_id.clone();
+  let block_thread_result = web::block(|| {
+    return select_collection_movies_by_id(pool, collection_id_clone);
+  }).await;
+
+  let collection_movies = match block_thread_result
+  {
+    Ok(collection_movies_result) => {
+      match collection_movies_result
+      {
+        Ok(collection_movies) => { collection_movies },
+        Err(err) => { return Err(err); }
+      }
+    },
+    Err(err) => {
+      return Err(blocking_error(err));
+    }
+  };
+
+  return Ok(web::Json(collection_movies));
 }
 
 #[post("/get_videos")]

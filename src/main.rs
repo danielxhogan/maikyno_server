@@ -18,6 +18,7 @@ use routes::{
     get_collection_shows,
     get_seasons,
     get_movies,
+    get_collection_movies,
     get_videos,
     save_state
   },
@@ -68,6 +69,7 @@ async fn main() -> std::io::Result<()>
       .service(get_collection_shows)
       .service(get_seasons)
       .service(get_movies)
+      .service(get_collection_movies)
       .service(get_videos)
       .service(save_state)
       .service(rename_extras)
