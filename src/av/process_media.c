@@ -779,7 +779,7 @@ int decode_packet(ProcessingContext *proc_ctx,
   return 0;
 }
 
-int transcode(ProcessingContext *proc_ctx,
+int main_loop(ProcessingContext *proc_ctx,
   const char *batch_id, char *process_job_id)
 {
   StreamContext *stream_ctx;
@@ -993,7 +993,7 @@ void flush_encoders(ProcessingContext *proc_ctx)
   }
 }
 
-int process_video(char *process_job_id, const char *batch_id, char *out_filename)
+int process_video(char *process_job_id, const char *batch_id, char **out_filename)
 {
   int ret = 0;
 
@@ -1053,8 +1053,8 @@ int process_video(char *process_job_id, const char *batch_id, char *out_filename
   sqlite3_close(db);
   db = NULL;
 
-  if ((ret = transcode(proc_ctx, batch_id, process_job_id)) < 0) {
-    fprintf(stderr, "Failed to transcode.\n");
+  if ((ret = main_loop(proc_ctx, batch_id, process_job_id)) < 0) {
+    fprintf(stderr, "Failed during main processing loop.\n");
   }
 
   flush_decoders(proc_ctx);
@@ -1132,6 +1132,88 @@ update_status:
   }
 
   return 0;
+}
+
+static int remux_video(char *out_filename)
+{
+  if (!out_filename)
+    return -1;
+
+  int ret;
+  char *remux_filename = NULL;
+  char *remux_cmd = NULL;
+  char *mv_cmd = NULL;
+
+  char *end;
+  char *remux_cmd_base = "mkvmerge -o \"";
+  for (end = remux_cmd_base; *end; end++);
+  int remux_cmd_base_len = end - remux_cmd_base;
+
+  for (end = out_filename; *end; end++);
+  int out_filename_len = end - out_filename;
+  int remux_filename_len = out_filename_len + 2;
+
+  remux_filename = calloc(remux_filename_len + 1, sizeof(char));
+  if (!remux_filename) {
+    fprintf(stderr, "Failed to allocate remux_filename.\n");
+    ret = -1;
+    goto end;
+  }
+
+  memcpy(remux_filename, out_filename, out_filename_len);
+  strcat(remux_filename, "rm");
+
+  remux_cmd = calloc((remux_cmd_base_len
+    + remux_filename_len
+    + 3
+    + out_filename_len
+    + 2),
+    sizeof(char));
+
+  if (!remux_cmd) {
+    fprintf(stderr, "Failed to allocate remux_filename.\n");
+    ret = -1;
+    goto end;
+  }
+
+  strncat(remux_cmd, remux_cmd_base, remux_cmd_base_len);
+  strncat(remux_cmd, remux_filename, remux_filename_len);
+  strcat(remux_cmd, "\" \"");
+  strncat(remux_cmd, out_filename, out_filename_len);
+  strcat(remux_cmd, "\"");
+
+  system(remux_cmd);
+
+  char *mv_cmd_base = "mv \"";
+  for (end = mv_cmd_base; *end; end++);
+  int mv_cmd_base_len = end - mv_cmd_base;
+
+  mv_cmd = calloc((mv_cmd_base_len
+    + remux_filename_len
+    + 3
+    + out_filename_len
+    + 2),
+    sizeof(char));
+
+  if (!mv_cmd) {
+    fprintf(stderr, "Failed to allocate mv_cmd.\n");
+    ret = -1;
+    goto end;
+  }
+
+  strncat(mv_cmd, mv_cmd_base, mv_cmd_base_len);
+  strncat(mv_cmd, remux_filename, remux_filename_len);
+  strcat(mv_cmd, "\" \"");
+  strncat(mv_cmd, out_filename, out_filename_len);
+  strcat(mv_cmd, "\"");
+
+  ret = system(mv_cmd);
+
+end:
+  free(remux_filename);
+  free(remux_cmd);
+  free(mv_cmd);
+  return ret;
 }
 
 int process_media(const char *batch_id)
@@ -1230,6 +1312,8 @@ int process_media(const char *batch_id)
 
   for (i = 0; i < batch_size; i++)
   {
+    char *out_filename = NULL;
+
     time(&timer);
     lt = localtime(&timer);
     start_hour = lt->tm_hour;
@@ -1237,15 +1321,11 @@ int process_media(const char *batch_id)
     start_sec = lt->tm_sec;
     printf("start time: %d:%02d:%02d\n", start_hour, start_min, start_sec);
 
-    char *out_filename = NULL;
-    if ((ret = process_video(process_job_ids[i], batch_id, out_filename)) < 0) {
-      if (ret != ABORTED) {
-        fprintf(stderr, "Failed to process video for process job \"%s\".\n",
-          process_job_ids[i]);
-        goto end;
+    if ((ret = process_video(process_job_ids[i], batch_id, &out_filename) >= 0)) {
+      if (remux_video(out_filename) < 0) {
+        fprintf(stderr, "Failed to remux video.");
       }
     }
-    free(out_filename);
 
     time(&timer);
     lt = localtime(&timer);
@@ -1276,6 +1356,15 @@ int process_media(const char *batch_id)
     }
 
     printf("elapsed: %02d:%02d:%02d\n", hour, min, sec);
+
+    if (ret == ABORTED)
+      goto end;
+    else if (ret < 0) {
+      fprintf(stderr, "Failed to process video for process job \"%s\".\n",
+        process_job_ids[i]);
+    }
+
+    free(out_filename);
   }
   
 end:

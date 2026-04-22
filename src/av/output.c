@@ -859,7 +859,8 @@ static int open_encoder(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
 {
   int rendition = 0, ret = 0;
 
-  if (stream_ctx->codec_type == AVMEDIA_TYPE_VIDEO) {
+  if (stream_ctx->codec_type == AVMEDIA_TYPE_VIDEO)
+  {
     if ((ret = open_video_encoder(&stream_ctx->rend0_enc_ctx,
         proc_ctx, stream_ctx, in_filename, 0)) < 0)
     {
@@ -879,8 +880,7 @@ static int open_encoder(ProcessingContext *proc_ctx, StreamContext *stream_ctx,
         return ret;
       }
     }
-  }
-  else if (stream_ctx->codec_type == AVMEDIA_TYPE_AUDIO)
+  } else if (stream_ctx->codec_type == AVMEDIA_TYPE_AUDIO)
   {
     if (stream_ctx->renditions) {
       if (stream_ctx->transcode_rend0) {
@@ -912,6 +912,7 @@ static int init_stream(AVFormatContext *fmt_ctx,
 {
   int ret;
   AVStream *out_stream;
+  char enc_name[256];
 
   if (!(out_stream = avformat_new_stream(fmt_ctx, NULL))) {
     fprintf(stderr, "Failed to allocate new output stream.\n");
@@ -944,6 +945,13 @@ static int init_stream(AVFormatContext *fmt_ctx,
 
     out_stream->r_frame_rate = in_stream->r_frame_rate;
     out_stream->avg_frame_rate = in_stream->avg_frame_rate;
+
+    snprintf(enc_name, sizeof(enc_name), "Lavc%d.%d.%d %s",
+      LIBAVCODEC_VERSION_MAJOR,
+      LIBAVCODEC_VERSION_MINOR,
+      LIBAVCODEC_VERSION_MICRO,
+      enc_ctx->codec->name);
+    av_dict_set(&out_stream->metadata, "ENCODER", enc_name, 0);
   }
   else {
     if ((ret = avcodec_parameters_copy(out_stream->codecpar,
@@ -1142,10 +1150,10 @@ int open_encoders_and_streams(ProcessingContext *proc_ctx)
 }
 
 int open_output(ProcessingContext *proc_ctx,
-  char *process_job_id, sqlite3 *db, char *out_filename)
+  char *process_job_id, sqlite3 *db, char **out_filename_cpy)
 {
   int extra, ret = 0;
-  char *name = NULL, *media_dir_path = NULL, *title = NULL;
+  char *name = NULL, *media_dir_path = NULL, *title = NULL, *out_filename = NULL;
 
   if ((ret = get_file_data(&name, &extra,
     &media_dir_path, &title, db, process_job_id)) < 0)
@@ -1221,5 +1229,13 @@ end:
   free(title);
 
   if (ret < 0) { return ret; }
+
+  int out_filename_len;
+  char *end;
+  for (end = out_filename; *end; end++);
+  out_filename_len = end - out_filename;
+  (*out_filename_cpy = calloc(out_filename_len + 1, sizeof(char)));
+  memcpy(*out_filename_cpy, out_filename, out_filename_len);
+
   return 0;
 }
