@@ -216,11 +216,15 @@ int configure_libx265(AVCodecContext *enc_ctx,
   cores = get_core_count();
   if (cores <= 0) { cores = 4; }
 
-  if (stream_ctx->renditions) {
-    pools = (cores + 1) / 2;
-  } else {
-    pools = ((cores * 2) + 2) / 3;
-  }
+    // pools = (cores + 1) / 2;
+
+  // if (stream_ctx->renditions) {
+  //   pools = ((cores * 2) + 2) / 3;
+  // } else {
+  //   pools = ((cores * 2) + 2) / 3;
+  // }
+
+  pools = cores;
 
   snprintf(additional_params_str, sizeof(additional_params_str),
     "pools=%d:keyint=120:min-keyint=120:no-open-gop=true:no-scenecut=true", pools);
@@ -498,6 +502,9 @@ static int open_video_encoder(AVCodecContext **enc_ctx,
   (*enc_ctx)->color_range = AVCOL_RANGE_MPEG;
 
   (*enc_ctx)->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+
+  (*enc_ctx)->thread_count = 0;
+  (*enc_ctx)->thread_type = FF_THREAD_FRAME | FF_THREAD_SLICE;
 
   if (*hw_enc) {
     if ((ret = init_hw_enc_ctx(proc_ctx, *enc_ctx, *pix_fmt)) < 0) {
