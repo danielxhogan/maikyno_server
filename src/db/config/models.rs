@@ -55,7 +55,7 @@ pub struct NewLibraryDir {
   pub static_path: String,
 }
 
-#[derive(Debug, Queryable, Insertable, Clone)]
+#[derive(Debug, Queryable, Insertable, Clone, Serialize)]
 #[diesel(table_name = collections)]
 pub struct Collection {
   pub id: String,

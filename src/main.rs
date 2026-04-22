@@ -13,6 +13,7 @@ use routes::{
     new_library,
     add_library_dirs,
     get_libraries,
+    get_collections,
     get_shows,
     get_seasons,
     get_movies,
@@ -60,6 +61,7 @@ async fn main() -> std::io::Result<()>
       .service(new_library)
       .service(add_library_dirs)
       .service(get_libraries)
+      .service(get_collections)
       .service(scan_library)
       .service(get_shows)
       .service(get_seasons)

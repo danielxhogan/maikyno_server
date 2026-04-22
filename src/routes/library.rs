@@ -10,6 +10,9 @@ use crate::db::{
     select_library,
     select_libraries
   },
+  collection::{
+    select_collections_by_id
+  },
   media::{
     select_seasons_by_id,
     select_movies,
@@ -54,6 +57,11 @@ struct NewLibraryDirInfo {
 
 #[derive(Deserialize)]
 struct GetMoviesInfo {
+  library_id: String,
+}
+
+#[derive(Deserialize)]
+struct GetCollectionsParams {
   library_id: String,
 }
 
@@ -466,6 +474,32 @@ pub async fn get_libraries(pool: web::Data<DBPool>)
   };
 
   return Ok(web::Json(libraries));
+}
+
+#[post("/get_collections")]
+pub async fn get_collections(get_collections_params: web::Json<GetCollectionsParams>,
+  pool: web::Data<DBPool>) -> impl Responder
+{
+  let library_id_clone = get_collections_params.library_id.clone();
+  let block_thread_result = web::block(|| {
+    return select_collections_by_id(pool, library_id_clone);
+  }).await;
+
+  let collections = match block_thread_result
+  {
+    Ok(collections_result) => {
+      match collections_result
+      {
+        Ok(collections) => { collections },
+        Err(err) => { return Err(err); }
+      }
+    },
+    Err(err) => {
+      return Err(blocking_error(err));
+    }
+  };
+
+  return Ok(web::Json(collections));
 }
 
 #[post("/get_shows")]

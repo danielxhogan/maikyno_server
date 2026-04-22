@@ -75,6 +75,27 @@ pub fn select_collections(pool: web::Data<DBPool>, library: Library)
   return  collections_result;
 }
 
+pub fn select_collections_by_id(pool: web::Data<DBPool>, library_id: String)
+-> Result<Vec<Collection>, MKError>
+{
+  let mut db = match get_db_conn(pool) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
+
+  let collections_result = collections::table
+    .filter(collections::library_id.eq(&library_id))
+    .get_results::<Collection>(&mut db)
+    .map_err(|err| {
+      let err_msg = format!("Failed to get collections for library:
+      {:?}\nError: {:?}", library_id, err);
+
+      eprintln!("{err_msg:?}");
+      return MKError::new(MKErrorType::DBError, err_msg);
+    });
+
+  return  collections_result;
+}
+
 pub fn update_collection(pool: web::Data<DBPool>,
   update_collection: UpdateCollection) -> Result<Collection, MKError>
 {
