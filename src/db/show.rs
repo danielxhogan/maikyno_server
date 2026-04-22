@@ -1,11 +1,9 @@
 use crate::db::{
-    config::{
-    db_connect::{get_db_conn, DBPool},
-    models::{Library, Show, NewShow, UpdateShow},
-    schema::shows
-  },
-  collection::delete_collection_shows_for_show,
-  media::delete_seasons_for_show
+    collection::delete_collection_shows_for_show, config::{
+    db_connect::{DBPool, get_db_conn},
+    models::{ Library, NewShow, Show, UpdateShow},
+    schema::{ shows}
+  }, media::delete_seasons_for_show
 };
 
 use crate::utils::mk_error::{MKError, MKErrorType};

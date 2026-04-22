@@ -1475,6 +1475,7 @@ async fn check_seen_collection_show(collection_show_dir: &DirEntry,
           show_id: show.id.clone(),
           ino: ino,
           device_id: device_id,
+          name: show.name.clone(),
           show_path: show.real_path.clone()
         };
 
@@ -1561,7 +1562,8 @@ async fn scan_shows(scan_path_buf: &PathBuf,
 
     match scan_shows_collection_info {
       Some(some_scan_shows_collection_info) => {
-        match check_seen_collection_show(&show_dir, some_scan_shows_collection_info,
+        match check_seen_collection_show(&show_dir,
+          some_scan_shows_collection_info,
           &show, pool).await {
             Ok(_) => {},
             Err(err) => { return Err(err); }

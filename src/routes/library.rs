@@ -11,7 +11,8 @@ use crate::db::{
     select_libraries
   },
   collection::{
-    select_collections_by_id
+    select_collections_by_id,
+    select_collection_shows_by_id
   },
   media::{
     select_seasons_by_id,
@@ -68,6 +69,11 @@ struct GetCollectionsParams {
 #[derive(Deserialize)]
 struct GetShowsParams {
   library_id: String,
+}
+
+#[derive(Deserialize)]
+struct GetCollectionShowsParams {
+  collection_id: String,
 }
 
 #[derive(Deserialize)]
@@ -526,6 +532,33 @@ pub async fn get_shows(get_shows_params: web::Json<GetShowsParams>,
   };
 
   return Ok(web::Json(shows));
+}
+
+#[post("/get_collection_shows")]
+pub async fn get_collection_shows(
+  get_collection_shows_params: web::Json<GetCollectionShowsParams>,
+  pool: web::Data<DBPool>) -> impl Responder
+{
+  let collection_id_clone = get_collection_shows_params.collection_id.clone();
+  let block_thread_result = web::block(|| {
+    return select_collection_shows_by_id(pool, collection_id_clone);
+  }).await;
+
+  let collection_shows = match block_thread_result
+  {
+    Ok(collection_shows_result) => {
+      match collection_shows_result
+      {
+        Ok(collection_shows) => { collection_shows },
+        Err(err) => { return Err(err); }
+      }
+    },
+    Err(err) => {
+      return Err(blocking_error(err));
+    }
+  };
+
+  return Ok(web::Json(collection_shows));
 }
 
 #[post("/get_seasons")]

@@ -93,7 +93,7 @@ pub struct NewCollectionShow {
   pub collection_name: String
 }
 
-#[derive(Debug, Queryable, Clone)]
+#[derive(Debug, Queryable, Clone, Serialize)]
 pub struct CollectionShowInfo {
   pub id: String,
   pub collection_id: String,
@@ -101,7 +101,7 @@ pub struct CollectionShowInfo {
   pub show_id: String,
   pub ino: String,
   pub device_id: String,
-  // pub name: String,
+  pub name: String,
   pub show_path: String,
   // pub symlink_path: String,
   // pub static_path: String,

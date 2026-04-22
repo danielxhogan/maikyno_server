@@ -15,6 +15,7 @@ use routes::{
     get_libraries,
     get_collections,
     get_shows,
+    get_collection_shows,
     get_seasons,
     get_movies,
     get_videos,
@@ -64,6 +65,7 @@ async fn main() -> std::io::Result<()>
       .service(get_collections)
       .service(scan_library)
       .service(get_shows)
+      .service(get_collection_shows)
       .service(get_seasons)
       .service(get_movies)
       .service(get_videos)

@@ -204,7 +204,7 @@ pub fn select_collection_shows(pool: web::Data<DBPool>, collection: Collection)
       shows::id,
       shows::ino,
       shows::device_id,
-      // shows::name,
+      shows::name,
       shows::real_path,
       // shows::symlink_path,
       // shows::static_path,
@@ -215,6 +215,43 @@ pub fn select_collection_shows(pool: web::Data<DBPool>, collection: Collection)
     .map_err(|err| {
       let err_msg = format!("Failed to get shows for collection:
         {:?}, {:?}\nError: {:?}", collection.name, collection.id, err);
+
+      eprintln!("{err_msg:?}");
+      return MKError::new(MKErrorType::DBError, err_msg);
+    });
+
+  return collection_shows_result;
+}
+
+pub fn select_collection_shows_by_id(pool: web::Data<DBPool>, collection_id: String)
+  -> Result<Vec<CollectionShowInfo>, MKError>
+{
+  let mut db = match get_db_conn(pool) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
+
+  let collection_shows_result = collection_shows::table
+    .inner_join(shows::table.on(collection_shows::show_id.eq(shows::id)))
+    .inner_join(collections::table.on(collection_shows::collection_id.eq(collections::id)))
+    .filter(collection_shows::collection_id.eq(&collection_id))
+    .select((
+      collection_shows::id,
+      collections::id,
+      collections::name,
+      shows::id,
+      shows::ino,
+      shows::device_id,
+      shows::name,
+      shows::real_path,
+      // shows::symlink_path,
+      // shows::static_path,
+      // shows::library_id,
+      // shows::library_dir_id
+    ))
+    .get_results::<CollectionShowInfo>(&mut db)
+    .map_err(|err| {
+      let err_msg = format!("Failed to get shows for collection:
+        {:?}\nError: {:?}", collection_id, err);
 
       eprintln!("{err_msg:?}");
       return MKError::new(MKErrorType::DBError, err_msg);
