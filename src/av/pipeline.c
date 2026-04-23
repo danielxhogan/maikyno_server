@@ -1,10 +1,10 @@
-#include "process_media.h"
+#include "pipeline.h"
 
-#include "proc.h"
-#include "input.h"
-#include "output.h"
-#include "burn_in.h"
-#include "utils.h"
+#include "init/proc.h"
+#include "init/input.h"
+#include "init/output.h"
+#include "filters/burn_in.h"
+#include "utils/utils.h"
 
 #include <sqlite3.h>
 #include <time.h>

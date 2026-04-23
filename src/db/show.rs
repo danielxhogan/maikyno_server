@@ -74,6 +74,7 @@ pub fn select_shows_by_id(library_id: String, pool: web::Data<DBPool>)
 
   let shows_result = shows::table
     .filter(shows::library_id.eq(&library_id))
+    .order_by(shows::name)
     .get_results::<Show>(&mut db)
     .map_err(|err| {
       let err_msg = format!(

@@ -16,32 +16,33 @@ fn main()
 
   println!("cargo::rerun-if-changed=src/av/scan_media_streams.c");
   println!("cargo::rerun-if-changed=src/av/scan_media_streams.h");
-  println!("cargo::rerun-if-changed=src/av/process_media.c");
-  println!("cargo::rerun-if-changed=src/av/process_media.h");
-  println!("cargo::rerun-if-changed=src/av/proc.c");
-  println!("cargo::rerun-if-changed=src/av/proc.h");
-  println!("cargo::rerun-if-changed=src/av/input.c");
-  println!("cargo::rerun-if-changed=src/av/input.h");
-  println!("cargo::rerun-if-changed=src/av/output.c");
-  println!("cargo::rerun-if-changed=src/av/output.h");
-  println!("cargo::rerun-if-changed=src/av/hdr.c");
-  println!("cargo::rerun-if-changed=src/av/hdr.h");
-  println!("cargo::rerun-if-changed=src/av/swr.c");
-  println!("cargo::rerun-if-changed=src/av/swr.h");
-  println!("cargo::rerun-if-changed=src/av/fsc.c");
-  println!("cargo::rerun-if-changed=src/av/fsc.h");
-  println!("cargo::rerun-if-changed=src/av/fmt.c");
-  println!("cargo::rerun-if-changed=src/av/fmt.h");
-  println!("cargo::rerun-if-changed=src/av/deint.c");
-  println!("cargo::rerun-if-changed=src/av/deint.h");
-  println!("cargo::rerun-if-changed=src/av/burn_in.c");
-  println!("cargo::rerun-if-changed=src/av/burn_in.h");
-  println!("cargo::rerun-if-changed=src/av/rendition.c");
-  println!("cargo::rerun-if-changed=src/av/rendition.h");
-  println!("cargo::rerun-if-changed=src/av/volume.c");
-  println!("cargo::rerun-if-changed=src/av/volume.h");
-  println!("cargo::rerun-if-changed=src/av/utils.c");
-  println!("cargo::rerun-if-changed=src/av/utils.h");
+  println!("cargo::rerun-if-changed=src/av/pipeline.c");
+  println!("cargo::rerun-if-changed=src/av/pipeline.h");
+  println!("cargo::rerun-if-changed=src/av/init/proc.c");
+  println!("cargo::rerun-if-changed=src/av/init/proc.h");
+  println!("cargo::rerun-if-changed=src/av/init/input.c");
+  println!("cargo::rerun-if-changed=src/av/init/input.h");
+  println!("cargo::rerun-if-changed=src/av/init/output.c");
+  println!("cargo::rerun-if-changed=src/av/init/output.h");
+  println!("cargo::rerun-if-changed=src/av/tools/hdr.c");
+  println!("cargo::rerun-if-changed=src/av/tools/hdr.h");
+  println!("cargo::rerun-if-changed=src/av/tools/swr.c");
+  println!("cargo::rerun-if-changed=src/av/tools/swr.h");
+  println!("cargo::rerun-if-changed=src/av/tools/fsc.c");
+  println!("cargo::rerun-if-changed=src/av/tools/fsc.h");
+  println!("cargo::rerun-if-changed=src/av/filters/fmt.c");
+  println!("cargo::rerun-if-changed=src/av/filters/fmt.h");
+  println!("cargo::rerun-if-changed=src/av/filters/deint.c");
+  println!("cargo::rerun-if-changed=src/av/filters/deint.h");
+  println!("cargo::rerun-if-changed=src/av/filters/burn_in.c");
+  println!("cargo::rerun-if-changed=src/av/filters/burn_in.h");
+  println!("cargo::rerun-if-changed=src/av/filters/rendition.c");
+  println!("cargo::rerun-if-changed=src/av/filters/rendition.h");
+  println!("cargo::rerun-if-changed=src/av/filters/volume.c");
+  println!("cargo::rerun-if-changed=src/av/filters/volume.h");
+  println!("cargo::rerun-if-changed=src/av/utils/utils.c");
+  println!("cargo::rerun-if-changed=src/av/utils/utils.h");
+  println!("cargo::rerun-if-changed=src/av/utils/common.h");
 
   dotenv().ok();
 
@@ -75,19 +76,19 @@ fn main()
   let mut cc_builder = cc::Build::new();
 
   cc_builder.file("src/av/scan_media_streams.c");
-  cc_builder.file("src/av/process_media.c");
-  cc_builder.file("src/av/proc.c");
-  cc_builder.file("src/av/input.c");
-  cc_builder.file("src/av/output.c");
-  cc_builder.file("src/av/hdr.c");
-  cc_builder.file("src/av/swr.c");
-  cc_builder.file("src/av/fsc.c");
-  cc_builder.file("src/av/fmt.c");
-  cc_builder.file("src/av/deint.c");
-  cc_builder.file("src/av/burn_in.c");
-  cc_builder.file("src/av/rendition.c");
-  cc_builder.file("src/av/volume.c");
-  cc_builder.file("src/av/utils.c");
+  cc_builder.file("src/av/pipeline.c");
+  cc_builder.file("src/av/init/proc.c");
+  cc_builder.file("src/av/init/input.c");
+  cc_builder.file("src/av/init/output.c");
+  cc_builder.file("src/av/tools/hdr.c");
+  cc_builder.file("src/av/tools/swr.c");
+  cc_builder.file("src/av/tools/fsc.c");
+  cc_builder.file("src/av/filters/fmt.c");
+  cc_builder.file("src/av/filters/deint.c");
+  cc_builder.file("src/av/filters/burn_in.c");
+  cc_builder.file("src/av/filters/rendition.c");
+  cc_builder.file("src/av/filters/volume.c");
+  cc_builder.file("src/av/utils/utils.c");
   cc_builder.define("DATABASE_URL", format!("\"{}\"", database_url).as_str());
 
   for path in &avformat.include_paths {
@@ -189,7 +190,7 @@ fn main()
   }
 
   let mut builder = bindgen::Builder::default()
-    .header("src/av/av.h")
+    .header("src/av/utils/av.h")
     .blocklist_item("FP_NAN")
     .blocklist_item("FP_INFINITE")
     .blocklist_item("FP_ZERO")

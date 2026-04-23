@@ -1,8 +1,8 @@
 #include "output.h"
 #include "input.h"
 #include "proc.h"
-#include "hdr.h"
-#include "utils.h"
+#include "../tools/hdr.h"
+#include "../utils/utils.h"
 
 static int copy_chapters(AVFormatContext *out_fmt_ctx,
   AVFormatContext *in_fmt_ctx)

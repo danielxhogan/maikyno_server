@@ -97,6 +97,7 @@ pub fn select_movies(pool: web::Data<DBPool>, library: Library)
 
   let media_result = media_dirs::table
     .filter(media_dirs::library_id.eq(&library.id))
+    .order_by(media_dirs::name)
     .get_results::<MediaDir>(&mut db)
     .map_err(|err| {
       let err_msg = format!("Failed to get movies for library:

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common.h"
+#include "../utils/common.h"
 
 typedef struct RenditionFilterContext {
   AVFilterContext *buffersrc_ctx;

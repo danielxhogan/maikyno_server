@@ -84,6 +84,7 @@ pub fn select_collections_by_id(pool: web::Data<DBPool>, library_id: String)
 
   let collections_result = collections::table
     .filter(collections::library_id.eq(&library_id))
+    .order_by(collections::name)
     .get_results::<Collection>(&mut db)
     .map_err(|err| {
       let err_msg = format!("Failed to get collections for library:
@@ -234,6 +235,7 @@ pub fn select_collection_shows_by_id(pool: web::Data<DBPool>, collection_id: Str
     .inner_join(shows::table.on(collection_shows::show_id.eq(shows::id)))
     .inner_join(collections::table.on(collection_shows::collection_id.eq(collections::id)))
     .filter(collection_shows::collection_id.eq(&collection_id))
+    .order_by(shows::name)
     .select((
       collection_shows::id,
       collections::id,
@@ -409,6 +411,7 @@ pub fn select_collection_movies_by_id(pool: web::Data<DBPool>, collection_id: St
     .inner_join(collections::table
       .on(collection_movies::collection_id.eq(collections::id)))
     .filter(collection_movies::collection_id.eq(&collection_id))
+    .order_by(media_dirs::name)
     .select((
       collection_movies::id,
       collections::id,

@@ -1,7 +1,6 @@
 #pragma once
 
-#include <libavformat/avformat.h>
-#include <libavcodec/avcodec.h>
+#include "../utils/common.h"
 
 #define SAMPLE_BUFFER_LENGTH AV_NUM_DATA_POINTERS
 

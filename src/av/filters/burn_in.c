@@ -1,5 +1,5 @@
 #include "burn_in.h"
-#include "proc.h"
+#include "../init/proc.h"
 
 SubToFrameContext *sub_to_frame_context_alloc(ProcessingContext *proc_ctx)
 {

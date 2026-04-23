@@ -1,5 +1,5 @@
 #include "rendition.h"
-#include "proc.h"
+#include "../init/proc.h"
 
 int get_rendition_filter_string(char *flt_str, ProcessingContext *proc_ctx)
 {

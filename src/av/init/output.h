@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common.h"
+#include "../utils/common.h"
 #include <sqlite3.h>
 
 int open_output(ProcessingContext *proc_ctx,

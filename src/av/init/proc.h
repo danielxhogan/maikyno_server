@@ -1,17 +1,17 @@
 #pragma once
 
-#include "common.h"
-
-#include "swr.h"
-#include "fsc.h"
-
-#include "fmt.h"
-#include "deint.h"
-#include "burn_in.h"
-#include "rendition.h"
-#include "volume.h"
 #include "input.h"
 
+#include "../tools/swr.h"
+#include "../tools/fsc.h"
+
+#include "../filters/fmt.h"
+#include "../filters/deint.h"
+#include "../filters/burn_in.h"
+#include "../filters/rendition.h"
+#include "../filters/volume.h"
+
+#include "../utils/common.h"
 #include <sqlite3.h>
 
 typedef struct StreamContext {

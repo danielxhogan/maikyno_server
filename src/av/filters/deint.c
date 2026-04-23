@@ -1,5 +1,5 @@
 #include "deint.h"
-#include "proc.h"
+#include "../init/proc.h"
 
 DeinterlaceFilterContext *deint_filter_context_init(
   ProcessingContext *proc_ctx, StreamContext *stream_ctx)

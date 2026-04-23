@@ -6,6 +6,7 @@
 #include <libavfilter/buffersrc.h>
 #include <libavfilter/buffersink.h>
 #include <libswscale/swscale.h>
+#include <libswresample/swresample.h>
 #include <libavutil/avutil.h>
 #include <libavutil/opt.h>
 #include <libavutil/pixdesc.h>

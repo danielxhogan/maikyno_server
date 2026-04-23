@@ -1,6 +1,6 @@
 #pragma once
 
-#include "proc.h"
+#include "../init/proc.h"
 #include <uuid/uuid.h>
 
 enum ProcessJobStatus {

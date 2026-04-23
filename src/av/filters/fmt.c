@@ -1,5 +1,5 @@
 #include "fmt.h"
-#include "proc.h"
+#include "../init/proc.h"
 
 int get_filter_string(char *flt_str, ProcessingContext *proc_ctx,
   StreamContext *stream_ctx, enum AVPixelFormat in_pix_fmt)

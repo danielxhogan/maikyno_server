@@ -1,5 +1,5 @@
 #include "volume.h"
-#include "proc.h"
+#include "../init/proc.h"
 
 VolumeFilterContext *volume_filter_context_init(
   StreamContext *stream_ctx, AVCodecContext *enc_ctx, int rendition)

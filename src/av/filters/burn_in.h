@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common.h"
+#include "../utils/common.h"
 
 #define SUBTITLE_OUTPUT_PIX_FMT AV_PIX_FMT_RGBA
 
