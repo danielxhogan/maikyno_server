@@ -1,10 +1,5 @@
 #include "deint.h"
-
-#include <libavformat/avformat.h>
-#include <libavcodec/avcodec.h>
-#include <libavfilter/avfilter.h>
-#include <libavutil/pixdesc.h>
-#include <libavutil/opt.h>
+#include "proc.h"
 
 DeinterlaceFilterContext *deint_filter_context_init(
   ProcessingContext *proc_ctx, StreamContext *stream_ctx)

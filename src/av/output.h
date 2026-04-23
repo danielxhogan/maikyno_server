@@ -1,10 +1,6 @@
 #pragma once
 
-#include "types.h"
-
-#include <libavformat/avformat.h>
-#include <libavcodec/avcodec.h>
-// #include <libavcodec/bsf.h>
+#include "common.h"
 #include <sqlite3.h>
 
 int open_output(ProcessingContext *proc_ctx,

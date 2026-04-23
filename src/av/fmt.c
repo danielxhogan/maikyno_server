@@ -1,6 +1,5 @@
 #include "fmt.h"
-#include "libavutil/avutil.h"
-#include "libavutil/pixdesc.h"
+#include "proc.h"
 
 int get_filter_string(char *flt_str, ProcessingContext *proc_ctx,
   StreamContext *stream_ctx, enum AVPixelFormat in_pix_fmt)

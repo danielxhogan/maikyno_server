@@ -1,4 +1,5 @@
 #include "input.h"
+#include "proc.h"
 
 int get_input_file(char **input_file, char *process_job_id, sqlite3 *db)
 {

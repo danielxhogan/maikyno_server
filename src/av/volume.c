@@ -1,7 +1,5 @@
 #include "volume.h"
-
-#include <libavutil/pixdesc.h>
-#include <libavutil/opt.h>
+#include "proc.h"
 
 VolumeFilterContext *volume_filter_context_init(
   StreamContext *stream_ctx, AVCodecContext *enc_ctx, int rendition)

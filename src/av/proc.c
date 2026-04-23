@@ -1,10 +1,4 @@
 #include "proc.h"
-#include "fmt.h"
-#include "deint.h"
-#include "burn_in.h"
-#include "rendition.h"
-#include "volume.h"
-#include "input.h"
 
 int get_input_file_nb_streams(char *process_job_id, sqlite3 *db)
 {

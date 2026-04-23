@@ -1,5 +1,6 @@
 #include "output.h"
 #include "input.h"
+#include "proc.h"
 #include "hdr.h"
 #include "utils.h"
 

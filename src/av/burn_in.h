@@ -1,13 +1,27 @@
 #pragma once
 
-#include "types.h"
-
-#include <libswscale/swscale.h>
-#include <libavfilter/buffersrc.h>
-#include <libavutil/pixdesc.h>
-#include <libavutil/opt.h>
+#include "common.h"
 
 #define SUBTITLE_OUTPUT_PIX_FMT AV_PIX_FMT_RGBA
+
+typedef struct SubToFrameContext {
+  struct SwsContext *sws_ctx;
+  enum AVPixelFormat in_pix_fmt;
+  enum AVPixelFormat out_pix_fmt;
+  long width_ratio;
+  long height_ratio;
+  int scale_algo;
+  AVFrame *subtitle_frame;
+} SubToFrameContext;
+
+typedef struct BurnInFilterContext {
+  AVFilterContext *v_buffersrc_ctx;
+  AVFilterContext *s_buffersrc_ctx;
+  AVFilterContext *buffersink_ctx;
+  AVFilterGraph *filter_graph;
+  AVFrame *filtered_frame;
+  SubToFrameContext *stf_ctx;
+} BurnInFilterContext;
 
 int sub_to_frame_convert(ProcessingContext *proc_ctx);
 int push_dummy_subtitle(ProcessingContext *proc_ctx,

@@ -1,7 +1,6 @@
 #pragma once
 
-#include "types.h"
-
+#include "common.h"
 #include <sqlite3.h>
 
 #define INACTIVE_STREAM -1

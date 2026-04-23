@@ -1,7 +1,5 @@
 #include "rendition.h"
-
-#include <libavutil/pixdesc.h>
-#include <libavutil/opt.h>
+#include "proc.h"
 
 int get_rendition_filter_string(char *flt_str, ProcessingContext *proc_ctx)
 {

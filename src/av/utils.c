@@ -1,7 +1,6 @@
 #include "utils.h"
 
 #include <sqlite3.h>
-
 #include <stdio.h>
 
 #ifdef _WIN32

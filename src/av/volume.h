@@ -1,4 +1,13 @@
-#include "types.h"
+#pragma once
+
+#include "common.h"
+
+typedef struct VolumeFilterContext {
+  AVFilterContext *buffersink_ctx;
+  AVFilterContext *buffersrc_ctx;
+  AVFilterGraph *filter_graph;
+  AVFrame *frame;
+} VolumeFilterContext;
 
 VolumeFilterContext *volume_filter_context_init(
   StreamContext *stream_ctx, AVCodecContext *enc_ctx, int rendition);

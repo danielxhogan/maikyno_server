@@ -6,7 +6,7 @@
 #include "burn_in.h"
 #include "utils.h"
 
-#include <stdio.h>
+#include <sqlite3.h>
 #include <time.h>
 
 int pts_offset = 0;
