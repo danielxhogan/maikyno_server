@@ -245,33 +245,33 @@ fn create_new_library_dirs(new_paths: Vec<String>, root_library_dir: &String,
 }
 
 #[post("/new_library")]
-pub async fn new_library(new_library_info: web::Json<NewLibraryParams>,
+pub async fn new_library(new_library_params: web::Json<NewLibraryParams>,
   pool: web::Data<DBPool>, app_state: web::Data<AppState>)
   -> actix_web::Result<String>
 {
   let media_type: MediaType;
   let mut err_msg: String;
 
-  if new_library_info.media_type == MediaType::Movie.to_string() {
+  if new_library_params.media_type == MediaType::Movie.to_string() {
     media_type = MediaType::Movie;
   }
-  else if new_library_info.media_type == MediaType::Show.to_string() {
+  else if new_library_params.media_type == MediaType::Show.to_string() {
     media_type = MediaType::Show;
   }
   else {
     err_msg = format!("{:?}: {:?}",
-      MKErrorType::InvalidMediaType.to_string(), &new_library_info.media_type);
+      MKErrorType::InvalidMediaType.to_string(), &new_library_params.media_type);
 
     eprintln!("{err_msg}");
     return Err(MKError::new(MKErrorType::InvalidMediaType, err_msg).into());
   }
 
   let root_library_dir = format!("{}/{}",
-    app_state.root_media_dir_string, new_library_info.name);
+    app_state.root_media_dir_string, new_library_params.name);
 
   if PathBuf::from(&root_library_dir).exists() {
     let err_msg = format!("Library: {:?} already exists.",
-    &new_library_info.name);
+    &new_library_params.name);
 
     eprintln!("{err_msg}");
     return Err(MKError::new(MKErrorType::LibraryAlreadyExists, err_msg).into())
@@ -284,8 +284,8 @@ pub async fn new_library(new_library_info: web::Json<NewLibraryParams>,
 
   let mut new_library_dirs: Vec<NewLibraryDir> = vec![];
 
-  new_library_dirs = match create_new_library_dirs(new_library_info.paths.clone(),
-    &root_library_dir, &new_library_info.name)
+  new_library_dirs = match create_new_library_dirs(new_library_params.paths.clone(),
+    &root_library_dir, &new_library_params.name)
   {
     Ok(new_library_dirs) => {new_library_dirs},
     Err(err) => {
@@ -331,7 +331,7 @@ pub async fn new_library(new_library_info: web::Json<NewLibraryParams>,
   }
 
   let new_library = NewLibrary {
-    name: new_library_info.name.clone(),
+    name: new_library_params.name.clone(),
     media_type: media_type.to_string()
   };
 
@@ -384,12 +384,12 @@ pub async fn new_library(new_library_info: web::Json<NewLibraryParams>,
 }
 
 #[post("/add_library_dirs")]
-pub async fn add_library_dirs(new_library_dir_info: web::Json<NewLibraryDirParams>,
+pub async fn add_library_dirs(new_library_dir_params: web::Json<NewLibraryDirParams>,
   pool: web::Data<DBPool>, app_state: web::Data<AppState>)
   -> actix_web::Result<String>
 {
   let pool_clone = pool.clone();
-  let library_id_clone = new_library_dir_info.library_id.clone();
+  let library_id_clone = new_library_dir_params.library_id.clone();
   let block_thread_result = web::block(|| {
     return select_library(pool_clone, library_id_clone);
   }).await;
@@ -414,7 +414,7 @@ pub async fn add_library_dirs(new_library_dir_info: web::Json<NewLibraryDirParam
     app_state.root_media_dir_string, library.name);
 
   let new_library_dirs =
-    match create_new_library_dirs(new_library_dir_info.paths.clone(),
+    match create_new_library_dirs(new_library_dir_params.paths.clone(),
       &root_library_dir, &library.name)
     {
       Ok(new_library_dirs) => { new_library_dirs },
@@ -594,11 +594,11 @@ pub async fn get_seasons(get_seasons_params: web::Json<GetSeasonsParams>,
 }
 
 #[post("/get_movies")]
-pub async fn get_movies(get_movies_info: web::Json<GetMoviesParams>,
+pub async fn get_movies(get_movies_params: web::Json<GetMoviesParams>,
   pool: web::Data<DBPool>) -> impl Responder
 {
   let pool_clone = pool.clone();
-  let library_id_clone = get_movies_info.library_id.clone();
+  let library_id_clone = get_movies_params.library_id.clone();
   let block_thread_result = web::block(|| {
     return select_library(pool_clone, library_id_clone);
   }).await;
@@ -666,11 +666,11 @@ pub async fn get_collection_movies(
 }
 
 #[post("/get_videos")]
-pub async fn get_videos(get_videos_info: web::Json<GetVideosParams>,
+pub async fn get_videos(get_videos_params: web::Json<GetVideosParams>,
   pool: web::Data<DBPool>) -> impl Responder
 {
   let pool_clone = pool.clone();
-  let media_dir_id_clone = get_videos_info.media_dir_id.clone();
+  let media_dir_id_clone = get_videos_params.media_dir_id.clone();
   let block_thread_result = web::block(|| {
     return select_media_dir(pool_clone, media_dir_id_clone);
   }).await;

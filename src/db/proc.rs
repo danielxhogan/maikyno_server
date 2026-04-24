@@ -1,23 +1,27 @@
 use crate::db::{
   config::{
-    db_connect::{ get_db_conn, DBPool },
+    db_connect::{ DBPool, get_db_conn },
     models::{
       Stream,
       VideoStreams,
       MediaDirStreams,
+      Batch,
       ProcessJob,
       ProcessJobVideoStream,
       ProcessJobAudioStream,
       ProcessJobSubtitleStream,
-      Batch,
+      ProcessJobInfo,
+      ProcessJobStreams,
     },
     schema::{
+      media_dirs,
+      videos,
       streams,
+      batches,
       process_jobs,
       process_job_video_streams,
       process_job_audio_streams,
       process_job_subtitle_streams,
-      batches,
     }
   },
   media::{ select_video, select_videos_by_id }
@@ -360,6 +364,98 @@ pub fn select_process_jobs_for_batch_id(pool: web::Data<DBPool>, batch_id: Strin
     });
 
   return process_jobs_result;
+}
+
+pub fn select_process_jobs_for_media_dir(media_dir_id: String,
+  pool: web::Data<DBPool>) -> Result<Vec<ProcessJobStreams>, MKError>
+{
+  let mut db = match get_db_conn(pool) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
+
+  let process_jobs = match process_jobs::table
+    .inner_join(videos::table.on(process_jobs::video_id.eq(videos::id)))
+    .inner_join(media_dirs::table.on(videos::media_dir_id.eq(media_dirs::id)))
+    .filter(media_dirs::id.eq(&media_dir_id))
+    .order_by(process_jobs::created.desc())
+    .select((
+      process_jobs::id,
+      videos::name,
+      process_jobs::created,
+      process_jobs::job_status,
+      process_jobs::pct_complete,
+    ))
+    .get_results::<ProcessJobInfo>(&mut db)
+    {
+      Ok(process_jobs) => { process_jobs },
+      Err(err) => {
+        let err_msg = format!("Failed to get process_jobs for media_dir:
+          {:?}\nError: {:?}", media_dir_id, err);
+
+        eprintln!("{err_msg:?}");
+        return Err(MKError::new(MKErrorType::DBError, err_msg));
+      }
+    };
+
+    let mut process_jobs_streams_vec: Vec<ProcessJobStreams> = vec![];
+
+    for process_job in process_jobs {
+      let process_jobs_video_stream = match process_job_video_streams::table
+        .filter(process_job_video_streams::process_job_id
+          .eq(&process_job.process_job_id))
+        .get_result::<ProcessJobVideoStream>(&mut db)
+        {
+          Ok(process_jobs_video_stream) => { process_jobs_video_stream },
+          Err(err) => {
+            let err_msg = format!("Failed to get process_job_video_stream \
+for process_job: {:?}\nError: {:?}", process_job.process_job_id, err);
+
+            eprintln!("{err_msg:?}");
+            return Err(MKError::new(MKErrorType::DBError, err_msg));
+          }
+        };
+
+      let process_job_audio_stream_vec = match process_job_audio_streams::table
+        .filter(process_job_audio_streams::process_job_id
+          .eq(&process_job.process_job_id))
+        .get_results::<ProcessJobAudioStream>(&mut db)
+        {
+          Ok(process_jobs_audio_stream_vec) => { process_jobs_audio_stream_vec },
+          Err(err) => {
+            let err_msg = format!("Failed to get process_job_audio_streams \
+for process_job: {:?}\nError: {:?}", process_job.process_job_id, err);
+
+            eprintln!("{err_msg:?}");
+            return Err(MKError::new(MKErrorType::DBError, err_msg));
+          }
+        };
+
+      let process_job_subtitle_stream_vec = match process_job_subtitle_streams::table
+        .filter(process_job_subtitle_streams::process_job_id
+          .eq(&process_job.process_job_id))
+        .get_results::<ProcessJobSubtitleStream>(&mut db)
+        {
+          Ok(process_jobs_subtitle_stream_vec) => { process_jobs_subtitle_stream_vec },
+          Err(err) => {
+            let err_msg = format!("Failed to get process_job_subtitle_streams \
+for process_job: {:?}\nError: {:?}", process_job.process_job_id, err);
+
+            eprintln!("{err_msg:?}");
+            return Err(MKError::new(MKErrorType::DBError, err_msg));
+          }
+        };
+
+      let process_job_streams = ProcessJobStreams {
+        process_job: process_job,
+        video_stream: process_jobs_video_stream,
+        audio_streams: process_job_audio_stream_vec,
+        subtitle_streams: process_job_subtitle_stream_vec
+      };
+
+      process_jobs_streams_vec.push(process_job_streams);
+    }
+
+  return Ok(process_jobs_streams_vec);
 }
 
 pub fn update_status_process_job(pool: web::Data<DBPool>,

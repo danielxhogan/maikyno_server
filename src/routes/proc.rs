@@ -4,6 +4,7 @@ use crate::db::{
   proc::{
     get_media_dir_streams,
     create_batch,
+    select_process_jobs_for_media_dir,
     update_batch_abort
   }
 };
@@ -33,6 +34,11 @@ struct RenameExtrasParams {
 
 #[derive(Deserialize, Clone)]
 struct ScanMediaDirStreamsParams {
+  media_dir_id: String
+}
+
+#[derive(Deserialize)]
+struct GetProcessJobsParams {
   media_dir_id: String
 }
 
@@ -298,6 +304,33 @@ pub async fn process_media(process_media_info: web::Json<ProcessMediaParams>,
   });
 
   return Ok("hi".to_string());
+}
+
+#[post("/get_process_jobs")]
+pub async fn get_process_jobs(
+  get_process_jobs_params: web::Json<GetProcessJobsParams>,
+  pool: web::Data<DBPool>) -> impl Responder
+{
+  let media_dir_id_clone = get_process_jobs_params.media_dir_id.clone();
+  let block_thread_result = web::block(|| {
+    return select_process_jobs_for_media_dir(media_dir_id_clone, pool);
+  }).await;
+
+  let process_jobs = match block_thread_result
+  {
+    Ok(process_jobs_result) => {
+      match process_jobs_result
+      {
+        Ok(process_jobs) => { process_jobs },
+        Err(err) => { return Err(err); }
+      }
+    },
+    Err(err) => {
+      return Err(blocking_error(err));
+    }
+  };
+
+  return Ok(web::Json(process_jobs));
 }
 
 #[post("/abort_batch")]

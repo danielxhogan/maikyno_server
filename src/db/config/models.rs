@@ -337,9 +337,9 @@ pub struct ProcessJob {
   pub batch_id: String,
 }
 
-#[derive(Debug, Insertable, Queryable, Clone)]
+#[derive(Debug, Insertable, Queryable, Clone, Serialize)]
 #[diesel(table_name = process_job_video_streams)]
-pub struct  ProcessJobVideoStream {
+pub struct ProcessJobVideoStream {
   pub id: String,
   pub title: Option<String>,
   pub passthrough: bool,
@@ -355,9 +355,9 @@ pub struct  ProcessJobVideoStream {
   pub process_job_id: String
 }
 
-#[derive(Debug, Insertable, Queryable, Clone)]
+#[derive(Debug, Insertable, Queryable, Clone, Serialize)]
 #[diesel(table_name = process_job_audio_streams)]
-pub struct  ProcessJobAudioStream {
+pub struct ProcessJobAudioStream {
   pub id: String,
   pub title: Option<String>,
   pub passthrough: bool,
@@ -369,9 +369,9 @@ pub struct  ProcessJobAudioStream {
   pub process_job_id: String
 }
 
-#[derive(Debug, Insertable, Queryable, Clone)]
+#[derive(Debug, Insertable, Queryable, Clone, Serialize)]
 #[diesel(table_name = process_job_subtitle_streams)]
-pub struct  ProcessJobSubtitleStream {
+pub struct ProcessJobSubtitleStream {
   pub id: String,
   pub title: Option<String>,
   pub burn_in: bool,
@@ -379,9 +379,26 @@ pub struct  ProcessJobSubtitleStream {
   pub process_job_id: String
 }
 
+#[derive(Queryable, Serialize)]
+pub struct ProcessJobInfo {
+  pub process_job_id: String,
+  pub video_name: String,
+  pub created: NaiveDateTime,
+  pub job_status: String,
+  pub pct_complete: i32
+}
+
+#[derive(Serialize)]
+pub struct ProcessJobStreams {
+  pub process_job: ProcessJobInfo,
+  pub video_stream: ProcessJobVideoStream,
+  pub audio_streams: Vec<ProcessJobAudioStream>,
+  pub subtitle_streams: Vec<ProcessJobSubtitleStream>
+}
+
 #[derive(Debug, Insertable, Queryable, Clone)]
 #[diesel(table_name = batches)]
-pub struct  Batch {
+pub struct Batch {
   pub id: String,
   pub batch_size: i32,
   pub aborted: bool

@@ -23,7 +23,13 @@ use routes::{
     save_state
   },
   scan_library::scan_library,
-  proc::{ rename_extras, scan_media_streams, process_media, abort_batch }
+  proc::{
+    rename_extras,
+    scan_media_streams,
+    process_media,
+    get_process_jobs,
+    abort_batch
+  }
 };
 
 use actix_web::{web, App, HttpServer};
@@ -75,6 +81,7 @@ async fn main() -> std::io::Result<()>
       .service(rename_extras)
       .service(scan_media_streams)
       .service(process_media)
+      .service(get_process_jobs)
       .service(abort_batch)
       .service(af::Files::new("media",
         root_media_dir_pathbuf.clone()));
