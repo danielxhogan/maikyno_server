@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS process_jobs (
   stream_count INT,
   pct_complete INT NOT NULL,
   err_msg VARCHAR,
+  created DATETIME NOT NULL,
   video_id VARCHAR REFERENCES videos(id) NOT NULL,
   batch_id VARCHAR REFERENCES batches(id) NOT NULL
 );

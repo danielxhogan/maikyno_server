@@ -1,6 +1,6 @@
 use crate::db::{
   config::{
-    db_connect::{get_db_conn, DBPool},
+    db_connect::{ get_db_conn, DBPool },
     models::{
       Stream,
       VideoStreams,
@@ -20,15 +20,16 @@ use crate::db::{
       batches,
     }
   },
-  media::{select_video, select_videos_by_id}
+  media::{ select_video, select_videos_by_id }
 };
 
 use crate::utils::{
-  mk_error::{MKError, MKErrorType, blocking_error},
-  proc::{ProcessMediaInfo, ProcessVideoInfo, ProcessJobStatus}
+  mk_error::{ MKError, MKErrorType, blocking_error },
+  proc::{ ProcessMediaParams, ProcessVideoParams, ProcessJobStatus }
 };
 
 use actix_web::web;
+use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use uuid::Uuid;
 
@@ -104,7 +105,7 @@ pub async fn get_media_dir_streams(media_dir_id: String,
   return Ok(media_dirs_streams);
 }
 
-pub async fn create_batch(process_media_info: ProcessMediaInfo,
+pub async fn create_batch(process_media_info: ProcessMediaParams,
   pool: web::Data<DBPool>) -> Result<Batch, MKError>
 {
   let mut db = match get_db_conn(pool.clone()) {
@@ -132,7 +133,8 @@ pub async fn create_batch(process_media_info: ProcessMediaInfo,
 
   let mut pool_clone: web::Data<DBPool>;
   let mut batch_id_clone: String;
-  let mut video_info_clone: ProcessVideoInfo;
+  let mut video_info_clone: ProcessVideoParams;
+  let created = chrono::Utc::now().naive_utc();
 
   for video_info in process_media_info.videos.clone()
   {
@@ -141,7 +143,8 @@ pub async fn create_batch(process_media_info: ProcessMediaInfo,
     video_info_clone = video_info.clone();
 
     let block_thread_result = web::block(move || {
-      return create_process_job(batch_id_clone, video_info_clone, pool_clone);
+      return create_process_job(batch_id_clone,
+        video_info_clone, created, pool_clone);
     }).await;
 
     match block_thread_result {
@@ -159,7 +162,8 @@ pub async fn create_batch(process_media_info: ProcessMediaInfo,
   return create_batch_result;
 }
 
-pub async fn create_process_job(batch_id: String, video_info: ProcessVideoInfo,
+pub async fn create_process_job(batch_id: String,
+  video_info: ProcessVideoParams, created: NaiveDateTime,
   pool: web::Data<DBPool>) -> Result<ProcessJob, MKError>
 {
   let mut stream_count = 1;
@@ -194,6 +198,7 @@ pub async fn create_process_job(batch_id: String, video_info: ProcessVideoInfo,
       stream_count: None,
       pct_complete: 0,
       err_msg: None,
+      created: created,
       video_id: video_info.video_id.clone(),
       batch_id: batch_id,
     };

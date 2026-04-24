@@ -1,7 +1,7 @@
 use crate::db::{
   config::{
     db_connect::DBPool,
-    models::{NewLibrary, NewLibraryDir, UpdateVideo}
+    models::{ NewLibrary, NewLibraryDir, UpdateVideo }
   },
   library::{
     MediaType,
@@ -23,7 +23,7 @@ use crate::db::{
     select_videos,
     update_video
   },
-  show::{select_shows_by_id}
+  show::select_shows_by_id
 };
 
 use crate::AppState;
@@ -45,14 +45,14 @@ use std::{
 };
 
 #[derive(Deserialize)]
-struct NewLibraryInfo {
+struct NewLibraryParams {
   name: String,
   paths: Vec<String>,
   media_type: String
 }
 
 #[derive(Deserialize)]
-struct NewLibraryDirInfo {
+struct NewLibraryDirParams {
   library_id: String,
   paths: Vec<String>,
 }
@@ -78,7 +78,7 @@ struct GetSeasonsParams {
 }
 
 #[derive(Deserialize)]
-struct GetMoviesInfo {
+struct GetMoviesParams {
   library_id: String,
 }
 
@@ -88,7 +88,7 @@ struct GetCollectionMoviesParams {
 }
 
 #[derive(Deserialize)]
-struct GetVideosInfo {
+struct GetVideosParams {
   media_dir_id: String,
 }
 
@@ -105,7 +105,7 @@ struct SaveStateParams {
 }
 
 fn create_new_library_dirs(new_paths: Vec<String>, root_library_dir: &String,
-  library_name: &String) -> Result< Vec<NewLibraryDir>, MKError>
+  library_name: &String) -> Result<Vec<NewLibraryDir>, MKError>
 {
   let err_msg: String;
   let mut new_library_path: PathBuf;
@@ -245,7 +245,7 @@ fn create_new_library_dirs(new_paths: Vec<String>, root_library_dir: &String,
 }
 
 #[post("/new_library")]
-pub async fn new_library(new_library_info: web::Json<NewLibraryInfo>,
+pub async fn new_library(new_library_info: web::Json<NewLibraryParams>,
   pool: web::Data<DBPool>, app_state: web::Data<AppState>)
   -> actix_web::Result<String>
 {
@@ -384,7 +384,7 @@ pub async fn new_library(new_library_info: web::Json<NewLibraryInfo>,
 }
 
 #[post("/add_library_dirs")]
-pub async fn add_library_dirs(new_library_dir_info: web::Json<NewLibraryDirInfo>,
+pub async fn add_library_dirs(new_library_dir_info: web::Json<NewLibraryDirParams>,
   pool: web::Data<DBPool>, app_state: web::Data<AppState>)
   -> actix_web::Result<String>
 {
@@ -594,7 +594,7 @@ pub async fn get_seasons(get_seasons_params: web::Json<GetSeasonsParams>,
 }
 
 #[post("/get_movies")]
-pub async fn get_movies(get_movies_info: web::Json<GetMoviesInfo>,
+pub async fn get_movies(get_movies_info: web::Json<GetMoviesParams>,
   pool: web::Data<DBPool>) -> impl Responder
 {
   let pool_clone = pool.clone();
@@ -666,7 +666,7 @@ pub async fn get_collection_movies(
 }
 
 #[post("/get_videos")]
-pub async fn get_videos(get_videos_info: web::Json<GetVideosInfo>,
+pub async fn get_videos(get_videos_info: web::Json<GetVideosParams>,
   pool: web::Data<DBPool>) -> impl Responder
 {
   let pool_clone = pool.clone();

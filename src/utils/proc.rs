@@ -7,7 +7,7 @@ use derive_more::Display;
 use serde::Deserialize;
 
 #[derive(Deserialize, Clone)]
-pub struct ProcessVideoStreamInfo {
+pub struct ProcessVideoStreamParams {
   pub id: String,
   pub title: Option<String>,
   pub passthrough: bool,
@@ -22,7 +22,7 @@ pub struct ProcessVideoStreamInfo {
 }
 
 #[derive(Deserialize, Clone)]
-pub struct ProcessAudioStreamInfo {
+pub struct ProcessAudioStreamParams {
   pub id: String,
   pub title: Option<String>,
   pub passthrough: bool,
@@ -33,26 +33,25 @@ pub struct ProcessAudioStreamInfo {
 }
 
 #[derive(Deserialize, Clone)]
-pub struct ProcessSubtitleStreamInfo {
+pub struct ProcessSubtitleStreamParams {
   pub id: String,
   pub title: Option<String>,
   pub burn_in: bool,
 }
 
 #[derive(Deserialize, Clone)]
-pub struct ProcessVideoInfo {
+pub struct ProcessVideoParams {
   pub video_id: String,
   pub title: Option<String>,
-  pub video_stream: ProcessVideoStreamInfo,
-  pub audio_streams: Vec<ProcessAudioStreamInfo>,
-  pub subtitle_streams: Vec<ProcessSubtitleStreamInfo>,
-  // pub process_id: Option<String>
+  pub video_stream: ProcessVideoStreamParams,
+  pub audio_streams: Vec<ProcessAudioStreamParams>,
+  pub subtitle_streams: Vec<ProcessSubtitleStreamParams>,
 }
 
 #[derive(Deserialize, Clone)]
-pub struct ProcessMediaInfo {
+pub struct ProcessMediaParams {
   pub media_dir_id: String,
-  pub videos: Vec<ProcessVideoInfo>,
+  pub videos: Vec<ProcessVideoParams>,
 }
 
 #[derive(Display, Clone)]

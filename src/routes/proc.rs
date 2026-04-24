@@ -9,40 +9,40 @@ use crate::db::{
 };
 
 use crate::utils::{
-  proc::ProcessMediaInfo,
+  proc::ProcessMediaParams,
   mk_fs::mk_read_dir,
-  mk_error::{MKError, MKErrorType, blocking_error},
+  mk_error::{ MKError, MKErrorType, blocking_error },
 };
 
 use crate::av;
 
-use actix_web::{Responder, post, web};
+use actix_web::{ Responder, post, web };
 use serde::Deserialize;
 
 use std::{
   ffi::CString,
-  fs::{create_dir_all, rename},
-  os::raw::{c_char},
+  fs::{ create_dir_all, rename },
+  os::raw::c_char,
   path::PathBuf
 };
 
 #[derive(Deserialize)]
-struct RenameExtrasInfo {
+struct RenameExtrasParams {
   media_dir_id: String
 }
 
 #[derive(Deserialize, Clone)]
-struct ScanMediaDirStreamsInfo {
+struct ScanMediaDirStreamsParams {
   media_dir_id: String
 }
 
 #[derive(Deserialize)]
-struct AbortBatchInfo {
+struct AbortBatchParams {
   batch_id: String
 }
 
 #[post("/rename_extras")]
-pub async fn rename_extras(rename_extras_info: web::Json<RenameExtrasInfo>,
+pub async fn rename_extras(rename_extras_info: web::Json<RenameExtrasParams>,
   pool: web::Data<DBPool>) -> actix_web::Result<String>
 {
   let pool_clone = pool.clone();
@@ -76,19 +76,28 @@ pub async fn rename_extras(rename_extras_info: web::Json<RenameExtrasInfo>,
   for extra_result in extras {
     let extra = match extra_result {
       Ok(extra) => { extra },
-      Err(err) => { eprintln!("Error geting extra dir entry: {:?}", err); continue; }
+      Err(err) => {
+        eprintln!("Error geting extra dir entry: {:?}", err);
+        continue;
+      }
     };
 
     let extra_path = extra.path();
 
     let extra_parent = match extra_path.parent() {
       Some(file_stem) => { file_stem },
-      None => { eprintln!("No parent found for extra {video_count}"); continue; }
+      None => {
+        eprintln!("No parent found for extra {video_count}");
+        continue;
+      }
     };
 
     let extra_ext = match extra_path.extension() {
       Some(ext) => { ext },
-      None => { eprintln!("No extension found for extra {video_count}"); continue; }
+      None => {
+        eprintln!("No extension found for extra {video_count}");
+        continue;
+      }
     };
 
     let tmp_name = format!("{}/{:05}.{}",
@@ -112,19 +121,28 @@ pub async fn rename_extras(rename_extras_info: web::Json<RenameExtrasInfo>,
   for extra_result in extras {
     let extra = match extra_result {
       Ok(extra) => { extra },
-      Err(err) => { eprintln!("Error geting extra dir entry: {:?}", err); continue; }
+      Err(err) => {
+        eprintln!("Error geting extra dir entry: {:?}", err);
+        continue;
+      }
     };
 
     let extra_path = extra.path();
 
     let extra_parent = match extra_path.parent() {
       Some(file_stem) => { file_stem },
-      None => { eprintln!("No parent found for extra {video_count}"); continue; }
+      None => {
+        eprintln!("No parent found for extra {video_count}");
+        continue;
+      }
     };
 
     let extra_ext = match extra_path.extension() {
       Some(ext) => { ext },
-      None => { eprintln!("No extension found for extra {video_count}"); continue; }
+      None => {
+        eprintln!("No extension found for extra {video_count}");
+        continue;
+      }
     };
 
     let new_name = format!("{}/{:02}.{}",
@@ -143,7 +161,7 @@ pub async fn rename_extras(rename_extras_info: web::Json<RenameExtrasInfo>,
 
 #[post("/scan_media_streams")]
 pub async fn scan_media_streams(
-  scan_media_dir_streams_info: web::Json<ScanMediaDirStreamsInfo>,
+  scan_media_dir_streams_info: web::Json<ScanMediaDirStreamsParams>,
   pool: web::Data<DBPool>) -> impl Responder
 {
   unsafe {
@@ -184,7 +202,7 @@ pub async fn scan_media_streams(
 }
 
 #[post("/process_media")]
-pub async fn process_media(process_media_info: web::Json<ProcessMediaInfo>,
+pub async fn process_media(process_media_info: web::Json<ProcessMediaParams>,
   pool: web::Data<DBPool>) -> actix_web::Result<String>
 {
   if process_media_info.videos.len() == 0 {
@@ -283,7 +301,7 @@ pub async fn process_media(process_media_info: web::Json<ProcessMediaInfo>,
 }
 
 #[post("/abort_batch")]
-pub async fn abort_batch(abort_batch_info: web::Json<AbortBatchInfo>,
+pub async fn abort_batch(abort_batch_info: web::Json<AbortBatchParams>,
   pool: web::Data<DBPool>) -> Result<String, MKError>
 {
   let pool_clone = pool.clone();

@@ -1,7 +1,7 @@
 use std::{
   collections::HashMap,
-  fs::{DirEntry, ReadDir},
-  os::unix::fs::{DirEntryExt, MetadataExt},
+  fs::{ DirEntry, ReadDir },
+  os::unix::fs::{ DirEntryExt, MetadataExt },
   path::PathBuf
 };
 
@@ -32,9 +32,9 @@ use crate::db::{
     }
   },
   library::{
+    MediaType,
     select_library,
-    select_library_dirs,
-    MediaType
+    select_library_dirs
   },
   collection::{
     create_collection,
@@ -79,7 +79,7 @@ use actix_web::{post, web};
 use serde::Deserialize;
 
 #[derive(Deserialize, Clone)]
-struct ScanLibraryInfo {
+struct ScanLibraryParams {
   library_id: String
 }
 
@@ -103,7 +103,7 @@ struct ScanShowsCollectionInfo<'a> {
   collection_shows_seen: &'a mut CollectionShowsSeen,
   collection: &'a Collection
 }
-  
+
 struct ScanMoviesCollectionInfo<'a> {
   collection_movies_seen: &'a mut CollectionMoviesSeen,
   collection: &'a Collection
@@ -1653,7 +1653,7 @@ async fn scan_shows(scan_path_buf: &PathBuf,
 }
 
 #[post("/scan_library")]
-pub async fn scan_library(scan_library_info: web::Json<ScanLibraryInfo>,
+pub async fn scan_library(scan_library_info: web::Json<ScanLibraryParams>,
   pool: web::Data<DBPool>) -> actix_web::Result<String>
 {
   let library_record =

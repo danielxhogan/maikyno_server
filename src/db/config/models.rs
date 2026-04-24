@@ -17,6 +17,8 @@ use crate::db::config::schema::{
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use chrono::NaiveDateTime;
+
 #[derive(Debug, Queryable, Selectable, Insertable, Serialize, Clone)]
 #[diesel(table_name = libraries)]
 pub struct Library {
@@ -330,6 +332,7 @@ pub struct ProcessJob {
   pub stream_count: Option<i32>,
   pub pct_complete: i32,
   pub err_msg: Option<String>,
+  pub created: NaiveDateTime,
   pub video_id: String,
   pub batch_id: String,
 }
