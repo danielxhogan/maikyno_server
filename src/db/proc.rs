@@ -384,6 +384,7 @@ pub fn select_process_jobs_for_media_dir(media_dir_id: String,
       process_jobs::created,
       process_jobs::job_status,
       process_jobs::pct_complete,
+      process_jobs::batch_id
     ))
     .get_results::<ProcessJobInfo>(&mut db)
     {

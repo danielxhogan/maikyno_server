@@ -385,7 +385,8 @@ pub struct ProcessJobInfo {
   pub video_name: String,
   pub created: NaiveDateTime,
   pub job_status: String,
-  pub pct_complete: i32
+  pub pct_complete: i32,
+  pub batch_id: String,
 }
 
 #[derive(Serialize)]

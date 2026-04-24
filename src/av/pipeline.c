@@ -996,14 +996,13 @@ void flush_encoders(ProcessingContext *proc_ctx)
 int process_video(char *process_job_id, const char *batch_id, char **out_filename)
 {
   int ret = 0;
+  ProcessingContext *proc_ctx = NULL;
+  sqlite3 *db = NULL;
+  StreamContext *stream_ctx;
 
   if ((ret = check_abort_status(batch_id)) == ABORTED) {
     goto update_status;
   }
-
-  ProcessingContext *proc_ctx = NULL;
-  StreamContext *stream_ctx;
-  sqlite3 *db;
 
   av_log_set_level(AV_LOG_ERROR);
 
@@ -1054,7 +1053,11 @@ int process_video(char *process_job_id, const char *batch_id, char **out_filenam
   db = NULL;
 
   if ((ret = main_loop(proc_ctx, batch_id, process_job_id)) < 0) {
-    fprintf(stderr, "Failed during main processing loop.\n");
+    if (ret == ABORTED) {
+      fprintf(stderr, "Received abort signal. Exiting main processing loop.\n");
+    } else {
+      fprintf(stderr, "Failed during main processing loop.\n");
+    }
   }
 
   flush_decoders(proc_ctx);
@@ -1081,9 +1084,8 @@ int process_video(char *process_job_id, const char *batch_id, char **out_filenam
   }
 
   if (proc_ctx->rend_ctx) {
-    if ((ret = make_rendtion(proc_ctx, NULL)) < 0) {
+    if (make_rendtion(proc_ctx, NULL) < 0) {
       fprintf(stderr, "Failed to flush rendition context.\n");
-      return ret;
     }
   }
 
@@ -1308,7 +1310,9 @@ int process_media(const char *batch_id)
 
   time_t timer;
   struct tm *lt;
-  int hour, min, sec, start_hour, start_min, start_sec, end_hour, end_min, end_sec;
+  int hour, min, sec,
+    start_hour, start_min, start_sec,
+    end_hour, end_min, end_sec;
 
   for (i = 0; i < batch_size; i++)
   {
@@ -1326,6 +1330,8 @@ int process_media(const char *batch_id)
         fprintf(stderr, "Failed to remux video.");
       }
     }
+
+    free(out_filename);
 
     time(&timer);
     lt = localtime(&timer);
@@ -1357,14 +1363,10 @@ int process_media(const char *batch_id)
 
     printf("elapsed: %02d:%02d:%02d\n", hour, min, sec);
 
-    if (ret == ABORTED)
-      goto end;
-    else if (ret < 0) {
+    if (ret < 0 && ret != ABORTED) {
       fprintf(stderr, "Failed to process video for process job \"%s\".\n",
         process_job_ids[i]);
     }
-
-    free(out_filename);
   }
   
 end:
