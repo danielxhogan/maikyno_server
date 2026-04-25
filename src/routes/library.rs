@@ -750,6 +750,7 @@ pub async fn save_state(
     real_path: Some(video.real_path),
     static_path: Some(video.static_path),
     extra: video.extra,
+    og: video.og,
     processed: video.processed,
     ts: save_state_params.ts,
     pct_watched: save_state_params.pct_watched,

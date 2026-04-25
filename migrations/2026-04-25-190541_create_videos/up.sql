@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS videos (
   static_path VARCHAR NOT NULL,
   bitrate INT,
   extra BOOL NOT NULL,
+  og BOOL NOT NULL,
   processed BOOL NOT NULL,
   thumbnail_url VARCHAR,
   ts INT NOT NULL,

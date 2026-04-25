@@ -260,6 +260,7 @@ pub struct Video {
   pub static_path: String,
   pub bitrate: Option<i32>,
   pub extra: bool,
+  pub og: bool,
   pub processed: bool,
   pub thumbnail_url: Option<String>,
   pub ts: i32,
@@ -277,6 +278,7 @@ pub struct NewVideo {
   pub real_path: String,
   pub static_path: String,
   pub extra: bool,
+  pub og: bool,
   pub processed: bool,
   pub thumbnail_url: Option<String>,
   pub media_dir_id: String
@@ -288,6 +290,7 @@ pub struct UpdateVideo {
   pub real_path: Option<String>,
   pub static_path: Option<String>,
   pub extra: bool,
+  pub og: bool,
   pub processed: bool,
   pub ts: i32,
   pub pct_watched: i32,

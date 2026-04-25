@@ -166,6 +166,7 @@ diesel::table! {
         static_path -> Text,
         bitrate -> Nullable<Integer>,
         extra -> Bool,
+        og -> Bool,
         processed -> Bool,
         thumbnail_url -> Nullable<Text>,
         ts -> Integer,

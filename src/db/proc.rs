@@ -33,7 +33,7 @@ use crate::utils::{
 };
 
 use actix_web::web;
-use chrono::NaiveDateTime;
+use chrono::{Local, NaiveDateTime};
 use diesel::prelude::*;
 use uuid::Uuid;
 
@@ -138,7 +138,8 @@ pub async fn create_batch(process_media_info: ProcessMediaParams,
   let mut pool_clone: web::Data<DBPool>;
   let mut batch_id_clone: String;
   let mut video_info_clone: ProcessVideoParams;
-  let created = chrono::Utc::now().naive_utc();
+  // let created = chrono::Utc::now().naive_utc();
+  let created = Local::now().naive_local();
 
   for video_info in process_media_info.videos.clone()
   {

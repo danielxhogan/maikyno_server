@@ -153,6 +153,7 @@ type MediaSeen = HashMap<DirEntryId, MediaDirSeen>;
 struct VideoSeen {
   video: Video,
   seen: bool,
+  og: bool,
   processed: bool
 }
 
@@ -502,6 +503,7 @@ async fn get_initial_videos(media_dir: &MediaDir, pool: &web::Data<DBPool>)
         let video_seen = VideoSeen {
           video: video.clone(),
           seen: false,
+          og: false,
           processed: false
         };
 
@@ -727,7 +729,8 @@ async fn check_seen_video(video: &DirEntry,
         real_path = None;
       }
 
-      if is_proc_dir { video_seen.processed = true };
+      if !is_proc_dir { video_seen.og = true; }
+      if is_proc_dir { video_seen.processed = true; };
 
       let update_video_info = UpdateVideo {
         id: video_seen.video.id.clone(),
@@ -735,6 +738,7 @@ async fn check_seen_video(video: &DirEntry,
         real_path: real_path,
         static_path: static_path,
         extra: is_extras_dir,
+        og: video_seen.og,
         processed: video_seen.processed,
         ts: video_seen.video.ts.clone(),
         pct_watched: video_seen.video.pct_watched.clone(),
@@ -768,6 +772,7 @@ async fn check_seen_video(video: &DirEntry,
         real_path: video_path,
         static_path: path_accumulator.static_path.clone(),
         extra: is_extras_dir,
+        og: !is_proc_dir,
         processed: is_proc_dir,
         thumbnail_url: None,
         media_dir_id: recursion_state.media_dir_id.clone()
@@ -793,6 +798,7 @@ async fn check_seen_video(video: &DirEntry,
       let video_seen = VideoSeen {
         video: video_record,
         seen: true,
+        og: !is_proc_dir,
         processed: is_proc_dir
       };
 
