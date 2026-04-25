@@ -7,7 +7,7 @@ int get_input_file(char **input_file, char *process_job_id, sqlite3 *db)
   const unsigned char *input_file_tmp, *end;
 
   char *select_video_path_query =
-    "SELECT videos.real_path FROM process_jobs \
+    "SELECT videos.og_path FROM process_jobs \
     JOIN videos ON process_jobs.video_id = videos.id \
     WHERE process_jobs.id = ?;";
   sqlite3_stmt *select_video_path_stmt;

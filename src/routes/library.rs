@@ -747,10 +747,9 @@ pub async fn save_state(
   let update_video_info = UpdateVideo {
     id: video.id,
     name: video.name,
-    real_path: Some(video.real_path),
+    og_path: video.og_path,
     static_path: Some(video.static_path),
     extra: video.extra,
-    og: video.og,
     processed: video.processed,
     ts: save_state_params.ts,
     pct_watched: save_state_params.pct_watched,

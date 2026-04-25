@@ -256,11 +256,10 @@ pub struct Video {
   pub name: String,
   pub title: Option<String>,
   pub suggested_title: Option<String>,
-  pub real_path: String,
+  pub og_path: Option<String>,
   pub static_path: String,
   pub bitrate: Option<i32>,
   pub extra: bool,
-  pub og: bool,
   pub processed: bool,
   pub thumbnail_url: Option<String>,
   pub ts: i32,
@@ -275,10 +274,9 @@ pub struct Video {
 
 pub struct NewVideo {
   pub name: String,
-  pub real_path: String,
+  pub og_path: Option<String>,
   pub static_path: String,
   pub extra: bool,
-  pub og: bool,
   pub processed: bool,
   pub thumbnail_url: Option<String>,
   pub media_dir_id: String
@@ -287,10 +285,9 @@ pub struct NewVideo {
 pub struct UpdateVideo {
   pub id: String,
   pub name: String,
-  pub real_path: Option<String>,
+  pub og_path: Option<String>,
   pub static_path: Option<String>,
   pub extra: bool,
-  pub og: bool,
   pub processed: bool,
   pub ts: i32,
   pub pct_watched: i32,

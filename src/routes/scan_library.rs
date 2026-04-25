@@ -708,12 +708,18 @@ async fn check_seen_video(video: &DirEntry,
     Err(err) => { return Err(err); }
   };
 
+  let og_path: Option<String>;
+  if !is_proc_dir {
+    og_path = Some(video_path.clone());
+  } else {
+    og_path = None;
+  }
+
   match recursion_state.videos_seen.get_mut(&video_file_name) {
     Some(video_seen) => {
       video_seen.seen = true;
 
       let static_path: Option<String>;
-      let real_path: Option<String>;
 
       if is_proc_dir || !video_seen.processed {
         static_path = Some(path_accumulator.static_path.clone());
@@ -722,23 +728,15 @@ async fn check_seen_video(video: &DirEntry,
         static_path = None;
       }
 
-      if !is_proc_dir {
-        real_path = Some(video_path.clone());
-      }
-      else {
-        real_path = None;
-      }
-
       if !is_proc_dir { video_seen.og = true; }
       if is_proc_dir { video_seen.processed = true; };
 
       let update_video_info = UpdateVideo {
         id: video_seen.video.id.clone(),
         name: video_file_name,
-        real_path: real_path,
+        og_path: og_path,
         static_path: static_path,
         extra: is_extras_dir,
-        og: video_seen.og,
         processed: video_seen.processed,
         ts: video_seen.video.ts.clone(),
         pct_watched: video_seen.video.pct_watched.clone(),
@@ -769,10 +767,9 @@ async fn check_seen_video(video: &DirEntry,
     None => {
       let new_video = NewVideo {
         name: video_file_name.clone(),
-        real_path: video_path,
+        og_path: og_path,
         static_path: path_accumulator.static_path.clone(),
         extra: is_extras_dir,
-        og: !is_proc_dir,
         processed: is_proc_dir,
         thumbnail_url: None,
         media_dir_id: recursion_state.media_dir_id.clone()

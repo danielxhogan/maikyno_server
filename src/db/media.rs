@@ -261,11 +261,10 @@ pub fn create_video(pool: web::Data<DBPool>, new_video: NewVideo)
     name: new_video.name.clone(),
     title: None,
     suggested_title: None,
-    real_path: new_video.real_path,
+    og_path: new_video.og_path,
     static_path: new_video.static_path,
     bitrate: None,
     extra: new_video.extra,
-    og: new_video.og,
     processed: new_video.processed,
     thumbnail_url: new_video.thumbnail_url,
     ts: 0,
@@ -379,9 +378,9 @@ pub fn update_video(pool: web::Data<DBPool>, update_video: UpdateVideo)
     }
   };
 
-  let real_path = match update_video.real_path {
-    Some(real_path) => { real_path },
-    None => { prev_video.real_path }
+  let og_path = match update_video.og_path {
+    Some(og_path) => { Some(og_path) },
+    None => { prev_video.og_path }
   };
 
   let static_path = match update_video.static_path {
@@ -393,10 +392,9 @@ pub fn update_video(pool: web::Data<DBPool>, update_video: UpdateVideo)
     .filter(videos::id.eq(&update_video.id)))
     .set((
       videos::name.eq(&update_video.name),
-      videos::real_path.eq(real_path),
+      videos::og_path.eq(og_path),
       videos::static_path.eq(static_path),
       videos::extra.eq(update_video.extra),
-      videos::og.eq(update_video.og),
       videos::processed.eq(update_video.processed),
       videos::ts.eq(update_video.ts),
       videos::pct_watched.eq(update_video.pct_watched),

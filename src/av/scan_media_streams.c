@@ -363,7 +363,10 @@ int scan_media_streams(const char *media_dir_id)
   char *select_media_dir_query =
     "SELECT name, real_path, show_id FROM media_dirs WHERE id = ?;";
   char *select_videos_query =
-    "SELECT id, name, real_path, extra FROM videos WHERE media_dir_id = ?;";
+    "SELECT id, name, og_path, extra \
+    FROM videos \
+    WHERE media_dir_id = ? \
+    AND og_path IS NOT NULL;";
 
   char *media_dir_name, *media_dir_path, *show_id,
     *video_id, *video_name, *video_path;

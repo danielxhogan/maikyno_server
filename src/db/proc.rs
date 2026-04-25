@@ -55,7 +55,7 @@ pub async fn get_media_dir_streams(media_dir_id: String,
   let mut media_dirs_streams: MediaDirStreams = vec![] ;
 
   for video in videos.clone() {
-    if video.extra { continue; }
+    if video.extra || video.og_path.is_none() { continue; }
 
     let streams_result = streams::table
       .filter(streams::video_id.eq(&video.id))
@@ -81,7 +81,7 @@ pub async fn get_media_dir_streams(media_dir_id: String,
   }
 
   for video in videos {
-    if !video.extra { continue; }
+    if !video.extra || video.og_path.is_none() { continue; }
 
     let streams_result = streams::table
       .filter(streams::video_id.eq(&video.id))
