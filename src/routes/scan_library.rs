@@ -708,43 +708,51 @@ async fn check_seen_video(video: &DirEntry,
     Err(err) => { return Err(err); }
   };
 
-  let og_path: Option<String>;
-  if !is_proc_dir {
-    og_path = Some(video_path.clone());
-  } else {
-    og_path = None;
-  }
-
   match recursion_state.videos_seen.get_mut(&video_file_name) {
     Some(video_seen) => {
       video_seen.seen = true;
 
+      let og_path: Option<Option<String>>;
       let static_path: Option<String>;
 
-      if is_proc_dir || !video_seen.processed {
+      if is_proc_dir {
+        video_seen.processed = true;
         static_path = Some(path_accumulator.static_path.clone());
-      }
-      else {
-        static_path = None;
-      }
 
-      if !is_proc_dir { video_seen.og = true; }
-      if is_proc_dir { video_seen.processed = true; };
+        if video_seen.og {
+          og_path = None;
+        } else {
+          og_path = Some(None);
+        }
+      } else {
+        video_seen.og = true;
+        og_path = Some(Some(video_path.clone()));
+
+        if video_seen.processed {
+          static_path = None;
+        } else {
+          static_path = Some(path_accumulator.static_path.clone());
+        }
+      }
 
       let update_video_info = UpdateVideo {
         id: video_seen.video.id.clone(),
-        name: video_file_name,
+        name: Some(video_file_name),
+        title: None,
+        suggested_title: None,
         og_path: og_path,
         static_path: static_path,
-        extra: is_extras_dir,
-        processed: video_seen.processed,
-        ts: video_seen.video.ts.clone(),
-        pct_watched: video_seen.video.pct_watched.clone(),
-        finished: video_seen.video.finished.clone(),
-        v_stream: video_seen.video.v_stream.clone(),
-        a_stream: video_seen.video.a_stream.clone(),
-        s_stream: video_seen.video.s_stream.clone(),
-        s_pos: video_seen.video.s_pos.clone()
+        bitrate: None,
+        extra: Some(is_extras_dir),
+        processed: Some(video_seen.processed),
+        thumbnail_url: None,
+        ts: None,
+        pct_watched: None,
+        finished: None,
+        v_stream: None,
+        a_stream: None,
+        s_stream: None,
+        s_pos: None
       };
 
       let pool_clone = pool.clone();
@@ -765,6 +773,13 @@ async fn check_seen_video(video: &DirEntry,
       };
     },
     None => {
+      let og_path: Option<String>;
+      if is_proc_dir {
+        og_path = None;
+      } else {
+        og_path = Some(video_path.clone());
+      }
+
       let new_video = NewVideo {
         name: video_file_name.clone(),
         og_path: og_path,

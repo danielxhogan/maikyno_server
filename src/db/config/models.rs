@@ -284,18 +284,22 @@ pub struct NewVideo {
 
 pub struct UpdateVideo {
   pub id: String,
-  pub name: String,
-  pub og_path: Option<String>,
+  pub name: Option<String>,
+  pub title: Option<Option<String>>,
+  pub suggested_title: Option<Option<String>>,
+  pub og_path: Option<Option<String>>,
   pub static_path: Option<String>,
-  pub extra: bool,
-  pub processed: bool,
-  pub ts: i32,
-  pub pct_watched: i32,
-  pub finished: bool,
-  pub v_stream: i32,
-  pub a_stream: i32,
-  pub s_stream: i32,
-  pub s_pos: i32,
+  pub bitrate: Option<Option<i32>>,
+  pub extra: Option<bool>,
+  pub processed: Option<bool>,
+  pub thumbnail_url: Option<Option<String>>,
+  pub ts: Option<i32>,
+  pub pct_watched: Option<i32>,
+  pub finished: Option<bool>,
+  pub v_stream: Option<i32>,
+  pub a_stream: Option<i32>,
+  pub s_stream: Option<i32>,
+  pub s_pos: Option<i32>,
 }
 
 // proc

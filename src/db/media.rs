@@ -362,8 +362,6 @@ pub fn update_video(pool: web::Data<DBPool>, update_video: UpdateVideo)
     Ok(db) => { db }, Err(err) => { return Err(err); }
   };
 
-  let updated_video_result: Result<Video, MKError>;
-
   let prev_video = match videos::table
     .filter(videos::id.eq(&update_video.id))
     .get_result::<Video>(&mut db)
@@ -378,36 +376,110 @@ pub fn update_video(pool: web::Data<DBPool>, update_video: UpdateVideo)
     }
   };
 
+  let name = match update_video.name {
+    Some(name) => { name },
+    None => { prev_video.name }
+  };
+
+  let title = match update_video.title {
+    Some(title) => { title },
+    None => { prev_video.title }
+  };
+
+  let suggested_title = match update_video.suggested_title {
+    Some(suggested_title) => { suggested_title },
+    None => { prev_video.suggested_title }
+  };
+
   let og_path = match update_video.og_path {
-    Some(og_path) => { Some(og_path) },
+    Some(og_path) => { og_path },
     None => { prev_video.og_path }
   };
 
   let static_path = match update_video.static_path {
     Some(static_path) => { static_path },
-    None => {prev_video.static_path }
+    None => { prev_video.static_path }
   };
 
-  updated_video_result = diesel::update(videos::table
+  let bitrate = match update_video.bitrate {
+    Some(bitrate) => { bitrate },
+    None => { prev_video.bitrate }
+  };
+
+  let extra = match update_video.extra {
+    Some(extra) => { extra },
+    None => { prev_video.extra }
+  };
+
+  let processed = match update_video.processed {
+    Some(processed) => { processed },
+    None => { prev_video.processed }
+  };
+
+  let thumbnail_url = match update_video.thumbnail_url {
+    Some(thumbnail_url) => { thumbnail_url },
+    None => { prev_video.thumbnail_url }
+  };
+
+  let ts = match update_video.ts {
+    Some(ts) => { ts },
+    None => { prev_video.ts }
+  };
+
+  let pct_watched = match update_video.pct_watched {
+    Some(pct_watched) => { pct_watched },
+    None => { prev_video.pct_watched }
+  };
+
+  let finished = match update_video.finished {
+    Some(finished) => { finished },
+    None => { prev_video.finished }
+  };
+
+  let v_stream = match update_video.v_stream {
+    Some(v_stream) => { v_stream },
+    None => { prev_video.v_stream }
+  };
+
+  let a_stream = match update_video.a_stream {
+    Some(a_stream) => { a_stream },
+    None => { prev_video.a_stream }
+  };
+
+  let s_stream = match update_video.s_stream {
+    Some(s_stream) => { s_stream },
+    None => { prev_video.s_stream }
+  };
+
+  let s_pos = match update_video.s_pos {
+    Some(s_pos) => { s_pos },
+    None => { prev_video.s_pos }
+  };
+
+  let updated_video_result = diesel::update(videos::table
     .filter(videos::id.eq(&update_video.id)))
     .set((
-      videos::name.eq(&update_video.name),
+      videos::name.eq(&name),
+      videos::title.eq(title),
+      videos::suggested_title.eq(suggested_title),
       videos::og_path.eq(og_path),
       videos::static_path.eq(static_path),
-      videos::extra.eq(update_video.extra),
-      videos::processed.eq(update_video.processed),
-      videos::ts.eq(update_video.ts),
-      videos::pct_watched.eq(update_video.pct_watched),
-      videos::finished.eq(update_video.finished),
-      videos::v_stream.eq(update_video.v_stream),
-      videos::a_stream.eq(update_video.a_stream),
-      videos::s_stream.eq(update_video.s_stream),
-      videos::s_pos.eq(update_video.s_pos),
+      videos::bitrate.eq(bitrate),
+      videos::extra.eq(extra),
+      videos::processed.eq(processed),
+      videos::thumbnail_url.eq(thumbnail_url),
+      videos::ts.eq(ts),
+      videos::pct_watched.eq(pct_watched),
+      videos::finished.eq(finished),
+      videos::v_stream.eq(v_stream),
+      videos::a_stream.eq(a_stream),
+      videos::s_stream.eq(s_stream),
+      videos::s_pos.eq(s_pos),
     ))
     .get_result(&mut db)
     .map_err(|err| {
       let err_msg = format!("Failed to update video: {:?}, {:?}\nError: {:?}",
-        update_video.name, update_video.id, err);
+        name, update_video.id, err);
 
       eprintln!("{err_msg:?}");
       return MKError::new(MKErrorType::DBError, err_msg);

@@ -19,7 +19,7 @@ use crate::db::{
     select_seasons_by_id,
     select_movies,
     select_media_dir,
-    select_video,
+    // select_video,
     select_videos,
     update_video
   },
@@ -715,28 +715,6 @@ pub async fn save_state(
   save_state_params: web::Json<SaveStateParams>,
   pool: web::Data<DBPool>) -> actix_web::Result<String>
 {
-  let pool_clone = pool.clone();
-  let video_id_clone = save_state_params.video_id.clone();
-  let block_thread_result = web::block(|| {
-    return select_video(pool_clone, video_id_clone);
-  }).await;
-
-  let video = match block_thread_result
-  {
-    Ok(video_result) => {
-      match video_result
-      {
-        Ok(video) => { video },
-        Err(err) => {
-          return Err(err.into());
-        }
-      }
-    },
-    Err(err) => {
-      return Err(blocking_error(err).into());
-    }
-  };
-
   let finished: bool;
   if save_state_params.finished == 0 {
     finished = false;
@@ -745,19 +723,23 @@ pub async fn save_state(
   }
 
   let update_video_info = UpdateVideo {
-    id: video.id,
-    name: video.name,
-    og_path: video.og_path,
-    static_path: Some(video.static_path),
-    extra: video.extra,
-    processed: video.processed,
-    ts: save_state_params.ts,
-    pct_watched: save_state_params.pct_watched,
-    finished: finished,
-    v_stream: save_state_params.v_stream,
-    a_stream: save_state_params.a_stream,
-    s_stream: save_state_params.s_stream,
-    s_pos: save_state_params.s_pos
+    id: save_state_params.video_id.clone(),
+    name: None,
+    title: None,
+    suggested_title: None,
+    og_path: None,
+    static_path: None,
+    bitrate: None,
+    extra: None,
+    processed: None,
+    thumbnail_url: None,
+    ts: Some(save_state_params.ts),
+    pct_watched: Some(save_state_params.pct_watched),
+    finished: Some(finished),
+    v_stream: Some(save_state_params.v_stream),
+    a_stream: Some(save_state_params.a_stream),
+    s_stream: Some(save_state_params.s_stream),
+    s_pos: Some(save_state_params.s_pos)
   };
 
   let block_thread_result = web::block(|| {
