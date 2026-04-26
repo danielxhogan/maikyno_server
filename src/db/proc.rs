@@ -12,6 +12,7 @@ use crate::db::{
       ProcessJobSubtitleStream,
       ProcessJobInfo,
       ProcessJobStreams,
+      BatchProcessJobStreams,
     },
     schema::{
       media_dirs,
@@ -368,7 +369,7 @@ pub fn select_process_jobs_for_batch_id(pool: web::Data<DBPool>, batch_id: Strin
 }
 
 pub fn select_process_jobs_for_media_dir(media_dir_id: String,
-  pool: web::Data<DBPool>) -> Result<Vec<ProcessJobStreams>, MKError>
+  pool: web::Data<DBPool>) -> Result<Vec<BatchProcessJobStreams>, MKError>
 {
   let mut db = match get_db_conn(pool) {
     Ok(db) => { db }, Err(err) => { return Err(err); }
@@ -399,9 +400,33 @@ pub fn select_process_jobs_for_media_dir(media_dir_id: String,
       }
     };
 
-    let mut process_jobs_streams_vec: Vec<ProcessJobStreams> = vec![];
+    let mut batches: Vec<BatchProcessJobStreams> = vec![];
+    let mut current_batch: Option<BatchProcessJobStreams> = None;
+    let mut current_batch_id: Option<String> = None;
 
     for process_job in process_jobs {
+      if current_batch.is_none()
+        || current_batch_id.is_none()
+        || current_batch_id.as_ref().unwrap() != &process_job.batch_id.clone()
+      {
+        if current_batch.is_some() {
+          batches.push(current_batch.unwrap());
+        }
+
+        current_batch_id = Some(process_job.batch_id.clone());
+        current_batch = Some(BatchProcessJobStreams {
+          batch_id: current_batch_id.clone().unwrap(),
+          active: false,
+          process_jobs: vec![]
+        });
+      }
+
+      if process_job.job_status == "processing"
+        || process_job.job_status == "pending"
+      {
+        current_batch.as_mut().unwrap().active = true;
+      }
+
       let process_jobs_video_stream = match process_job_video_streams::table
         .filter(process_job_video_streams::process_job_id
           .eq(&process_job.process_job_id))
@@ -432,20 +457,23 @@ for process_job: {:?}\nError: {:?}", process_job.process_job_id, err);
           }
         };
 
-      let process_job_subtitle_stream_vec = match process_job_subtitle_streams::table
-        .filter(process_job_subtitle_streams::process_job_id
-          .eq(&process_job.process_job_id))
-        .get_results::<ProcessJobSubtitleStream>(&mut db)
-        {
-          Ok(process_jobs_subtitle_stream_vec) => { process_jobs_subtitle_stream_vec },
-          Err(err) => {
-            let err_msg = format!("Failed to get process_job_subtitle_streams \
+      let process_job_subtitle_stream_vec =
+        match process_job_subtitle_streams::table
+          .filter(process_job_subtitle_streams::process_job_id
+            .eq(&process_job.process_job_id))
+          .get_results::<ProcessJobSubtitleStream>(&mut db)
+          {
+            Ok(process_jobs_subtitle_stream_vec) => {
+              process_jobs_subtitle_stream_vec
+            },
+            Err(err) => {
+              let err_msg = format!("Failed to get process_job_subtitle_streams \
 for process_job: {:?}\nError: {:?}", process_job.process_job_id, err);
 
-            eprintln!("{err_msg:?}");
-            return Err(MKError::new(MKErrorType::DBError, err_msg));
-          }
-        };
+              eprintln!("{err_msg:?}");
+              return Err(MKError::new(MKErrorType::DBError, err_msg));
+            }
+          };
 
       let process_job_streams = ProcessJobStreams {
         process_job: process_job,
@@ -454,10 +482,15 @@ for process_job: {:?}\nError: {:?}", process_job.process_job_id, err);
         subtitle_streams: process_job_subtitle_stream_vec
       };
 
-      process_jobs_streams_vec.push(process_job_streams);
+      current_batch.as_mut().unwrap()
+        .process_jobs.push(process_job_streams);
     }
 
-  return Ok(process_jobs_streams_vec);
+    if current_batch.is_some() {
+      batches.push(current_batch.unwrap());
+    }
+
+  return Ok(batches);
 }
 
 pub fn update_status_process_job(pool: web::Data<DBPool>,
