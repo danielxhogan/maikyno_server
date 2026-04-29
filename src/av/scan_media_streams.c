@@ -272,12 +272,12 @@ int scan_video(char *video_id, char *video_name,
     profile_name = avcodec_profile_name(stream->codecpar->codec_id,
       stream->codecpar->profile);
 
-    if (
-      profile_name &&
-      (!strcmp(profile_name, "DTS-HD MA") ||
-        !strcmp(profile_name, "DTS-HD MA + DTS:X") ||
-        !strcmp(profile_name, "Dolby TrueHD") ||
-        !strcmp(profile_name, "Dolby TrueHD + Dolby Atmos"))
+    if (profile_name
+      && (!strcmp(profile_name, "DTS-HD MA")
+      || !strcmp(profile_name, "DTS-HD HRA")
+      || !strcmp(profile_name, "DTS-HD MA + DTS:X")
+      || !strcmp(profile_name, "Dolby TrueHD")
+      || !strcmp(profile_name, "Dolby TrueHD + Dolby Atmos"))
     ) {
       codec_name = profile_name;
     }
