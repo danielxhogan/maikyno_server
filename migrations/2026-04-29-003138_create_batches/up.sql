@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS batches (
   id VARCHAR PRIMARY KEY NOT NULL,
   batch_size INT NOT NULL,
-  aborted BOOL NOT NULL
+  aborted BOOL NOT NULL,
+  created DATETIME NOT NULL
 );

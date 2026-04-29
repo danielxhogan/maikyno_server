@@ -80,7 +80,7 @@ pub fn create_library(pool: web::Data<DBPool>, new_library: NewLibrary,
 }
 
 pub fn select_library(pool: web::Data<DBPool>, library_id: String)
--> Result<Library, MKError>
+  -> Result<Library, MKError>
 {
   let mut db = match get_db_conn(pool) {
     Ok(db) => { db }, Err(err) => { return Err(err); }

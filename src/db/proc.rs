@@ -2,27 +2,26 @@ use crate::db::{
   config::{
     db_connect::{ DBPool, get_db_conn },
     models::{
-      Stream,
-      VideoStreams,
-      MediaDirStreams,
       Batch,
+      BatchProcessJobStreams,
+      MediaDirStreams,
       ProcessJob,
-      ProcessJobVideoStream,
       ProcessJobAudioStream,
-      ProcessJobSubtitleStream,
       ProcessJobInfo,
       ProcessJobStreams,
-      BatchProcessJobStreams,
+      ProcessJobSubtitleStream,
+      ProcessJobVideoStream,
+      Stream,
+      VideoStreams
     },
     schema::{
-      media_dirs,
-      videos,
-      streams,
       batches,
-      process_jobs,
-      process_job_video_streams,
+      media_dirs,
       process_job_audio_streams,
       process_job_subtitle_streams,
+      process_job_video_streams,
+      process_jobs,
+      streams, videos
     }
   },
   media::{ select_video, select_videos_by_id }
@@ -118,10 +117,12 @@ pub async fn create_batch(process_media_info: ProcessMediaParams,
   };
 
   let batch_id = Uuid::new_v4().to_string();
+  let created = Local::now().naive_local();
 
   let batch = Batch {
     id: batch_id.clone(),
     batch_size: process_media_info.videos.len() as i32,
+    created: created,
     aborted: false
   };
 
@@ -139,8 +140,6 @@ pub async fn create_batch(process_media_info: ProcessMediaParams,
   let mut pool_clone: web::Data<DBPool>;
   let mut batch_id_clone: String;
   let mut video_info_clone: ProcessVideoParams;
-  // let created = chrono::Utc::now().naive_utc();
-  let created = Local::now().naive_local();
 
   for video_info in process_media_info.videos.clone()
   {
@@ -324,6 +323,26 @@ pub async fn create_process_job(batch_id: String,
   return create_process_job_result;
 }
 
+pub fn get_batch(batch_id: String, pool: web::Data<DBPool>)
+  -> Result<Batch, MKError>
+{
+  let mut db = match get_db_conn(pool) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
+
+  let batch_result = batches::table
+    .filter(batches::id.eq(&batch_id))
+    .get_result::<Batch>(&mut db)
+    .map_err(|err| {
+      let err_msg = format!("Failed to get batch: {:?}\nError: {:?}",
+        batch_id, err);
+      eprintln!("{err_msg:?}");
+      return MKError::new(MKErrorType::DBError, err_msg);
+    });
+
+  return batch_result;
+}
+
 pub fn update_batch_abort(batch_id: String, pool: web::Data<DBPool>)
   -> Result<Batch, MKError>
 {
@@ -347,8 +366,8 @@ pub fn update_batch_abort(batch_id: String, pool: web::Data<DBPool>)
   return updated_batch_result;
 }
 
-pub fn select_process_jobs_for_batch_id(pool: web::Data<DBPool>, batch_id: String)
-  -> Result<Vec<ProcessJob>, MKError>
+pub fn select_process_jobs_for_batch_id(batch_id: String,
+  pool: web::Data<DBPool>) -> Result<Vec<ProcessJob>, MKError>
 {
   let mut db = match get_db_conn(pool) {
     Ok(db) => { db }, Err(err) => { return Err(err); }
@@ -368,10 +387,11 @@ pub fn select_process_jobs_for_batch_id(pool: web::Data<DBPool>, batch_id: Strin
   return process_jobs_result;
 }
 
-pub fn select_process_jobs_for_media_dir(media_dir_id: String,
+pub async fn select_process_jobs_for_media_dir(media_dir_id: String,
   pool: web::Data<DBPool>) -> Result<Vec<BatchProcessJobStreams>, MKError>
 {
-  let mut db = match get_db_conn(pool) {
+  let mut pool_clone = pool.clone();
+  let mut db = match get_db_conn(pool_clone) {
     Ok(db) => { db }, Err(err) => { return Err(err); }
   };
 
@@ -402,6 +422,7 @@ pub fn select_process_jobs_for_media_dir(media_dir_id: String,
 
     let mut batches: Vec<BatchProcessJobStreams> = vec![];
     let mut current_batch: Option<BatchProcessJobStreams> = None;
+    let mut batch: Batch;
     let mut current_batch_id: Option<String> = None;
 
     for process_job in process_jobs {
@@ -413,9 +434,28 @@ pub fn select_process_jobs_for_media_dir(media_dir_id: String,
           batches.push(current_batch.unwrap());
         }
 
+        pool_clone = pool.clone();
         current_batch_id = Some(process_job.batch_id.clone());
+
+        let block_thread_result = web::block(|| {
+          return get_batch(current_batch_id.unwrap(), pool_clone);
+        }).await;
+
+        current_batch_id = Some(process_job.batch_id.clone());
+
+        let batch = match block_thread_result
+        {
+          Ok(batch_result) => {
+            match batch_result {
+              Ok(batch) => { batch },
+              Err(err) => { return Err(err.into()); }
+            }
+          },
+          Err(err) => { return Err(blocking_error(err).into()); }
+        };
+
         current_batch = Some(BatchProcessJobStreams {
-          batch_id: current_batch_id.clone().unwrap(),
+          batch: batch,
           active: false,
           process_jobs: vec![]
         });

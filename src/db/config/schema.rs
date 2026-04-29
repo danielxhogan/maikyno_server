@@ -5,6 +5,7 @@ diesel::table! {
         id -> Text,
         batch_size -> Integer,
         aborted -> Bool,
+        created -> Timestamp,
     }
 }
 

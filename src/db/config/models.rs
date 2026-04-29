@@ -403,15 +403,16 @@ pub struct ProcessJobStreams {
 
 #[derive(Serialize)]
 pub struct BatchProcessJobStreams {
-  pub batch_id: String,
+  pub batch: Batch,
   pub active: bool,
   pub process_jobs: Vec<ProcessJobStreams>
 }
 
-#[derive(Debug, Insertable, Queryable, Clone)]
+#[derive(Debug, Insertable, Queryable, Clone, Serialize)]
 #[diesel(table_name = batches)]
 pub struct Batch {
   pub id: String,
   pub batch_size: i32,
-  pub aborted: bool
+  pub aborted: bool,
+  pub created: NaiveDateTime
 }

@@ -319,7 +319,7 @@ pub async fn get_process_jobs(
   let process_jobs = match block_thread_result
   {
     Ok(process_jobs_result) => {
-      match process_jobs_result
+      match process_jobs_result.await
       {
         Ok(process_jobs) => { process_jobs },
         Err(err) => { return Err(err); }
