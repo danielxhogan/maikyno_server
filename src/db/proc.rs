@@ -203,7 +203,6 @@ pub async fn create_process_job(batch_id: String,
       stream_count: None,
       pct_complete: 0,
       err_msg: None,
-      created: created,
       video_id: video_info.video_id.clone(),
       batch_id: batch_id,
     };
@@ -396,14 +395,14 @@ pub async fn select_process_jobs_for_media_dir(media_dir_id: String,
   };
 
   let process_jobs = match process_jobs::table
+    .inner_join(batches::table.on(process_jobs::batch_id.eq(batches::id)))
     .inner_join(videos::table.on(process_jobs::video_id.eq(videos::id)))
     .inner_join(media_dirs::table.on(videos::media_dir_id.eq(media_dirs::id)))
     .filter(media_dirs::id.eq(&media_dir_id))
-    .order_by(process_jobs::created.desc())
+    .order_by(batches::created.desc())
     .select((
       process_jobs::id,
       videos::name,
-      process_jobs::created,
       process_jobs::job_status,
       process_jobs::pct_complete,
       process_jobs::batch_id

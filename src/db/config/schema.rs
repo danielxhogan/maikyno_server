@@ -122,7 +122,6 @@ diesel::table! {
         stream_count -> Nullable<Integer>,
         pct_complete -> Integer,
         err_msg -> Nullable<Text>,
-        created -> Timestamp,
         video_id -> Text,
         batch_id -> Text,
     }

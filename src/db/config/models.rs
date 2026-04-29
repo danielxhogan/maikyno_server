@@ -336,7 +336,6 @@ pub struct ProcessJob {
   pub stream_count: Option<i32>,
   pub pct_complete: i32,
   pub err_msg: Option<String>,
-  pub created: NaiveDateTime,
   pub video_id: String,
   pub batch_id: String,
 }
@@ -387,7 +386,6 @@ pub struct ProcessJobSubtitleStream {
 pub struct ProcessJobInfo {
   pub process_job_id: String,
   pub video_name: String,
-  pub created: NaiveDateTime,
   pub job_status: String,
   pub pct_complete: i32,
   pub batch_id: String,
