@@ -1,5 +1,5 @@
 use crate::db::config::{
-  db_connect::{get_db_conn, DBPool},
+  db_connect::{ get_db_conn, DBPool },
   models::{
     Library,
     Collection,
@@ -20,7 +20,8 @@ use crate::db::config::{
     collection_movies, collection_shows, collections, media_dirs, shows
   }
 };
-use crate::utils::mk_error::{MKError, MKErrorType};
+
+use crate::utils::mk_error::{ MKError, MKErrorType };
 
 use actix_web::web;
 use diesel::prelude::*;

@@ -15,13 +15,14 @@ use crate::db::{
       VideoStreams
     },
     schema::{
-      batches,
       media_dirs,
+      videos,
+      streams,
+      batches,
+      process_jobs,
+      process_job_video_streams,
       process_job_audio_streams,
       process_job_subtitle_streams,
-      process_job_video_streams,
-      process_jobs,
-      streams, videos
     }
   },
   media::{ select_video, select_videos_by_id }
@@ -37,7 +38,7 @@ use chrono::Local;
 use diesel::prelude::*;
 use uuid::Uuid;
 
-pub async fn get_media_dir_streams(media_dir_id: String,
+pub fn select_streams_for_media_dir(media_dir_id: String,
   pool: web::Data<DBPool>) -> Result<MediaDirStreams, MKError>
 {
   let pool_clone = pool.clone();
@@ -52,7 +53,7 @@ pub async fn get_media_dir_streams(media_dir_id: String,
     Ok(db) => { db }, Err(err) => { return Err(err); }
   };
 
-  let mut media_dirs_streams: MediaDirStreams = vec![] ;
+  let mut media_dirs_streams: MediaDirStreams = vec![];
 
   for video in videos.clone() {
     if video.extra || video.og_path.is_none() { continue; }
@@ -87,7 +88,7 @@ pub async fn get_media_dir_streams(media_dir_id: String,
       .filter(streams::video_id.eq(&video.id))
       .get_results::<Stream>(&mut db)
       .map_err(|err| {
-        let mut err_msg = format!("Failed to get video with id: '{}'. ",
+        let mut err_msg = format!("Failed to get video with id: '{}'.",
           video.id);
         err_msg = format!("{err_msg}Error: {}.", err);
         eprintln!("{err_msg:?}");
@@ -107,6 +108,26 @@ pub async fn get_media_dir_streams(media_dir_id: String,
   }
 
   return Ok(media_dirs_streams);
+}
+
+pub fn delete_streams(video_id: String, pool: web::Data<DBPool>)
+  -> Result<Vec<Stream>, MKError>
+{
+  let mut db = match get_db_conn(pool) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
+
+  let deleted_streams_result = diesel::delete(streams::table)
+    .filter(streams::video_id.eq(&video_id))
+    .get_results::<Stream>(&mut db)
+    .map_err(|err| {
+      let err_msg = format!("Failed to delete
+ streams for video: {:?}\nError: {:?}", video_id, err);
+      eprintln!("{err_msg:?}");
+      return MKError::new(MKErrorType::DBError, err_msg);
+    });
+
+  return deleted_streams_result;
 }
 
 pub async fn create_batch(process_media_info: ProcessMediaParams,
@@ -165,6 +186,49 @@ pub async fn create_batch(process_media_info: ProcessMediaParams,
   }
 
   return create_batch_result;
+}
+
+pub fn select_batch(batch_id: String, pool: web::Data<DBPool>)
+  -> Result<Batch, MKError>
+{
+  let mut db = match get_db_conn(pool) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
+
+  let batch_result = batches::table
+    .filter(batches::id.eq(&batch_id))
+    .get_result::<Batch>(&mut db)
+    .map_err(|err| {
+      let err_msg = format!("Failed to get batch: {:?}\nError: {:?}",
+        batch_id, err);
+      eprintln!("{err_msg:?}");
+      return MKError::new(MKErrorType::DBError, err_msg);
+    });
+
+  return batch_result;
+}
+
+pub fn update_batch_abort(batch_id: String, pool: web::Data<DBPool>)
+  -> Result<Batch, MKError>
+{
+  let mut db = match get_db_conn(pool) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
+
+  let updated_batch_result =
+    diesel::update(batches::table
+    .filter(batches::id.eq(&batch_id)))
+    .set(batches::aborted.eq(true))
+    .get_result(&mut db)
+    .map_err(|err| {
+      let err_msg = format!("Failed to abort batch: {:?}
+        \nError: {:?}", batch_id, err);
+
+      eprintln!("{err_msg:?}");
+      return MKError::new(MKErrorType::DBError, err_msg);
+    });
+
+  return updated_batch_result;
 }
 
 pub async fn create_process_job(batch_id: String,
@@ -322,47 +386,24 @@ pub async fn create_process_job(batch_id: String,
   return create_process_job_result;
 }
 
-pub fn get_batch(batch_id: String, pool: web::Data<DBPool>)
-  -> Result<Batch, MKError>
+pub fn select_process_job(process_job_id: String, pool: web::Data<DBPool>)
+  -> Result<ProcessJob, MKError>
 {
   let mut db = match get_db_conn(pool) {
     Ok(db) => { db }, Err(err) => { return Err(err); }
   };
 
-  let batch_result = batches::table
-    .filter(batches::id.eq(&batch_id))
-    .get_result::<Batch>(&mut db)
+  let process_job_result = process_jobs::table
+    .filter(process_jobs::id.eq(&process_job_id))
+    .get_result::<ProcessJob>(&mut db)
     .map_err(|err| {
-      let err_msg = format!("Failed to get batch: {:?}\nError: {:?}",
-        batch_id, err);
+      let err_msg = format!("Failed to get process job: {:?}\nError: {:?}",
+        process_job_id, err);
       eprintln!("{err_msg:?}");
       return MKError::new(MKErrorType::DBError, err_msg);
     });
 
-  return batch_result;
-}
-
-pub fn update_batch_abort(batch_id: String, pool: web::Data<DBPool>)
-  -> Result<Batch, MKError>
-{
-  let mut db = match get_db_conn(pool) {
-    Ok(db) => { db }, Err(err) => { return Err(err); }
-  };
-
-  let updated_batch_result =
-    diesel::update(batches::table
-    .filter(batches::id.eq(&batch_id)))
-    .set(batches::aborted.eq(true))
-    .get_result(&mut db)
-    .map_err(|err| {
-      let err_msg = format!("Failed to abort batch: {:?}
-        \nError: {:?}", batch_id, err);
-
-      eprintln!("{err_msg:?}");
-      return MKError::new(MKErrorType::DBError, err_msg);
-    });
-
-  return updated_batch_result;
+  return process_job_result;
 }
 
 pub fn select_process_jobs_for_batch_id(batch_id: String,
@@ -384,6 +425,24 @@ pub fn select_process_jobs_for_batch_id(batch_id: String,
     });
 
   return process_jobs_result;
+}
+
+pub fn select_process_jobs_for_video(video_id: String, pool: web::Data<DBPool>)
+  -> Result<Vec<ProcessJob>, MKError>
+{
+  let mut db = match get_db_conn(pool) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
+
+  return process_jobs::table
+    .filter(process_jobs::video_id.eq(&video_id))
+    .get_results::<ProcessJob>(&mut db)
+    .map_err(|err| {
+      let err_msg = format!("Failed to get process jobs for video id:
+        {:?}\nError: {:?}", &video_id, err);
+      eprintln!("{err_msg:?}");
+      return MKError::new(MKErrorType::DBError, err_msg);
+    });
 }
 
 pub async fn select_process_jobs_for_media_dir(media_dir_id: String,
@@ -437,7 +496,7 @@ pub async fn select_process_jobs_for_media_dir(media_dir_id: String,
         current_batch_id = Some(process_job.batch_id.clone());
 
         let block_thread_result = web::block(|| {
-          return get_batch(current_batch_id.unwrap(), pool_clone);
+          return select_batch(current_batch_id.unwrap(), pool_clone);
         }).await;
 
         current_batch_id = Some(process_job.batch_id.clone());
@@ -554,4 +613,123 @@ pub fn update_status_process_job(pool: web::Data<DBPool>,
     });
 
   return updated_process_job;
+}
+
+pub fn delete_process_job(process_job_id: String, pool: web::Data<DBPool>)
+  -> Result<String, MKError>
+{
+  let pool_clone = pool.clone();
+  let mut db = match get_db_conn(pool_clone) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
+
+  return db.transaction(|db|
+  {
+    let pool_clone = pool.clone();
+    let process_job_id_clone = process_job_id.clone();
+
+    let process_job =
+      match select_process_job(process_job_id_clone, pool_clone) {
+        Ok(process_job) => { process_job },
+        Err(err) => { return Err(err); }
+      };
+
+    let pool_clone = pool.clone();
+    let batch_id_clone = process_job.batch_id.clone();
+
+    let batch_process_jobs =
+      match select_process_jobs_for_batch_id(batch_id_clone, pool_clone) {
+        Ok(process_jobs) => { process_jobs },
+        Err(err) => { return Err(err); }
+      };
+
+    let _ = diesel::delete(process_job_video_streams::table)
+      .filter(process_job_video_streams::process_job_id.eq(&process_job_id))
+      .get_results::<ProcessJobVideoStream>(db)
+      .map_err(|err| {
+        let err_msg = format!("Failed to delete
+ process job video streams for process job:
+        {:?}\nError: {:?}", process_job_id, err);
+        eprintln!("{err_msg:?}");
+        return MKError::new(MKErrorType::DBError, err_msg);
+      });
+
+    let _ = diesel::delete(process_job_audio_streams::table)
+      .filter(process_job_audio_streams::process_job_id.eq(&process_job_id))
+      .get_results::<ProcessJobAudioStream>(db)
+      .map_err(|err| {
+        let err_msg = format!("Failed to delete
+ process job audio streams for process job:
+        {:?}\nError: {:?}", process_job_id, err);
+        eprintln!("{err_msg:?}");
+        return MKError::new(MKErrorType::DBError, err_msg);
+      });
+
+    let _ = diesel::delete(process_job_subtitle_streams::table)
+      .filter(process_job_subtitle_streams::process_job_id.eq(&process_job_id))
+      .get_results::<ProcessJobSubtitleStream>(db)
+      .map_err(|err| {
+        let err_msg = format!("Failed to delete
+ process job subtitle streams for process job: {:?}\nError: {:?}",
+        process_job_id, err);
+        eprintln!("{err_msg:?}");
+        return MKError::new(MKErrorType::DBError, err_msg);
+      });
+
+    let _ = diesel::delete(process_jobs::table)
+      .filter(process_jobs::id.eq(&process_job_id))
+      .get_results::<ProcessJob>(db)
+      .map_err(|err| {
+        let err_msg = format!("Failed to delete process job:
+        {:?}\nError: {:?}", process_job_id, err);
+        eprintln!("{err_msg:?}");
+        return MKError::new(MKErrorType::DBError, err_msg);
+      });
+
+    if batch_process_jobs.len() == 1 {
+      let _ = diesel::delete(batches::table)
+        .filter(batches::id.eq(&process_job.batch_id))
+        .get_results::<Batch>(db)
+        .map_err(|err| {
+          let err_msg = format!("Failed to delete batch:
+          {:?}\nError: {:?}", process_job.batch_id, err);
+          eprintln!("{err_msg:?}");
+          return MKError::new(MKErrorType::DBError, err_msg);
+        });
+    }
+
+    return Ok("deleted process_job.".to_string());
+  });
+}
+
+pub fn delete_process_jobs_for_video(video_id: String, pool: web::Data<DBPool>)
+  -> Result<String, MKError>
+{
+  let mut pool_clone = pool.clone();
+  let video_id_clone = video_id.clone();
+
+  let process_jobs =
+    match select_process_jobs_for_video(video_id_clone, pool_clone)
+    {
+        Ok(process_job) => { process_job },
+        Err(err) => { return Err(err); }
+    };
+
+  pool_clone = pool.clone();
+  let mut db = match get_db_conn(pool_clone) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
+
+  return db.transaction(|_|
+  {
+    for process_job in process_jobs {
+      let pool_clone = pool.clone();
+      match delete_process_job(process_job.id, pool_clone) {
+        Ok(_) => (),
+        Err(err) => { return Err(err); }
+      }
+    }
+
+    return Ok("Deleted all process jobs.".to_string());
+  });
 }

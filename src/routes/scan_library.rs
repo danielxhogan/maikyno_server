@@ -75,7 +75,7 @@ use crate::utils::{
   }
 };
 
-use actix_web::{post, web};
+use actix_web::{ post, web };
 use serde::Deserialize;
 
 #[derive(Deserialize, Clone)]

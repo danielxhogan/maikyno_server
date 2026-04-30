@@ -2,7 +2,7 @@ use crate::db::{
   config::db_connect::DBPool,
   media::select_media_dir,
   proc::{
-    get_media_dir_streams,
+    select_streams_for_media_dir,
     create_batch,
     select_process_jobs_for_media_dir,
     update_batch_abort
@@ -190,13 +190,13 @@ pub async fn scan_media_streams(
 
   let media_dir_id_clone = scan_media_dir_streams_info.media_dir_id.clone();
   let block_thread_result = web::block(|| {
-    return get_media_dir_streams(media_dir_id_clone, pool);
+    return select_streams_for_media_dir(media_dir_id_clone, pool);
   }).await;
 
   let media_dir_streams = match block_thread_result
   {
     Ok(media_dir_streams_result) => {
-      match media_dir_streams_result.await {
+      match media_dir_streams_result {
         Ok(media_dir_streams) => { media_dir_streams },
         Err(err) => { return Err(err.into()); }
       }

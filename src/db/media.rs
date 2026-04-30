@@ -1,22 +1,26 @@
 use crate::db::{
   config::{
-    db_connect::{get_db_conn, DBPool},
+    db_connect::{ DBPool, get_db_conn },
     models::{
       Library,
-      Show,
       MediaDir,
       NewMediaDir,
       NewVideo,
+      Show,
       UpdateMediaDir,
       UpdateVideo,
       Video
     },
-    schema::{media_dirs, videos}
+    schema::{ media_dirs, videos }
   },
-  collection::delete_collection_movies_for_movie
+  collection::delete_collection_movies_for_movie,
+  proc::{
+    delete_streams,
+    delete_process_jobs_for_video,
+  }
 };
 
-use crate::utils::mk_error::{MKError, MKErrorType};
+use crate::utils::mk_error::{ MKError, MKErrorType };
 
 use actix_web::web;
 use diesel::prelude::*;
@@ -491,41 +495,105 @@ pub fn update_video(pool: web::Data<DBPool>, update_video: UpdateVideo)
 pub fn delete_video(pool: web::Data<DBPool>, video: Video)
   -> Result<Option<Video>, MKError>
 {
-  let mut db = match get_db_conn(pool) {
+  let pool_clone = pool.clone();
+  let mut db = match get_db_conn(pool_clone) {
     Ok(db) => { db }, Err(err) => { return Err(err); }
   };
 
-  let deleted_video_result = diesel::delete(videos::table)
-    .filter(videos::id.eq(&video.id))
-    .get_result::<Video>(&mut db).optional()
-    .map_err(|err| {
-      let err_msg = format!("Failed to delete video: {:?}, {:?}\nError: {:?}",
-        video.name, video.id, err);
+  return db.transaction(|db|
+  {
+    let mut pool_clone = pool.clone();
+    let mut video_id_clone = video.id.clone();
 
-      eprintln!("{err_msg:?}");
-      return MKError::new(MKErrorType::DBError, err_msg);
-    });
+    match delete_streams(video_id_clone, pool_clone) {
+      Ok(_) => (),
+      Err(err) => { return Err(err); }
+    }
 
-  return deleted_video_result;
+    pool_clone = pool.clone();
+    video_id_clone = video.id.clone();
+
+    match delete_process_jobs_for_video(video_id_clone, pool_clone) {
+      Ok(_) => (),
+      Err(err) => { return Err(err); }
+    }
+
+    return diesel::delete(videos::table)
+      .filter(videos::id.eq(&video.id))
+      .get_result::<Video>(db).optional()
+      .map_err(|err| {
+        let err_msg = format!("Failed to delete video: {:?}, {:?}\nError: {:?}",
+          video.name, video.id, err);
+        eprintln!("{err_msg:?}");
+        return MKError::new(MKErrorType::DBError, err_msg);
+      });
+  });
+}
+
+pub fn delete_video_by_id(pool: web::Data<DBPool>, video_id: String)
+  -> Result<Option<Video>, MKError>
+{
+  let pool_clone = pool.clone();
+  let mut db = match get_db_conn(pool_clone) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
+
+  return db.transaction(|db|
+  {
+    let mut pool_clone = pool.clone();
+    let mut video_id_clone = video_id.clone();
+
+    match delete_streams(video_id_clone, pool_clone) {
+      Ok(_) => (),
+      Err(err) => { return Err(err); }
+    }
+
+    pool_clone = pool.clone();
+    video_id_clone = video_id.clone();
+
+    match delete_process_jobs_for_video(video_id_clone, pool_clone) {
+      Ok(_) => (),
+      Err(err) => { return Err(err); }
+    }
+
+    return diesel::delete(videos::table)
+      .filter(videos::id.eq(&video_id))
+      .get_result::<Video>(db).optional()
+      .map_err(|err| {
+        let err_msg = format!("Failed to delete video: {:?}\nError: {:?}",
+          &video_id, err);
+        eprintln!("{err_msg:?}");
+        return MKError::new(MKErrorType::DBError, err_msg);
+      });
+  });
 }
 
 pub fn delete_videos(pool: web::Data<DBPool>, media_dir: MediaDir)
-  -> Result<Vec<Video>, MKError>
+  -> Result<String, MKError>
 {
-  let mut db = match get_db_conn(pool) {
+  let mut pool_clone = pool.clone();
+  let media_dir_id = media_dir.id.clone();
+
+  let videos = match select_videos_by_id(pool_clone, media_dir_id) {
+    Ok(videos) => { videos },
+    Err(err) => { return Err(err); }
+  };
+
+  pool_clone = pool.clone();
+  let mut db = match get_db_conn(pool_clone) {
     Ok(db) => { db }, Err(err) => { return Err(err); }
   };
 
-  let deleted_videos_result = diesel::delete(videos::table)
-    .filter(videos::id.eq(&media_dir.id))
-    .get_results::<Video>(&mut db)
-    .map_err(|err| {
-      let err_msg = format!("Failed to delete videos for media dir:
-        {:?}, {:?}\nError: {:?}", media_dir.real_path, media_dir.id, err);
+  return db.transaction(|_|
+  {
+    for video in videos {
+      let pool_clone = pool.clone();
+      match delete_video(pool_clone, video) {
+        Ok(_) => (),
+        Err(err) => { return Err(err); }
+      }
+    }
 
-      eprintln!("{err_msg:?}");
-      return MKError::new(MKErrorType::DBError, err_msg);
-    });
-
-  return deleted_videos_result;
+    return Ok("deleted videos.".to_string());
+  });
 }
