@@ -138,27 +138,26 @@ pub fn select_libraries(pool: web::Data<DBPool>) -> Result<Vec<Library>, MKError
     return libraries_result;
 }
 
-pub fn select_library_dirs(pool: web::Data<DBPool>, library: Library)
-  -> Result<Vec<LibraryDir>, MKError>
+pub fn delete_library(library_id: String, pool: web::Data<DBPool>)
+-> Result<Library, MKError>
 {
   let mut db = match get_db_conn(pool) {
     Ok(db) => { db }, Err(err) => { return Err(err); }
   };
 
-  let library_dirs_result = library_dirs::table
-    .filter(library_dirs::library_id.eq(&library.id))
-    .get_results::<LibraryDir>(&mut db)
+  let delete_library_result = diesel::delete(libraries::table)
+    .filter(libraries::id.eq(&library_id))
+    .get_result::<Library>(&mut db)
     .map_err(|err| {
-      let err_msg = format!("Failed to get library dirs for library:
-      {:?}\nError: {:?}", library.name, err);
+      let err_ctx_msg = format!("Failed to delete library: {:?}\nError: {:?}",
+        library_id, err);
 
-      eprintln!("{err_msg:?}");
-      return MKError::new(MKErrorType::DBError, err_msg);
+      eprintln!("{err_ctx_msg:?}");
+      return MKError::new(MKErrorType::DBError, err_ctx_msg);
     });
 
-  return library_dirs_result;
+  return delete_library_result;
 }
-
 pub fn create_library_dirs(pool: web::Data<DBPool>,
   new_library_dirs: Vec<NewLibraryDir>, library_id: String)
   -> Result<String, MKError>
@@ -205,24 +204,23 @@ pub fn create_library_dirs(pool: web::Data<DBPool>,
   }
 }
 
-// pub fn delete_library(pool: web::Data<DBPool>, library: Library)
-// -> Result<Library, MKError>
-// {
-//   let mut db = match get_db_conn(pool) {
-//     Ok(db) => { db }, Err(err) => { return Err(err); }
-//   };
+pub fn select_library_dirs(pool: web::Data<DBPool>, library: Library)
+  -> Result<Vec<LibraryDir>, MKError>
+{
+  let mut db = match get_db_conn(pool) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
 
-//   let delete_library_result = diesel::delete(libraries::table)
-//     .filter(libraries::id.eq(library.id))
-//     // .execute(&mut db)
-//     .get_result::<Library>(&mut db)
-//     .map_err(|err| {
-//       let err_ctx_msg = format!("Failed to delete library: {:?}\nError: {:?}",
-//         library.name, err);
+  let library_dirs_result = library_dirs::table
+    .filter(library_dirs::library_id.eq(&library.id))
+    .get_results::<LibraryDir>(&mut db)
+    .map_err(|err| {
+      let err_msg = format!("Failed to get library dirs for library:
+      {:?}\nError: {:?}", library.name, err);
 
-//       eprintln!("{err_ctx_msg:?}");
-//       return MKError::new(MKErrorType::DBError, err_ctx_msg);
-//     });
+      eprintln!("{err_msg:?}");
+      return MKError::new(MKErrorType::DBError, err_msg);
+    });
 
-//   return delete_library_result;
-// }
+  return library_dirs_result;
+}

@@ -7,9 +7,10 @@ use crate::db::{
     MediaType,
     string_to_media_type,
     create_library,
-    create_library_dirs,
     select_library,
-    select_libraries
+    select_libraries,
+    delete_library,
+    create_library_dirs,
   },
   collection::{
     select_collections_by_id,
@@ -50,6 +51,11 @@ struct NewLibraryParams {
   name: String,
   paths: Vec<String>,
   media_type: String
+}
+
+#[derive(Deserialize)]
+struct RemoveLibraryParams {
+  library_id: String,
 }
 
 #[derive(Deserialize)]
@@ -378,6 +384,59 @@ pub async fn new_library(new_library_params: web::Json<NewLibraryParams>,
   }
 }
 
+#[post("/get_libraries")]
+pub async fn get_libraries(pool: web::Data<DBPool>)
+  -> impl Responder
+{
+  let block_thread_result = web::block(|| {
+    return select_libraries(pool);
+  }).await;
+
+  let libraries = match block_thread_result
+  {
+    Ok(libraries_result) => {
+      match libraries_result
+      {
+        Ok(libraries) => { libraries },
+        Err(err) => { return Err(err); }
+      }
+    },
+    Err(err) => {
+      return Err(blocking_error(err));
+    }
+  };
+
+  return Ok(web::Json(libraries));
+}
+
+#[post("/remove_library")]
+pub async fn remove_library(
+  remove_library_params: web::Json<RemoveLibraryParams>,
+  pool: web::Data<DBPool>)
+  -> Result<String, MKError>
+{
+  let library_id_clone = remove_library_params.library_id.clone();
+  let block_thread_result = web::block(|| {
+    return delete_library(library_id_clone, pool);
+  }).await;
+
+  match block_thread_result
+  {
+    Ok(delete_library_result) => {
+      match delete_library_result
+      {
+        Ok(_) => (),
+        Err(err) => { return Err(err); }
+      }
+    },
+    Err(err) => {
+      return Err(blocking_error(err));
+    }
+  };
+
+  return Ok("deleted library.".to_string());
+}
+
 #[post("/add_library_dirs")]
 pub async fn add_library_dirs(new_library_dir_params: web::Json<NewLibraryDirParams>,
   pool: web::Data<DBPool>, app_state: web::Data<AppState>)
@@ -456,31 +515,6 @@ pub async fn add_library_dirs(new_library_dir_params: web::Json<NewLibraryDirPar
   }
 
   return Ok("hi".to_string());
-}
-
-#[post("/get_libraries")]
-pub async fn get_libraries(pool: web::Data<DBPool>)
-  -> impl Responder
-{
-  let block_thread_result = web::block(|| {
-    return select_libraries(pool);
-  }).await;
-
-  let libraries = match block_thread_result
-  {
-    Ok(libraries_result) => {
-      match libraries_result
-      {
-        Ok(libraries) => { libraries },
-        Err(err) => { return Err(err); }
-      }
-    },
-    Err(err) => {
-      return Err(blocking_error(err));
-    }
-  };
-
-  return Ok(web::Json(libraries));
 }
 
 #[post("/get_collections")]

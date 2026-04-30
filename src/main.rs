@@ -13,6 +13,7 @@ use routes::{
     new_library,
     add_library_dirs,
     get_libraries,
+    remove_library,
     get_collections,
     get_shows,
     get_collection_shows,
@@ -67,8 +68,9 @@ async fn main() -> std::io::Result<()>
       .app_data(web::Data::new(pool.clone()))
       .app_data(web::Data::new(app_state.clone()))
       .service(new_library)
-      .service(add_library_dirs)
       .service(get_libraries)
+      .service(remove_library)
+      .service(add_library_dirs)
       .service(get_collections)
       .service(scan_library)
       .service(get_shows)
