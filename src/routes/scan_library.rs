@@ -1703,7 +1703,7 @@ pub async fn scan_library(scan_library_info: web::Json<ScanLibraryParams>,
   let mut show: Show;
   let mut collection: Collection;
 
-  if library_record.media_type == MediaType::Movie.to_string()
+  if library_record.media_type == MediaType::MOVIE.to_string()
   {
     let mut movies_seen =
       match get_initial_movies(&library_record, &pool).await
@@ -1757,7 +1757,7 @@ pub async fn scan_library(scan_library_info: web::Json<ScanLibraryParams>,
       }
     }
   }
-  else if library_record.media_type == MediaType::Show.to_string()
+  else if library_record.media_type == MediaType::SHOW.to_string()
   {
     let mut shows_seen =
       match get_initial_shows(&library_record, &pool).await

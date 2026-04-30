@@ -10,14 +10,36 @@ use diesel::prelude::*;
 use uuid::Uuid;
 use derive_more::Display;
 use serde::Deserialize;
+use std::str::FromStr;
 
 #[derive(Display, Deserialize, PartialEq)]
 pub enum MediaType {
   #[display("movie")]
-  Movie,
+  MOVIE,
 
   #[display("show")]
-  Show
+  SHOW,
+
+  #[display("none")]
+  NONE
+}
+
+impl FromStr for MediaType {
+  type Err = ();
+
+  fn from_str(input: &str) -> Result<Self, Self::Err>
+  {
+    match input {
+      "movie" => Ok(MediaType::MOVIE),
+      "show" => Ok(MediaType::SHOW),
+      _ => Ok(MediaType::NONE)
+    }
+  }
+}
+
+pub fn string_to_media_type(media_type: &str) -> MediaType
+{
+  return media_type.parse().unwrap_or(MediaType::NONE);
 }
 
 pub fn create_library(pool: web::Data<DBPool>, new_library: NewLibrary,

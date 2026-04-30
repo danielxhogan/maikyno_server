@@ -5,6 +5,7 @@ use crate::db::{
   },
   library::{
     MediaType,
+    string_to_media_type,
     create_library,
     create_library_dirs,
     select_library,
@@ -249,16 +250,10 @@ pub async fn new_library(new_library_params: web::Json<NewLibraryParams>,
   pool: web::Data<DBPool>, app_state: web::Data<AppState>)
   -> actix_web::Result<String>
 {
-  let media_type: MediaType;
   let mut err_msg: String;
 
-  if new_library_params.media_type == MediaType::Movie.to_string() {
-    media_type = MediaType::Movie;
-  }
-  else if new_library_params.media_type == MediaType::Show.to_string() {
-    media_type = MediaType::Show;
-  }
-  else {
+  let media_type = string_to_media_type(&new_library_params.media_type);
+  if media_type == MediaType::NONE {
     err_msg = format!("{:?}: {:?}",
       MKErrorType::InvalidMediaType.to_string(), &new_library_params.media_type);
 

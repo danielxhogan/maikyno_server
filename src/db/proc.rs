@@ -33,7 +33,7 @@ use crate::utils::{
 };
 
 use actix_web::web;
-use chrono::{Local, NaiveDateTime};
+use chrono::Local;
 use diesel::prelude::*;
 use uuid::Uuid;
 
@@ -149,7 +149,7 @@ pub async fn create_batch(process_media_info: ProcessMediaParams,
 
     let block_thread_result = web::block(move || {
       return create_process_job(batch_id_clone,
-        video_info_clone, created, pool_clone);
+        video_info_clone, pool_clone);
     }).await;
 
     match block_thread_result {
@@ -168,7 +168,7 @@ pub async fn create_batch(process_media_info: ProcessMediaParams,
 }
 
 pub async fn create_process_job(batch_id: String,
-  video_info: ProcessVideoParams, created: NaiveDateTime,
+  video_info: ProcessVideoParams,
   pool: web::Data<DBPool>) -> Result<ProcessJob, MKError>
 {
   let mut stream_count = 1;
@@ -442,7 +442,7 @@ pub async fn select_process_jobs_for_media_dir(media_dir_id: String,
 
         current_batch_id = Some(process_job.batch_id.clone());
 
-        let batch = match block_thread_result
+        batch = match block_thread_result
         {
           Ok(batch_result) => {
             match batch_result {
