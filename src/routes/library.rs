@@ -11,6 +11,7 @@ use crate::db::{
     select_libraries,
     delete_library,
     create_library_dirs,
+    delete_library_dir
   },
   collection::{
     select_collections_by_id,
@@ -62,6 +63,11 @@ struct RemoveLibraryParams {
 struct NewLibraryDirParams {
   library_id: String,
   paths: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct RemoveLibraryDirParams {
+  library_dir_id: String,
 }
 
 #[derive(Deserialize)]
@@ -438,7 +444,8 @@ pub async fn remove_library(
 }
 
 #[post("/add_library_dirs")]
-pub async fn add_library_dirs(new_library_dir_params: web::Json<NewLibraryDirParams>,
+pub async fn add_library_dirs(
+  new_library_dir_params: web::Json<NewLibraryDirParams>,
   pool: web::Data<DBPool>, app_state: web::Data<AppState>)
   -> actix_web::Result<String>
 {
@@ -515,6 +522,40 @@ pub async fn add_library_dirs(new_library_dir_params: web::Json<NewLibraryDirPar
   }
 
   return Ok("hi".to_string());
+}
+
+#[post("/remove_library_dir")]
+pub async fn remove_library_dir(
+  remove_library_dir_params: web::Json<RemoveLibraryDirParams>,
+  pool: web::Data<DBPool>) -> Result<String, MKError>
+{
+  let library_dir_id_clone = remove_library_dir_params.library_dir_id.clone();
+  let block_thread_result = web::block(|| {
+    return delete_library_dir(library_dir_id_clone, pool)
+  }).await;
+
+  let delete_library_dir_result = match block_thread_result {
+    Ok(delete_library_dir_result) => { delete_library_dir_result },
+    Err(err) => {
+      return Err(blocking_error(err));
+    }
+  };
+
+  let library_dir = match delete_library_dir_result {
+    Ok(library_dir) => { library_dir },
+    Err(err) => { return Err(err); }
+  };
+
+  match mk_remove_dir_all(&library_dir.symlink_path) {
+    Ok(_) => {},
+    Err(err) => {
+      eprintln!("{err:?}");
+      return Err(MKError::new(
+        MKErrorType::LibrarySymlinkError, err.message).into());
+    }
+  }
+
+  return Ok("deleted library dir.".to_string());
 }
 
 #[post("/get_collections")]

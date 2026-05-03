@@ -224,3 +224,24 @@ pub fn select_library_dirs(pool: web::Data<DBPool>, library: Library)
 
   return library_dirs_result;
 }
+
+pub fn delete_library_dir(library_dir_id: String, pool: web::Data<DBPool>)
+  -> Result<LibraryDir, MKError>
+{
+  let mut db = match get_db_conn(pool) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
+
+  let delete_library_dir_result = diesel::delete(library_dirs::table)
+    .filter(library_dirs::id.eq(&library_dir_id))
+    .get_result::<LibraryDir>(&mut db)
+    .map_err(|err| {
+      let err_ctx_msg = format!("Failed to delete library dir: {:?}\nError: {:?}",
+        library_dir_id, err);
+
+      eprintln!("{err_ctx_msg:?}");
+      return MKError::new(MKErrorType::DBError, err_ctx_msg);
+    });
+
+  return delete_library_dir_result;
+}

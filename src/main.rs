@@ -12,6 +12,7 @@ use routes::{
   library::{
     new_library,
     add_library_dirs,
+    remove_library_dir,
     get_libraries,
     remove_library,
     get_collections,
@@ -71,6 +72,7 @@ async fn main() -> std::io::Result<()>
       .service(get_libraries)
       .service(remove_library)
       .service(add_library_dirs)
+      .service(remove_library_dir)
       .service(get_collections)
       .service(scan_library)
       .service(get_shows)
