@@ -10,6 +10,7 @@ use crate::db::{
     select_library,
     select_libraries,
     delete_library,
+    select_library_dirs_by_id,
     create_library_dirs,
     delete_library_dir
   },
@@ -38,7 +39,6 @@ use crate::utils::{
 
 use actix_web::{ Responder, post, web };
 use serde::Deserialize;
-use serde_json;
 
 use std::{
   ffi::OsStr,
@@ -56,6 +56,11 @@ struct NewLibraryParams {
 
 #[derive(Deserialize)]
 struct RemoveLibraryParams {
+  library_id: String,
+}
+
+#[derive(Deserialize)]
+struct GetLibraryDirsParams {
   library_id: String,
 }
 
@@ -260,7 +265,7 @@ fn create_new_library_dirs(new_paths: Vec<String>, root_library_dir: &String,
 #[post("/new_library")]
 pub async fn new_library(new_library_params: web::Json<NewLibraryParams>,
   pool: web::Data<DBPool>, app_state: web::Data<AppState>)
-  -> actix_web::Result<String>
+  -> impl Responder
 {
   let mut err_msg: String;
 
@@ -268,9 +273,8 @@ pub async fn new_library(new_library_params: web::Json<NewLibraryParams>,
   if media_type == MediaType::NONE {
     err_msg = format!("{:?}: {:?}",
       MKErrorType::InvalidMediaType.to_string(), &new_library_params.media_type);
-
     eprintln!("{err_msg}");
-    return Err(MKError::new(MKErrorType::InvalidMediaType, err_msg).into());
+    return Err(MKError::new(MKErrorType::InvalidMediaType, err_msg));
   }
 
   let root_library_dir = format!("{}/{}",
@@ -279,7 +283,6 @@ pub async fn new_library(new_library_params: web::Json<NewLibraryParams>,
   if PathBuf::from(&root_library_dir).exists() {
     let err_msg = format!("Library: {:?} already exists.",
     &new_library_params.name);
-
     eprintln!("{err_msg}");
     return Err(MKError::new(MKErrorType::LibraryAlreadyExists, err_msg).into())
   }
@@ -379,15 +382,7 @@ pub async fn new_library(new_library_params: web::Json<NewLibraryParams>,
     }
   };
 
-  match serde_json::to_string(&library) {
-    Ok(library) => { Ok(library) },
-    Err(err) => {
-      err_msg = format!("{:?}: {:?}\nSuccessfully created library: {:?}",
-        MKErrorType::SerializeError.to_string(), err, library.name);
-      eprintln!("{err_msg}");
-      return Err(MKError::new(MKErrorType::SerializeError, err_msg).into());
-    }
-  }
+  return Ok(web::Json(library));
 }
 
 #[post("/get_libraries")]
@@ -441,6 +436,27 @@ pub async fn remove_library(
   };
 
   return Ok("deleted library.".to_string());
+}
+
+#[post("/get_library_dirs")]
+pub async fn get_library_dirs(
+  get_library_dirs_params: web::Json<GetLibraryDirsParams>,
+  pool: web::Data<DBPool>) -> impl Responder
+{
+  let library_id_clone = get_library_dirs_params.library_id.clone();
+  let block_thread_result = web::block(|| {
+    return select_library_dirs_by_id(pool, library_id_clone);
+  }).await;
+
+  let library_dirs_result = match block_thread_result {
+    Ok(library_dirs_result) => { library_dirs_result },
+    Err(err) => { return Err(blocking_error(err)); }
+  };
+
+  match library_dirs_result  {
+    Ok(library_dirs) => { return Ok(web::Json(library_dirs)); },
+    Err(err) => { return Err(err); }
+  };
 }
 
 #[post("/add_library_dirs")]
@@ -547,7 +563,7 @@ pub async fn remove_library_dir(
   };
 
   match mk_remove_dir_all(&library_dir.symlink_path) {
-    Ok(_) => {},
+    Ok(_) => (),
     Err(err) => {
       eprintln!("{err:?}");
       return Err(MKError::new(
@@ -559,7 +575,8 @@ pub async fn remove_library_dir(
 }
 
 #[post("/get_collections")]
-pub async fn get_collections(get_collections_params: web::Json<GetCollectionsParams>,
+pub async fn get_collections(
+  get_collections_params: web::Json<GetCollectionsParams>,
   pool: web::Data<DBPool>) -> impl Responder
 {
   let library_id_clone = get_collections_params.library_id.clone();

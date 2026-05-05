@@ -34,7 +34,7 @@ pub struct NewLibrary {
   pub media_type: String
 }
 
-#[derive(Debug, Queryable, Insertable, Clone)]
+#[derive(Debug, Queryable, Insertable, Clone, Serialize)]
 #[diesel(table_name = library_dirs)]
 pub struct LibraryDir {
   pub id: String,

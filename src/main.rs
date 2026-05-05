@@ -11,10 +11,11 @@ use db::config::db_connect::db_pool_init;
 use routes::{
   library::{
     new_library,
-    add_library_dirs,
-    remove_library_dir,
     get_libraries,
     remove_library,
+    get_library_dirs,
+    add_library_dirs,
+    remove_library_dir,
     get_collections,
     get_shows,
     get_collection_shows,
@@ -71,6 +72,7 @@ async fn main() -> std::io::Result<()>
       .service(new_library)
       .service(get_libraries)
       .service(remove_library)
+      .service(get_library_dirs)
       .service(add_library_dirs)
       .service(remove_library_dir)
       .service(get_collections)
