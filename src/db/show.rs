@@ -117,6 +117,36 @@ pub fn update_show(pool: web::Data<DBPool>, update_show: UpdateShow)
   return updated_show_result;
 }
 
+pub fn delete_shows(library_id: String, pool: web::Data<DBPool>)
+  -> Result<String, MKError>
+{
+  let pool_clone = pool.clone();
+  let mut db = match get_db_conn(pool_clone) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
+
+  return db.transaction(|_|
+  {
+    let mut pool_clone = pool.clone();
+    let library_id_clone = library_id;
+
+    let shows = match select_shows_by_id(library_id_clone, pool_clone) {
+      Ok(shows) => { shows },
+      Err(err) => { return Err(err); }
+    };
+
+    for show in shows {
+      pool_clone = pool.clone();
+      match delete_show(pool_clone, show) {
+        Ok(_) => (),
+        Err(err) => { return Err(err); }
+      }
+    }
+
+    return Ok("Deleted shows.".to_string());
+  });
+}
+
 pub fn delete_show(pool: web::Data<DBPool>, show: Show)
   -> Result<Option<Show>, MKError>
 {

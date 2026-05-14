@@ -114,6 +114,25 @@ pub fn select_movies(pool: web::Data<DBPool>, library: Library)
   return media_result;
 }
 
+pub fn select_movies_by_id(library_id: String, pool: web::Data<DBPool>)
+  -> Result<Vec<MediaDir>, MKError>
+{
+  let mut db = match get_db_conn(pool) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
+
+  return media_dirs::table
+    .filter(media_dirs::library_id.eq(&library_id))
+    .order_by(media_dirs::name)
+    .get_results::<MediaDir>(&mut db)
+    .map_err(|err| {
+      let err_msg = format!("Failed to get movies for library:
+ {:?}\nError: {:?}", library_id, err);
+      eprintln!("{err_msg:?}");
+      return MKError::new(MKErrorType::DBError, err_msg);
+    });
+}
+
 pub fn select_seasons(pool: web::Data<DBPool>, show: Show)
   -> Result<Vec<MediaDir>, MKError>
 {
@@ -183,6 +202,36 @@ pub fn update_media_dir(pool: web::Data<DBPool>,
     });
 
   return updated_media_dir_result;
+}
+
+pub fn delete_media_dirs(library_id: String, pool: web::Data<DBPool>)
+  -> Result<String, MKError>
+{
+  let pool_clone = pool.clone();
+  let mut db = match get_db_conn(pool_clone) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
+
+  return db.transaction(|_|
+  {
+    let mut pool_clone = pool.clone();
+    let library_id_clone = library_id;
+
+    let media_dirs = match select_movies_by_id(library_id_clone, pool_clone) {
+      Ok(media_dirs) => { media_dirs },
+      Err(err) => { return Err(err); }
+    };
+
+    for media_dir in media_dirs {
+      pool_clone = pool.clone();
+      match delete_media_dir(pool_clone, media_dir) {
+        Ok(_) => (),
+        Err(err) => { return Err(err); }
+      }
+    }
+
+    return Ok("Deleted media dirs.".to_string());
+  });
 }
 
 pub fn delete_media_dir(pool: web::Data<DBPool>, media_dir: MediaDir)

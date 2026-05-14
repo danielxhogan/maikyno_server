@@ -294,25 +294,26 @@ pub async fn new_library(new_library_params: web::Json<NewLibraryParams>,
 
   let mut new_library_dirs: Vec<NewLibraryDir> = vec![];
 
-  new_library_dirs = match create_new_library_dirs(new_library_params.paths.clone(),
-    &root_library_dir, &new_library_params.name)
-  {
-    Ok(new_library_dirs) => {new_library_dirs},
-    Err(err) => {
-      err_msg = err.message;
+  new_library_dirs =
+    match create_new_library_dirs(new_library_params.paths.clone(),
+      &root_library_dir, &new_library_params.name)
+    {
+      Ok(new_library_dirs) => {new_library_dirs},
+      Err(err) => {
+        err_msg = err.message;
 
-      match mk_remove_dir_all(&root_library_dir) {
-        Ok(_) => {},
-        Err(err) => {
-          err_msg = format!("{:?}\n{:?}", err_msg, err.message);
+        match mk_remove_dir_all(&root_library_dir) {
+          Ok(_) => {},
+          Err(err) => {
+            err_msg = format!("{:?}\n{:?}", err_msg, err.message);
+          }
         }
-      }
 
-      eprintln!("{err_msg:?}");
-      return Err(MKError::new(
-        MKErrorType::LibraryPathNotFoundError, err_msg).into());
-    }
-  };
+        eprintln!("{err_msg:?}");
+        return Err(MKError::new(
+          MKErrorType::LibraryPathNotFoundError, err_msg).into());
+      }
+    };
 
   for new_library_dir in new_library_dirs.clone()
   {
@@ -350,26 +351,10 @@ pub async fn new_library(new_library_params: web::Json<NewLibraryParams>,
     return create_library(pool_clone, new_library, new_library_dirs);
   }).await;
 
-  let library = match block_thread_result
-  {
-    Ok(create_library_result) => {
-      match create_library_result
-      {
-        Ok(library) => { library },
-        Err(err) => {
-          match mk_remove_dir_all(&root_library_dir) {
-            Ok(_) => {},
-            Err(rm_dir_err) => {
-              err_msg = format!("{:?}\n{:?}", err.message, rm_dir_err.message);
-              eprintln!("{err_msg}");
-              return Err(MKError::new(err.err_type, err_msg).into());
-            }
-          }
-          return Err(err.into());
-        }
-      }
-    },
-    Err(err) => {
+  let create_library_result = match block_thread_result {
+    Ok(create_library_result) => { create_library_result },
+    Err(err) =>
+    {
       match mk_remove_dir_all(&root_library_dir) {
         Ok(_) => {},
         Err(rm_dir_err) => {
@@ -378,7 +363,25 @@ pub async fn new_library(new_library_params: web::Json<NewLibraryParams>,
           return Err(blocking_error(err).into());
         }
       }
+
       return Err(blocking_error(err).into());
+    }
+  };
+
+  let library = match create_library_result {
+    Ok(library) => { library },
+    Err(err) =>
+    {
+      match mk_remove_dir_all(&root_library_dir) {
+        Ok(_) => {},
+        Err(rm_dir_err) => {
+          err_msg = format!("{:?}\n{:?}", err.message, rm_dir_err.message);
+          eprintln!("{err_msg}");
+          return Err(MKError::new(err.err_type, err_msg).into());
+        }
+      }
+
+      return Err(err.into());
     }
   };
 
@@ -421,21 +424,15 @@ pub async fn remove_library(
     return delete_library(library_id_clone, pool);
   }).await;
 
-  match block_thread_result
-  {
-    Ok(delete_library_result) => {
-      match delete_library_result
-      {
-        Ok(_) => (),
-        Err(err) => { return Err(err); }
-      }
-    },
-    Err(err) => {
-      return Err(blocking_error(err));
-    }
+  let delete_library_result = match block_thread_result {
+    Ok(delete_library_result) => { delete_library_result },
+    Err(err) => { return Err(blocking_error(err)); }
   };
 
-  return Ok("deleted library.".to_string());
+  match delete_library_result {
+    Ok(_) => { return Ok("deleted library.".to_string()); },
+    Err(err) => { return Err(err); }
+  };
 }
 
 #[post("/get_library_dirs")]

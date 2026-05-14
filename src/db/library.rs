@@ -1,9 +1,15 @@
-use crate::db::config::{
-  db_connect::{get_db_conn, DBPool},
-  models::{Library, NewLibrary, LibraryDir, NewLibraryDir},
-  schema::{libraries, library_dirs}
+use crate::db::{
+  config::{
+    db_connect::{ DBPool, get_db_conn },
+    models::{ Library, LibraryDir, NewLibrary, NewLibraryDir },
+    schema::{ libraries, library_dirs }
+  },
+  show::delete_shows,
+  media::delete_media_dirs,
+  collection::delete_collections
 };
-use crate::utils::mk_error::{MKError, MKErrorType};
+
+use crate::utils::mk_error::{ MKError, MKErrorType };
 
 use actix_web::web;
 use diesel::prelude::*;
@@ -141,22 +147,55 @@ pub fn select_libraries(pool: web::Data<DBPool>) -> Result<Vec<Library>, MKError
 pub fn delete_library(library_id: String, pool: web::Data<DBPool>)
 -> Result<Library, MKError>
 {
-  let mut db = match get_db_conn(pool) {
+  let pool_clone = pool.clone();
+  let mut db = match get_db_conn(pool_clone) {
     Ok(db) => { db }, Err(err) => { return Err(err); }
   };
 
-  let delete_library_result = diesel::delete(libraries::table)
-    .filter(libraries::id.eq(&library_id))
-    .get_result::<Library>(&mut db)
-    .map_err(|err| {
-      let err_ctx_msg = format!("Failed to delete library: {:?}\nError: {:?}",
-        library_id, err);
+  return db.transaction(|db|
+  {
+    let mut pool_clone = pool.clone();
+    let mut library_id_clone = library_id.clone();
 
-      eprintln!("{err_ctx_msg:?}");
-      return MKError::new(MKErrorType::DBError, err_ctx_msg);
-    });
+    match delete_library_dirs(library_id_clone, pool_clone) {
+      Ok(_) => (),
+      Err(err) => { return Err(err); }
+    }
 
-  return delete_library_result;
+    pool_clone = pool.clone();
+    library_id_clone = library_id.clone();
+
+    match delete_shows(library_id_clone, pool_clone) {
+      Ok(_) => (),
+      Err(err) => { return Err(err); }
+    }
+
+    pool_clone = pool.clone();
+    library_id_clone = library_id.clone();
+
+    match delete_media_dirs(library_id_clone, pool_clone) {
+      Ok(_) => (),
+      Err(err) => { return Err(err); }
+    }
+
+    pool_clone = pool.clone();
+    library_id_clone = library_id.clone();
+
+    match delete_collections(library_id_clone, pool_clone) {
+      Ok(_) => (),
+      Err(err) => { return Err(err); }
+    }
+
+    return diesel::delete(libraries::table)
+      .filter(libraries::id.eq(&library_id))
+      .get_result::<Library>(db)
+      .map_err(|err| {
+        let err_ctx_msg = format!("Failed to delete library: {:?}\nError: {:?}",
+          library_id, err);
+        eprintln!("{err_ctx_msg:?}");
+        return MKError::new(MKErrorType::DBError, err_ctx_msg);
+      });
+  });
 }
 
 pub fn select_library_dirs(pool: web::Data<DBPool>, library: Library)
@@ -245,6 +284,24 @@ pub fn create_library_dirs(pool: web::Data<DBPool>,
       return Err(MKError::new(MKErrorType::DBError, err_msg));
     }
   }
+}
+
+pub fn delete_library_dirs(library_id: String, pool: web::Data<DBPool>)
+  -> Result<Vec<LibraryDir>, MKError>
+{
+  let mut db = match get_db_conn(pool) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
+
+  return diesel::delete(library_dirs::table)
+    .filter(library_dirs::library_id.eq(&library_id))
+    .get_results::<LibraryDir>(&mut db)
+    .map_err(|err| {
+      let err_ctx_msg = format!("Failed to delete library dirs for library: \
+{:?}\nError: {:?}", library_id, err);
+      eprintln!("{err_ctx_msg:?}");
+      return MKError::new(MKErrorType::DBError, err_ctx_msg);
+    });
 }
 
 pub fn delete_library_dir(library_dir_id: String, pool: web::Data<DBPool>)

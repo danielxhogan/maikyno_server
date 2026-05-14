@@ -711,8 +711,8 @@ pub fn delete_process_jobs_for_video(video_id: String, pool: web::Data<DBPool>)
   let process_jobs =
     match select_process_jobs_for_video(video_id_clone, pool_clone)
     {
-        Ok(process_job) => { process_job },
-        Err(err) => { return Err(err); }
+      Ok(process_job) => { process_job },
+      Err(err) => { return Err(err); }
     };
 
   pool_clone = pool.clone();

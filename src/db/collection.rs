@@ -120,6 +120,36 @@ pub fn update_collection(pool: web::Data<DBPool>,
   return updated_collection_result;
 }
 
+pub fn delete_collections(library_id: String, pool: web::Data<DBPool>)
+  -> Result<String, MKError>
+{
+  let pool_clone = pool.clone();
+  let mut db = match get_db_conn(pool_clone) {
+    Ok(db) => { db }, Err(err) => { return Err(err); }
+  };
+
+  return db.transaction(|_|
+  {
+    let mut pool_clone = pool.clone();
+    let library_id_clone = library_id;
+
+    let collections = match select_collections_by_id(pool_clone, library_id_clone) {
+      Ok(collections) => { collections },
+      Err(err) => { return Err(err); }
+    };
+
+    for collection in collections {
+      pool_clone = pool.clone();
+      match delete_collection(pool_clone, collection) {
+        Ok(_) => (),
+        Err(err) => { return Err(err); }
+      }
+    }
+
+    return Ok("Deleted collections.".to_string());
+  });
+}
+
 pub fn delete_collection(pool: web::Data<DBPool>, collection: Collection)
   -> Result<Collection, MKError>
 {
